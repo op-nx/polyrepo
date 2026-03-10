@@ -73,11 +73,11 @@ describe('createNodesV2', () => {
 
     expect(targets).toBeDefined();
     expect(targets!['polyrepo-sync']).toEqual({
-      executor: 'nx-openpolyrepo:sync',
+      executor: '@op-nx/polyrepo:sync',
       options: {},
     });
     expect(targets!['polyrepo-status']).toEqual({
-      executor: 'nx-openpolyrepo:status',
+      executor: '@op-nx/polyrepo:status',
       options: {},
     });
   });

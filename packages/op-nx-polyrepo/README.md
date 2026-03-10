@@ -1,11 +1,11 @@
-# nx-openpolyrepo
+# op-nx-polyrepo
 
 This library was generated with [Nx](https://nx.dev).
 
 ## Building
 
-Run `nx build nx-openpolyrepo` to build the library.
+Run `nx build op-nx-polyrepo` to build the library.
 
 ## Running unit tests
 
-Run `nx test nx-openpolyrepo` to execute the unit tests via [Vitest](https://vitest.dev/).
+Run `nx test op-nx-polyrepo` to execute the unit tests via [Vitest](https://vitest.dev/).

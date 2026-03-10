@@ -51,7 +51,7 @@
       }
     },
     {
-      "plugin": "nx-openpolyrepo",
+      "plugin": "@op-nx/polyrepo",
       "options": {
         "repos": {
           "nx": {

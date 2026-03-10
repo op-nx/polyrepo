@@ -76,7 +76,7 @@ export default async function statusExecutor(
   );
   const pluginEntry = nxJson?.plugins?.find(
     (p) =>
-      typeof p === 'object' && 'plugin' in p && p.plugin === 'nx-openpolyrepo',
+      typeof p === 'object' && 'plugin' in p && p.plugin === '@op-nx/polyrepo',
   );
 
   const pluginOptions =

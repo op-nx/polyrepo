@@ -1,12 +1,12 @@
 {
-  "name": "nx-openpolyrepo-e2e",
+  "name": "op-nx-polyrepo-e2e",
   "version": "0.0.1",
   "private": true,
   "nx": {
     "projectType": "application",
     "sourceRoot": "packages/op-nx-polyrepo-e2e/src",
     "implicitDependencies": [
-      "nx-openpolyrepo"
+      "@op-nx/polyrepo"
     ],
     "targets": {
       "e2e": {

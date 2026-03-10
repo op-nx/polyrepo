@@ -12,7 +12,7 @@ export function validateConfig(options: unknown): PolyrepoConfig {
   const result = polyrepoConfigSchema.safeParse(options);
 
   if (!result.success) {
-    throw new Error(`Invalid nx-openpolyrepo config:\n${result.error.message}`);
+    throw new Error(`Invalid @op-nx/polyrepo config:\n${result.error.message}`);
   }
 
   return result.data;

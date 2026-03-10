@@ -1,4 +1,4 @@
-# Nx OpenPolyrepo
+# OpNx Polyrepo
 
 > An open-source Nx plugin for polyrepos.
 

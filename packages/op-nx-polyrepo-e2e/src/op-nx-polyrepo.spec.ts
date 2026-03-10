@@ -17,7 +17,7 @@ const createNxWorkspaceBin = join(
   createNxWorkspacePkg.bin['create-nx-workspace'],
 );
 
-describe('nx-openpolyrepo', () => {
+describe('@op-nx/polyrepo', () => {
   let projectDirectory: string;
 
   beforeAll(() => {
@@ -25,7 +25,7 @@ describe('nx-openpolyrepo', () => {
 
     // The plugin has been built and published to a local registry in the Vitest globalSetup
     // Install the plugin built with the latest source code into the test repo
-    execSync(`npm install -D nx-openpolyrepo@e2e`, {
+    execSync(`npm install -D @op-nx/polyrepo@e2e`, {
       cwd: projectDirectory,
       stdio: 'inherit',
       env: process.env,
@@ -53,7 +53,7 @@ describe('nx-openpolyrepo', () => {
 
   it('should be installed', () => {
     // npm ls will fail if the package is not installed properly
-    execSync('npm ls nx-openpolyrepo', {
+    execSync('npm ls @op-nx/polyrepo', {
       cwd: projectDirectory,
       stdio: 'inherit',
     });
@@ -87,7 +87,7 @@ describe('nx-openpolyrepo', () => {
       const project = JSON.parse(output);
       expect(project.targets['polyrepo-status']).toBeDefined();
       expect(project.targets['polyrepo-status'].executor).toBe(
-        'nx-openpolyrepo:status',
+        '@op-nx/polyrepo:status',
       );
     });
   });
@@ -124,12 +124,12 @@ function registerPlugin(
         typeof p === 'object' &&
         p !== null &&
         'plugin' in p &&
-        (p as { plugin: string }).plugin === 'nx-openpolyrepo'
+        (p as { plugin: string }).plugin === '@op-nx/polyrepo'
       ),
   );
 
   nxJson.plugins.push({
-    plugin: 'nx-openpolyrepo',
+    plugin: '@op-nx/polyrepo',
     options,
   });
 
@@ -143,7 +143,7 @@ function registerPlugin(
 function createTestProject() {
   const projectName = 'test-project';
   // Use OS temp directory to avoid .gitignore conflicts with the host repo
-  const tempRoot = mkdtempSync(join(tmpdir(), 'nx-openpolyrepo-e2e-'));
+  const tempRoot = mkdtempSync(join(tmpdir(), 'op-nx-polyrepo-e2e-'));
   const projectDirectory = join(tempRoot, projectName);
 
   execSync(

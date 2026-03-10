@@ -66,7 +66,7 @@ function setupPluginConfig(entries: NormalizedRepoEntry[]): void {
     JSON.stringify({
       plugins: [
         {
-          plugin: 'nx-openpolyrepo',
+          plugin: '@op-nx/polyrepo',
           options: fakeConfig,
         },
       ],

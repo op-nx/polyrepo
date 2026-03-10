@@ -24,11 +24,11 @@ export const createNodesV2: CreateNodesV2<PolyrepoConfig> = [
             '.': {
               targets: {
                 'polyrepo-sync': {
-                  executor: 'nx-openpolyrepo:sync',
+                  executor: '@op-nx/polyrepo:sync',
                   options: {},
                 },
                 'polyrepo-status': {
-                  executor: 'nx-openpolyrepo:status',
+                  executor: '@op-nx/polyrepo:status',
                   options: {},
                 },
               },
