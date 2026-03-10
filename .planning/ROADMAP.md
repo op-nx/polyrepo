@@ -27,11 +27,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. Running an Nx command triggers clone of configured repos into `.repos/` directory when not yet present
   3. Running an Nx command triggers pull for already-cloned repos to bring them up to date
   4. Invalid config entries (missing URL, malformed options) produce clear error messages at plugin load time
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 01-01: TBD
-- [ ] 01-02: TBD
+- [ ] 01-01-PLAN.md -- Plugin scaffold, config schema with zod validation, createNodesV2 entry point
+- [ ] 01-02-PLAN.md -- Git command wrappers and polyrepo-sync executor (clone + pull)
+- [ ] 01-03-PLAN.md -- polyrepo-status executor and end-to-end integration verification
 
 ### Phase 2: Unified Project Graph
 **Goal**: External repo projects appear in the unified Nx project graph with proper namespacing and fast cached extraction
@@ -68,6 +69,6 @@ Phases execute in numeric order: 1 -> 2 -> 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Plugin Foundation + Repo Assembly | 0/0 | Not started | - |
+| 1. Plugin Foundation + Repo Assembly | 0/3 | Planning complete | - |
 | 2. Unified Project Graph | 0/0 | Not started | - |
 | 3. Multi-Repo Git DX | 0/0 | Not started | - |
