@@ -3,7 +3,6 @@ import {
   polyrepoConfigSchema,
   normalizeRepos,
   type PolyrepoConfig,
-  type NormalizedRepoEntry,
 } from './schema';
 
 describe('polyrepoConfigSchema', () => {

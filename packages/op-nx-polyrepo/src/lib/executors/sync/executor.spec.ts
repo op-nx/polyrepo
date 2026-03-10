@@ -63,7 +63,6 @@ const mockGitFetchTag = vi.mocked(gitFetchTag);
 const mockDetectRepoState = vi.mocked(detectRepoState);
 const mockLoggerInfo = vi.mocked(logger.info);
 const mockLoggerWarn = vi.mocked(logger.warn);
-const mockLoggerError = vi.mocked(logger.error);
 
 function createContext(root = '/workspace'): ExecutorContext {
   return {

@@ -10,9 +10,8 @@ import {
   getCurrentRef,
 } from '../../git/detect';
 
-export interface StatusExecutorOptions {
-  // intentionally empty -- status takes no options
-}
+// Status executor takes no options
+export type StatusExecutorOptions = Record<string, never>;
 
 function getRepoPath(
   entry: NormalizedRepoEntry,

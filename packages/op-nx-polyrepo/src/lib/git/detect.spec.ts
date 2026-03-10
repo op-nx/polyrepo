@@ -38,25 +38,6 @@ function setupExecFileMock(stdout: string, stderr = ''): void {
   }) as typeof execFile);
 }
 
-function setupExecFileError(message: string): void {
-  mockExecFile.mockImplementation(((
-    _file: string,
-    _args: readonly string[],
-    _options: unknown,
-    callback?: (
-      error: ExecFileException | null,
-      stdout: string,
-      stderr: string,
-    ) => void,
-  ) => {
-    if (callback) {
-      const err = new Error(message) as ExecFileException;
-      err.code = 'ERR';
-      callback(err, '', message);
-    }
-  }) as typeof execFile);
-}
-
 describe('isGitUrl', () => {
   it('returns true for git@ URLs', () => {
     expect(isGitUrl('git@github.com:org/repo.git')).toBe(true);
