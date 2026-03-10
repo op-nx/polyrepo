@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-03-10)
 Phase: 1 of 3 (Plugin Foundation + Repo Assembly)
 Plan: 3 of 3 in current phase (PHASE COMPLETE)
 Status: Phase 1 Complete
-Last activity: 2026-03-10 -- Completed 01-03-PLAN.md
+Last activity: 2026-03-10 - Completed quick task 1: Change the e2e test to use Vitest and remove all Jest tooling
 
 Progress: [██████████] 100% (Phase 1)
 
@@ -74,6 +74,12 @@ Recent decisions affecting current work:
 ### Pending Todos
 
 None yet.
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 1 | Change the e2e test to use Vitest and remove all Jest tooling | 2026-03-10 | 16b040d | [1-change-the-e2e-test-to-use-vitest-and-re](./quick/1-change-the-e2e-test-to-use-vitest-and-re/) |
 
 ### Blockers/Concerns
 
