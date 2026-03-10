@@ -128,7 +128,7 @@ function createTestProject() {
   const projectDirectory = join(tempRoot, projectName);
 
   execSync(
-    `npx create-nx-workspace@latest ${projectName} --preset apps --nxCloud=skip --no-interactive`,
+    `npx create-nx-workspace@latest ${projectName} --preset apps --ci=skip --interactive=false`,
     {
       cwd: tempRoot,
       stdio: 'inherit',
