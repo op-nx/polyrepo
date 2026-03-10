@@ -12,7 +12,7 @@ This roadmap delivers a working Nx plugin for synthetic monorepos in three phase
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Plugin Foundation + Repo Assembly** - Plugin skeleton, git clone/pull, nx.json config with validation
+- [x] **Phase 1: Plugin Foundation + Repo Assembly** - Plugin skeleton, git clone/pull, nx.json config with validation
 - [ ] **Phase 2: Unified Project Graph** - External projects in nx graph with namespacing and cached extraction
 - [ ] **Phase 3: Multi-Repo Git DX** - Combined status, bulk operations, per-repo output
 
@@ -30,9 +30,9 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 3 plans
 
 Plans:
-- [ ] 01-01-PLAN.md -- Plugin scaffold, config schema with zod validation, createNodesV2 entry point
-- [ ] 01-02-PLAN.md -- Git command wrappers and polyrepo-sync executor (clone + pull)
-- [ ] 01-03-PLAN.md -- polyrepo-status executor and end-to-end integration verification
+- [x] 01-01-PLAN.md -- Plugin scaffold, config schema with zod validation, createNodesV2 entry point
+- [x] 01-02-PLAN.md -- Git command wrappers and polyrepo-sync executor (clone + pull)
+- [x] 01-03-PLAN.md -- polyrepo-status executor and end-to-end integration verification
 
 ### Phase 2: Unified Project Graph
 **Goal**: External repo projects appear in the unified Nx project graph with proper namespacing and fast cached extraction
@@ -69,6 +69,6 @@ Phases execute in numeric order: 1 -> 2 -> 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Plugin Foundation + Repo Assembly | 0/3 | Planning complete | - |
+| 1. Plugin Foundation + Repo Assembly | 3/3 | Complete | 2026-03-10 |
 | 2. Unified Project Graph | 0/0 | Not started | - |
 | 3. Multi-Repo Git DX | 0/0 | Not started | - |
