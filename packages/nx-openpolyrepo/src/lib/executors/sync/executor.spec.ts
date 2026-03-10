@@ -2,8 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { ExecutorContext } from '@nx/devkit';
 
 // Mock dependencies before importing executor
+vi.mock('node:fs', () => ({
+  readFileSync: vi.fn(),
+}));
+
 vi.mock('@nx/devkit', () => ({
-  readNxJson: vi.fn(),
   logger: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -32,7 +35,8 @@ vi.mock('../../git/detect.js', () => ({
   detectRepoState: vi.fn(),
 }));
 
-import { readNxJson, logger } from '@nx/devkit';
+import { readFileSync } from 'node:fs';
+import { logger } from '@nx/devkit';
 import { validateConfig } from '../../config/validate.js';
 import { normalizeRepos } from '../../config/schema.js';
 import type { NormalizedRepoEntry, PolyrepoConfig } from '../../config/schema.js';
@@ -47,7 +51,7 @@ import {
 import { detectRepoState } from '../../git/detect.js';
 import syncExecutor from './executor.js';
 
-const mockReadNxJson = vi.mocked(readNxJson);
+const mockReadFileSync = vi.mocked(readFileSync);
 const mockValidateConfig = vi.mocked(validateConfig);
 const mockNormalizeRepos = vi.mocked(normalizeRepos);
 const mockGitClone = vi.mocked(gitClone);
@@ -74,14 +78,14 @@ const fakeConfig: PolyrepoConfig = {
 };
 
 function setupPluginConfig(entries: NormalizedRepoEntry[]): void {
-  mockReadNxJson.mockReturnValue({
+  mockReadFileSync.mockReturnValue(JSON.stringify({
     plugins: [
       {
         plugin: 'nx-openpolyrepo',
         options: fakeConfig,
       },
     ],
-  } as ReturnType<typeof readNxJson>);
+  }));
   mockValidateConfig.mockReturnValue(fakeConfig);
   mockNormalizeRepos.mockReturnValue(entries);
 }

@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/schema",
+  "type": "object",
+  "properties": {
+    "strategy": {
+      "type": "string",
+      "enum": ["fetch", "pull", "rebase", "ff-only"],
+      "default": "pull",
+      "description": "Git update strategy for existing repos"
+    }
+  },
+  "additionalProperties": false
+}
