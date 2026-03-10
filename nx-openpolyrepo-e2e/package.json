@@ -1,0 +1,27 @@
+{
+  "name": "nx-openpolyrepo-e2e",
+  "version": "0.0.1",
+  "private": true,
+  "nx": {
+    "projectType": "application",
+    "sourceRoot": "nx-openpolyrepo-e2e/src",
+    "implicitDependencies": [
+      "nx-openpolyrepo"
+    ],
+    "targets": {
+      "e2e": {
+        "executor": "@nx/jest:jest",
+        "outputs": [
+          "{projectRoot}/test-output/jest/coverage"
+        ],
+        "options": {
+          "jestConfig": "nx-openpolyrepo-e2e/jest.config.cts",
+          "runInBand": true
+        },
+        "dependsOn": [
+          "^build"
+        ]
+      }
+    }
+  }
+}

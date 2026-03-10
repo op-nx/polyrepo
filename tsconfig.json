@@ -5,6 +5,9 @@
   "references": [
     {
       "path": "./packages/nx-openpolyrepo"
+    },
+    {
+      "path": "./nx-openpolyrepo-e2e"
     }
   ]
 }
