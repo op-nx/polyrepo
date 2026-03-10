@@ -1,6 +1,6 @@
 /**
  * This script starts a local registry for e2e testing purposes.
- * It is meant to be called in jest's globalSetup.
+ * It is meant to be called in Vitest's globalSetup.
  */
 
 /// <reference path="registry.d.ts" />

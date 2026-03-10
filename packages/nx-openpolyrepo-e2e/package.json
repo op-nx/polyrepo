@@ -10,13 +10,12 @@
     ],
     "targets": {
       "e2e": {
-        "executor": "@nx/jest:jest",
+        "executor": "@nx/vitest:test",
         "outputs": [
-          "{projectRoot}/test-output/jest/coverage"
+          "{projectRoot}/test-output/vitest/coverage"
         ],
         "options": {
-          "jestConfig": "packages/nx-openpolyrepo-e2e/jest.config.cts",
-          "runInBand": true
+          "configFile": "packages/nx-openpolyrepo-e2e/vitest.config.mts"
         },
         "dependsOn": [
           "^build"

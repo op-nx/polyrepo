@@ -2,6 +2,9 @@ import { execSync } from 'child_process';
 import { join, dirname } from 'path';
 import { rmSync, readFileSync, writeFileSync, mkdtempSync } from 'fs';
 import { tmpdir } from 'os';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
 
 const createNxWorkspacePkgPath = require.resolve(
   'create-nx-workspace/package.json',
@@ -20,7 +23,7 @@ describe('nx-openpolyrepo', () => {
   beforeAll(() => {
     projectDirectory = createTestProject();
 
-    // The plugin has been built and published to a local registry in the jest globalSetup
+    // The plugin has been built and published to a local registry in the Vitest globalSetup
     // Install the plugin built with the latest source code into the test repo
     execSync(`npm install -D nx-openpolyrepo@e2e`, {
       cwd: projectDirectory,
