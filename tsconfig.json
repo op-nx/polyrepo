@@ -4,10 +4,10 @@
   "files": [],
   "references": [
     {
-      "path": "./packages/nx-openpolyrepo"
+      "path": "./packages/op-nx-polyrepo"
     },
     {
-      "path": "./packages/nx-openpolyrepo-e2e"
+      "path": "./packages/op-nx-polyrepo-e2e"
     }
   ]
 }

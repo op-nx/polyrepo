@@ -29,7 +29,7 @@ function isTagRef(ref: string | undefined): boolean {
 }
 
 function getStrategyFn(
-  strategy: SyncExecutorOptions['strategy']
+  strategy: SyncExecutorOptions['strategy'],
 ): (cwd: string) => Promise<void> {
   switch (strategy) {
     case 'fetch': {
@@ -53,7 +53,7 @@ function getStrategyFn(
 async function syncRepo(
   entry: NormalizedRepoEntry,
   workspaceRoot: string,
-  strategy: SyncExecutorOptions['strategy']
+  strategy: SyncExecutorOptions['strategy'],
 ): Promise<void> {
   const state = detectRepoState(entry.alias, entry, workspaceRoot);
 
@@ -62,7 +62,10 @@ async function syncRepo(
 
     if (state === 'not-synced') {
       logger.info(`Cloning ${entry.alias} from ${entry.url}...`);
-      await gitClone(entry.url, repoPath, { depth: entry.depth, ref: entry.ref });
+      await gitClone(entry.url, repoPath, {
+        depth: entry.depth,
+        ref: entry.ref,
+      });
       logger.info(`Done: ${entry.alias} cloned.`);
 
       return;
@@ -86,7 +89,9 @@ async function syncRepo(
 
   // Local repo
   if (state === 'not-synced') {
-    logger.warn(`Local repo "${entry.alias}" path does not exist: ${entry.path}. Skipping.`);
+    logger.warn(
+      `Local repo "${entry.alias}" path does not exist: ${entry.path}. Skipping.`,
+    );
 
     return;
   }
@@ -99,14 +104,15 @@ async function syncRepo(
 
 export default async function syncExecutor(
   options: SyncExecutorOptions,
-  context: ExecutorContext
+  context: ExecutorContext,
 ): Promise<{ success: boolean }> {
   const nxJsonPath = join(context.root, 'nx.json');
   const nxJson: NxJsonConfiguration = JSON.parse(
-    readFileSync(nxJsonPath, 'utf-8')
+    readFileSync(nxJsonPath, 'utf-8'),
   );
   const pluginEntry = nxJson?.plugins?.find(
-    (p) => typeof p === 'object' && 'plugin' in p && p.plugin === 'nx-openpolyrepo'
+    (p) =>
+      typeof p === 'object' && 'plugin' in p && p.plugin === 'nx-openpolyrepo',
   );
 
   const pluginOptions =
@@ -119,7 +125,7 @@ export default async function syncExecutor(
   const strategy = options.strategy;
 
   const results = await Promise.allSettled(
-    entries.map((entry) => syncRepo(entry, context.root, strategy))
+    entries.map((entry) => syncRepo(entry, context.root, strategy)),
   );
 
   let synced = 0;

@@ -4,7 +4,11 @@ import { logger } from '@nx/devkit';
 import type { ExecutorContext, NxJsonConfiguration } from '@nx/devkit';
 import { validateConfig } from '../../config/validate';
 import { normalizeRepos, type NormalizedRepoEntry } from '../../config/schema';
-import { detectRepoState, getCurrentBranch, getCurrentRef } from '../../git/detect';
+import {
+  detectRepoState,
+  getCurrentBranch,
+  getCurrentRef,
+} from '../../git/detect';
 
 export interface StatusExecutorOptions {
   // intentionally empty -- status takes no options
@@ -12,7 +16,7 @@ export interface StatusExecutorOptions {
 
 function getRepoPath(
   entry: NormalizedRepoEntry,
-  workspaceRoot: string
+  workspaceRoot: string,
 ): string {
   if (entry.type === 'remote') {
     return join(workspaceRoot, '.repos', entry.alias);
@@ -23,7 +27,7 @@ function getRepoPath(
 
 async function reportRepo(
   entry: NormalizedRepoEntry,
-  workspaceRoot: string
+  workspaceRoot: string,
 ): Promise<void> {
   const state = detectRepoState(entry.alias, entry, workspaceRoot);
   const repoPath = getRepoPath(entry, workspaceRoot);
@@ -48,12 +52,14 @@ async function reportRepo(
   logger.info(`  ${entry.alias}: ${state} (${displayPath})`);
 
   const branch = await getCurrentBranch(repoPath);
-  const branchLabel = branch ?? await getCurrentRef(repoPath);
+  const branchLabel = branch ?? (await getCurrentRef(repoPath));
 
   if (entry.type === 'remote' && entry.ref) {
     const isDrift = branchLabel !== entry.ref;
     const driftMarker = isDrift ? ' [DRIFT]' : '';
-    logger.info(`    branch: ${branchLabel} (configured: ${entry.ref})${driftMarker}`);
+    logger.info(
+      `    branch: ${branchLabel} (configured: ${entry.ref})${driftMarker}`,
+    );
   } else {
     const configuredLabel = 'default';
     logger.info(`    branch: ${branchLabel} (configured: ${configuredLabel})`);
@@ -62,14 +68,15 @@ async function reportRepo(
 
 export default async function statusExecutor(
   _options: StatusExecutorOptions,
-  context: ExecutorContext
+  context: ExecutorContext,
 ): Promise<{ success: boolean }> {
   const nxJsonPath = join(context.root, 'nx.json');
   const nxJson: NxJsonConfiguration = JSON.parse(
-    readFileSync(nxJsonPath, 'utf-8')
+    readFileSync(nxJsonPath, 'utf-8'),
   );
   const pluginEntry = nxJson?.plugins?.find(
-    (p) => typeof p === 'object' && 'plugin' in p && p.plugin === 'nx-openpolyrepo'
+    (p) =>
+      typeof p === 'object' && 'plugin' in p && p.plugin === 'nx-openpolyrepo',
   );
 
   const pluginOptions =
@@ -85,7 +92,7 @@ export default async function statusExecutor(
       await reportRepo(entry, context.root);
     } catch (err) {
       logger.warn(
-        `Failed to get status for ${entry.alias}: ${err instanceof Error ? err.message : err}`
+        `Failed to get status for ${entry.alias}: ${err instanceof Error ? err.message : err}`,
       );
     }
   }

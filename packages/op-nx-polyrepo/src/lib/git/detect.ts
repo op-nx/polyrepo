@@ -14,7 +14,7 @@ export type RepoState = 'cloned' | 'referenced' | 'not-synced';
 export function detectRepoState(
   alias: string,
   entry: NormalizedRepoEntry,
-  workspaceRoot: string
+  workspaceRoot: string,
 ): RepoState {
   if (entry.type === 'remote') {
     const gitDir = join(workspaceRoot, '.repos', alias, '.git');
@@ -40,14 +40,20 @@ function execGitOutput(args: string[], cwd: string): Promise<string> {
 }
 
 export async function getCurrentBranch(cwd: string): Promise<string | null> {
-  const branch = await execGitOutput(['rev-parse', '--abbrev-ref', 'HEAD'], cwd);
+  const branch = await execGitOutput(
+    ['rev-parse', '--abbrev-ref', 'HEAD'],
+    cwd,
+  );
 
   return branch === 'HEAD' ? null : branch;
 }
 
 export async function getCurrentRef(cwd: string): Promise<string> {
   try {
-    const tag = await execGitOutput(['describe', '--tags', '--exact-match', 'HEAD'], cwd);
+    const tag = await execGitOutput(
+      ['describe', '--tags', '--exact-match', 'HEAD'],
+      cwd,
+    );
 
     return tag;
   } catch {

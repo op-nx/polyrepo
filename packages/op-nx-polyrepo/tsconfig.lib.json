@@ -1,18 +1,14 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "outDir": "../../dist/packages/nx-openpolyrepo",
-    "tsBuildInfoFile": "../../dist/packages/nx-openpolyrepo/tsconfig.lib.tsbuildinfo",
+    "outDir": "../../dist/packages/op-nx-polyrepo",
+    "tsBuildInfoFile": "../../dist/packages/op-nx-polyrepo/tsconfig.lib.tsbuildinfo",
     "emitDeclarationOnly": false,
     "module": "node16",
     "moduleResolution": "node16",
-    "types": [
-      "node"
-    ]
+    "types": ["node"]
   },
-  "include": [
-    "src/**/*.ts"
-  ],
+  "include": ["src/**/*.ts"],
   "references": [],
   "exclude": [
     "vite.config.ts",

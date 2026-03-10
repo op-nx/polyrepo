@@ -48,7 +48,7 @@ describe('createNodesV2', () => {
     const [, callback] = createNodesV2;
 
     await expect(
-      callback(['nx.json'], {} as never, mockContext)
+      callback(['nx.json'], {} as never, mockContext),
     ).rejects.toThrow();
   });
 

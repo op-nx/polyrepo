@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { validateConfig, warnIfReposNotGitignored, warnUnsyncedRepos } from './validate';
+import {
+  validateConfig,
+  warnIfReposNotGitignored,
+  warnUnsyncedRepos,
+} from './validate';
 import type { PolyrepoConfig } from './schema';
 
 vi.mock('node:fs/promises', async (importOriginal) => {
@@ -63,7 +67,7 @@ describe('warnIfReposNotGitignored', () => {
     await warnIfReposNotGitignored('/workspace');
 
     expect(mockedLoggerWarn).toHaveBeenCalledWith(
-      expect.stringContaining('.repos')
+      expect.stringContaining('.repos'),
     );
   });
 
@@ -87,7 +91,7 @@ describe('warnUnsyncedRepos', () => {
     warnUnsyncedRepos(config, '/workspace');
 
     expect(mockedLoggerWarn).toHaveBeenCalledWith(
-      expect.stringContaining('repo-a')
+      expect.stringContaining('repo-a'),
     );
   });
 

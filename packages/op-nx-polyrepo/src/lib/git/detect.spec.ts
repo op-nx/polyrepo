@@ -22,25 +22,39 @@ const mockExistsSync = vi.mocked(existsSync);
 const mockExecFile = vi.mocked(execFile);
 
 function setupExecFileMock(stdout: string, stderr = ''): void {
-  mockExecFile.mockImplementation(
-    ((_file: string, _args: readonly string[], _options: unknown, callback?: (error: ExecFileException | null, stdout: string, stderr: string) => void) => {
-      if (callback) {
-        callback(null, stdout, stderr);
-      }
-    }) as typeof execFile
-  );
+  mockExecFile.mockImplementation(((
+    _file: string,
+    _args: readonly string[],
+    _options: unknown,
+    callback?: (
+      error: ExecFileException | null,
+      stdout: string,
+      stderr: string,
+    ) => void,
+  ) => {
+    if (callback) {
+      callback(null, stdout, stderr);
+    }
+  }) as typeof execFile);
 }
 
 function setupExecFileError(message: string): void {
-  mockExecFile.mockImplementation(
-    ((_file: string, _args: readonly string[], _options: unknown, callback?: (error: ExecFileException | null, stdout: string, stderr: string) => void) => {
-      if (callback) {
-        const err = new Error(message) as ExecFileException;
-        err.code = 'ERR';
-        callback(err, '', message);
-      }
-    }) as typeof execFile
-  );
+  mockExecFile.mockImplementation(((
+    _file: string,
+    _args: readonly string[],
+    _options: unknown,
+    callback?: (
+      error: ExecFileException | null,
+      stdout: string,
+      stderr: string,
+    ) => void,
+  ) => {
+    if (callback) {
+      const err = new Error(message) as ExecFileException;
+      err.code = 'ERR';
+      callback(err, '', message);
+    }
+  }) as typeof execFile);
 }
 
 describe('isGitUrl', () => {
@@ -85,28 +99,36 @@ describe('detectRepoState', () => {
   it('returns "cloned" when .repos/<alias>/.git exists for remote repo', () => {
     mockExistsSync.mockReturnValue(true);
 
-    const result = detectRepoState('repo-a', {
-      type: 'remote',
-      alias: 'repo-a',
-      url: 'https://github.com/org/repo-a.git',
-      depth: 1,
-    }, '/workspace');
+    const result = detectRepoState(
+      'repo-a',
+      {
+        type: 'remote',
+        alias: 'repo-a',
+        url: 'https://github.com/org/repo-a.git',
+        depth: 1,
+      },
+      '/workspace',
+    );
 
     expect(result).toBe('cloned');
     expect(mockExistsSync).toHaveBeenCalledWith(
-      expect.stringContaining('.repos')
+      expect.stringContaining('.repos'),
     );
   });
 
   it('returns "not-synced" when .repos/<alias> does not exist for remote repo', () => {
     mockExistsSync.mockReturnValue(false);
 
-    const result = detectRepoState('repo-a', {
-      type: 'remote',
-      alias: 'repo-a',
-      url: 'https://github.com/org/repo-a.git',
-      depth: 1,
-    }, '/workspace');
+    const result = detectRepoState(
+      'repo-a',
+      {
+        type: 'remote',
+        alias: 'repo-a',
+        url: 'https://github.com/org/repo-a.git',
+        depth: 1,
+      },
+      '/workspace',
+    );
 
     expect(result).toBe('not-synced');
   });
@@ -114,11 +136,15 @@ describe('detectRepoState', () => {
   it('returns "referenced" for local path repos that exist', () => {
     mockExistsSync.mockReturnValue(true);
 
-    const result = detectRepoState('repo-b', {
-      type: 'local',
-      alias: 'repo-b',
-      path: 'D:/projects/repo-b',
-    }, '/workspace');
+    const result = detectRepoState(
+      'repo-b',
+      {
+        type: 'local',
+        alias: 'repo-b',
+        path: 'D:/projects/repo-b',
+      },
+      '/workspace',
+    );
 
     expect(result).toBe('referenced');
   });
@@ -126,11 +152,15 @@ describe('detectRepoState', () => {
   it('returns "not-synced" for local path repos that do not exist', () => {
     mockExistsSync.mockReturnValue(false);
 
-    const result = detectRepoState('repo-b', {
-      type: 'local',
-      alias: 'repo-b',
-      path: 'D:/projects/repo-b',
-    }, '/workspace');
+    const result = detectRepoState(
+      'repo-b',
+      {
+        type: 'local',
+        alias: 'repo-b',
+        path: 'D:/projects/repo-b',
+      },
+      '/workspace',
+    );
 
     expect(result).toBe('not-synced');
   });
@@ -151,7 +181,7 @@ describe('getCurrentBranch', () => {
       'git',
       ['rev-parse', '--abbrev-ref', 'HEAD'],
       expect.objectContaining({ cwd: '/workspace/.repos/repo' }),
-      expect.any(Function)
+      expect.any(Function),
     );
   });
 
@@ -179,23 +209,30 @@ describe('getCurrentRef', () => {
 
   it('returns short SHA when HEAD is not at a tag', async () => {
     let callCount = 0;
-    mockExecFile.mockImplementation(
-      ((_file: string, args: readonly string[], _options: unknown, callback?: (error: ExecFileException | null, stdout: string, stderr: string) => void) => {
-        if (callback) {
-          callCount++;
+    mockExecFile.mockImplementation(((
+      _file: string,
+      args: readonly string[],
+      _options: unknown,
+      callback?: (
+        error: ExecFileException | null,
+        stdout: string,
+        stderr: string,
+      ) => void,
+    ) => {
+      if (callback) {
+        callCount++;
 
-          if (callCount === 1) {
-            // First call: git describe --tags fails
-            const err = new Error('no tag') as ExecFileException;
-            err.code = 'ERR';
-            callback(err, '', 'no tag');
-          } else {
-            // Second call: git rev-parse --short HEAD
-            callback(null, 'abc1234\n', '');
-          }
+        if (callCount === 1) {
+          // First call: git describe --tags fails
+          const err = new Error('no tag') as ExecFileException;
+          err.code = 'ERR';
+          callback(err, '', 'no tag');
+        } else {
+          // Second call: git rev-parse --short HEAD
+          callback(null, 'abc1234\n', '');
         }
-      }) as typeof execFile
-    );
+      }
+    }) as typeof execFile);
 
     const result = await getCurrentRef('/workspace/.repos/repo');
 

@@ -16,7 +16,9 @@
   "nx": {
     "release": {
       "version": {
-        "manifestRootsToUpdate": ["dist/{projectRoot}"],
+        "manifestRootsToUpdate": [
+          "dist/{projectRoot}"
+        ],
         "currentVersionResolver": "git-tag",
         "fallbackCurrentVersionResolver": "disk"
       }
@@ -28,22 +30,22 @@
           "{options.outputPath}"
         ],
         "options": {
-          "outputPath": "dist/packages/nx-openpolyrepo",
-          "main": "packages/nx-openpolyrepo/src/index.ts",
-          "tsConfig": "packages/nx-openpolyrepo/tsconfig.lib.json",
+          "outputPath": "dist/packages/op-nx-polyrepo",
+          "main": "packages/op-nx-polyrepo/src/index.ts",
+          "tsConfig": "packages/op-nx-polyrepo/tsconfig.lib.json",
           "assets": [
             {
-              "input": "./packages/nx-openpolyrepo/src",
+              "input": "./packages/op-nx-polyrepo/src",
               "glob": "**/!(*.ts)",
               "output": "./src"
             },
             {
-              "input": "./packages/nx-openpolyrepo/src",
+              "input": "./packages/op-nx-polyrepo/src",
               "glob": "**/*.d.ts",
               "output": "./src"
             },
             {
-              "input": "./packages/nx-openpolyrepo",
+              "input": "./packages/op-nx-polyrepo",
               "glob": "executors.json",
               "output": "."
             }

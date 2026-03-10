@@ -26,7 +26,7 @@ function execGit(args: string[], cwd?: string): Promise<string> {
 export async function gitClone(
   url: string,
   targetDir: string,
-  options: CloneOptions = {}
+  options: CloneOptions = {},
 ): Promise<void> {
   const { depth = 1, ref } = options;
   const args: string[] = ['clone'];
@@ -62,7 +62,7 @@ export async function gitPullFfOnly(cwd: string): Promise<void> {
 export async function gitFetchTag(
   cwd: string,
   tag: string,
-  depth = 1
+  depth = 1,
 ): Promise<void> {
   await execGit(['fetch', '--depth', String(depth), 'origin', 'tag', tag], cwd);
   await execGit(['checkout', tag], cwd);

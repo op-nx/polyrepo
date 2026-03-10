@@ -78,14 +78,16 @@ const fakeConfig: PolyrepoConfig = {
 };
 
 function setupPluginConfig(entries: NormalizedRepoEntry[]): void {
-  mockReadFileSync.mockReturnValue(JSON.stringify({
-    plugins: [
-      {
-        plugin: 'nx-openpolyrepo',
-        options: fakeConfig,
-      },
-    ],
-  }));
+  mockReadFileSync.mockReturnValue(
+    JSON.stringify({
+      plugins: [
+        {
+          plugin: 'nx-openpolyrepo',
+          options: fakeConfig,
+        },
+      ],
+    }),
+  );
   mockValidateConfig.mockReturnValue(fakeConfig);
   mockNormalizeRepos.mockReturnValue(entries);
 }
@@ -103,7 +105,12 @@ describe('syncExecutor', () => {
 
   it('clones remote repo when .repos/<alias> does not exist', async () => {
     setupPluginConfig([
-      { type: 'remote', alias: 'repo-a', url: 'https://github.com/org/repo-a.git', depth: 1 },
+      {
+        type: 'remote',
+        alias: 'repo-a',
+        url: 'https://github.com/org/repo-a.git',
+        depth: 1,
+      },
     ]);
     mockDetectRepoState.mockReturnValue('not-synced');
 
@@ -112,14 +119,20 @@ describe('syncExecutor', () => {
     expect(mockGitClone).toHaveBeenCalledWith(
       'https://github.com/org/repo-a.git',
       expect.stringContaining('.repos'),
-      expect.objectContaining({ depth: 1 })
+      expect.objectContaining({ depth: 1 }),
     );
     expect(result).toEqual({ success: true });
   });
 
   it('pulls remote repo when .repos/<alias> already exists and ref is a branch', async () => {
     setupPluginConfig([
-      { type: 'remote', alias: 'repo-a', url: 'https://github.com/org/repo-a.git', ref: 'main', depth: 1 },
+      {
+        type: 'remote',
+        alias: 'repo-a',
+        url: 'https://github.com/org/repo-a.git',
+        ref: 'main',
+        depth: 1,
+      },
     ]);
     mockDetectRepoState.mockReturnValue('cloned');
 
@@ -132,7 +145,13 @@ describe('syncExecutor', () => {
 
   it('re-fetches tag when .repos/<alias> already exists and ref looks like a tag', async () => {
     setupPluginConfig([
-      { type: 'remote', alias: 'repo-a', url: 'https://github.com/org/repo-a.git', ref: 'v1.2.3', depth: 1 },
+      {
+        type: 'remote',
+        alias: 'repo-a',
+        url: 'https://github.com/org/repo-a.git',
+        ref: 'v1.2.3',
+        depth: 1,
+      },
     ]);
     mockDetectRepoState.mockReturnValue('cloned');
 
@@ -141,7 +160,7 @@ describe('syncExecutor', () => {
     expect(mockGitFetchTag).toHaveBeenCalledWith(
       expect.stringContaining('.repos'),
       'v1.2.3',
-      1
+      1,
     );
     expect(mockGitPull).not.toHaveBeenCalled();
     expect(result).toEqual({ success: true });
@@ -169,14 +188,19 @@ describe('syncExecutor', () => {
 
     expect(mockGitPull).not.toHaveBeenCalled();
     expect(mockLoggerWarn).toHaveBeenCalledWith(
-      expect.stringContaining('repo-b')
+      expect.stringContaining('repo-b'),
     );
     expect(result).toEqual({ success: true });
   });
 
   it('uses configured depth for clone (depth:0 = full)', async () => {
     setupPluginConfig([
-      { type: 'remote', alias: 'repo-a', url: 'https://github.com/org/repo-a.git', depth: 0 },
+      {
+        type: 'remote',
+        alias: 'repo-a',
+        url: 'https://github.com/org/repo-a.git',
+        depth: 0,
+      },
     ]);
     mockDetectRepoState.mockReturnValue('not-synced');
 
@@ -185,13 +209,19 @@ describe('syncExecutor', () => {
     expect(mockGitClone).toHaveBeenCalledWith(
       'https://github.com/org/repo-a.git',
       expect.any(String),
-      expect.objectContaining({ depth: 0 })
+      expect.objectContaining({ depth: 0 }),
     );
   });
 
   it('uses configured ref as --branch during clone', async () => {
     setupPluginConfig([
-      { type: 'remote', alias: 'repo-a', url: 'https://github.com/org/repo-a.git', ref: 'develop', depth: 1 },
+      {
+        type: 'remote',
+        alias: 'repo-a',
+        url: 'https://github.com/org/repo-a.git',
+        ref: 'develop',
+        depth: 1,
+      },
     ]);
     mockDetectRepoState.mockReturnValue('not-synced');
 
@@ -200,14 +230,24 @@ describe('syncExecutor', () => {
     expect(mockGitClone).toHaveBeenCalledWith(
       'https://github.com/org/repo-a.git',
       expect.any(String),
-      expect.objectContaining({ ref: 'develop' })
+      expect.objectContaining({ ref: 'develop' }),
     );
   });
 
   it('processes all repos in parallel (Promise.allSettled)', async () => {
     setupPluginConfig([
-      { type: 'remote', alias: 'repo-a', url: 'https://github.com/org/repo-a.git', depth: 1 },
-      { type: 'remote', alias: 'repo-b', url: 'https://github.com/org/repo-b.git', depth: 1 },
+      {
+        type: 'remote',
+        alias: 'repo-a',
+        url: 'https://github.com/org/repo-a.git',
+        depth: 1,
+      },
+      {
+        type: 'remote',
+        alias: 'repo-b',
+        url: 'https://github.com/org/repo-b.git',
+        depth: 1,
+      },
       { type: 'local', alias: 'repo-c', path: 'D:/projects/repo-c' },
     ]);
     mockDetectRepoState.mockReturnValue('not-synced');
@@ -222,7 +262,12 @@ describe('syncExecutor', () => {
 
   it('returns { success: true } when all repos succeed', async () => {
     setupPluginConfig([
-      { type: 'remote', alias: 'repo-a', url: 'https://github.com/org/repo-a.git', depth: 1 },
+      {
+        type: 'remote',
+        alias: 'repo-a',
+        url: 'https://github.com/org/repo-a.git',
+        depth: 1,
+      },
     ]);
     mockDetectRepoState.mockReturnValue('not-synced');
 
@@ -233,8 +278,18 @@ describe('syncExecutor', () => {
 
   it('returns { success: false } when any repo fails', async () => {
     setupPluginConfig([
-      { type: 'remote', alias: 'repo-a', url: 'https://github.com/org/repo-a.git', depth: 1 },
-      { type: 'remote', alias: 'repo-b', url: 'https://github.com/org/repo-b.git', depth: 1 },
+      {
+        type: 'remote',
+        alias: 'repo-a',
+        url: 'https://github.com/org/repo-a.git',
+        depth: 1,
+      },
+      {
+        type: 'remote',
+        alias: 'repo-b',
+        url: 'https://github.com/org/repo-b.git',
+        depth: 1,
+      },
     ]);
     mockDetectRepoState.mockReturnValue('not-synced');
     mockGitClone
@@ -248,27 +303,37 @@ describe('syncExecutor', () => {
 
   it('logs per-repo results (cloning/pulling/done/failed)', async () => {
     setupPluginConfig([
-      { type: 'remote', alias: 'repo-a', url: 'https://github.com/org/repo-a.git', depth: 1 },
+      {
+        type: 'remote',
+        alias: 'repo-a',
+        url: 'https://github.com/org/repo-a.git',
+        depth: 1,
+      },
     ]);
     mockDetectRepoState.mockReturnValue('not-synced');
 
     await syncExecutor({}, createContext());
 
     expect(mockLoggerInfo).toHaveBeenCalledWith(
-      expect.stringContaining('repo-a')
+      expect.stringContaining('repo-a'),
     );
   });
 
   it('logs summary at end (N synced, M failed)', async () => {
     setupPluginConfig([
-      { type: 'remote', alias: 'repo-a', url: 'https://github.com/org/repo-a.git', depth: 1 },
+      {
+        type: 'remote',
+        alias: 'repo-a',
+        url: 'https://github.com/org/repo-a.git',
+        depth: 1,
+      },
     ]);
     mockDetectRepoState.mockReturnValue('not-synced');
 
     await syncExecutor({}, createContext());
 
     const summaryCall = mockLoggerInfo.mock.calls.find(
-      (call) => typeof call[0] === 'string' && call[0].includes('synced')
+      (call) => typeof call[0] === 'string' && call[0].includes('synced'),
     );
 
     expect(summaryCall).toBeDefined();
@@ -277,7 +342,12 @@ describe('syncExecutor', () => {
   describe('strategy option', () => {
     it('defaults to pull strategy', async () => {
       setupPluginConfig([
-        { type: 'remote', alias: 'repo-a', url: 'https://github.com/org/repo-a.git', depth: 1 },
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          depth: 1,
+        },
       ]);
       mockDetectRepoState.mockReturnValue('cloned');
 
@@ -288,7 +358,12 @@ describe('syncExecutor', () => {
 
     it('strategy "fetch" calls gitFetch instead of gitPull', async () => {
       setupPluginConfig([
-        { type: 'remote', alias: 'repo-a', url: 'https://github.com/org/repo-a.git', depth: 1 },
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          depth: 1,
+        },
       ]);
       mockDetectRepoState.mockReturnValue('cloned');
 
@@ -300,7 +375,12 @@ describe('syncExecutor', () => {
 
     it('strategy "rebase" calls gitPullRebase', async () => {
       setupPluginConfig([
-        { type: 'remote', alias: 'repo-a', url: 'https://github.com/org/repo-a.git', depth: 1 },
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          depth: 1,
+        },
       ]);
       mockDetectRepoState.mockReturnValue('cloned');
 
@@ -312,7 +392,12 @@ describe('syncExecutor', () => {
 
     it('strategy "ff-only" calls gitPullFfOnly', async () => {
       setupPluginConfig([
-        { type: 'remote', alias: 'repo-a', url: 'https://github.com/org/repo-a.git', depth: 1 },
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          depth: 1,
+        },
       ]);
       mockDetectRepoState.mockReturnValue('cloned');
 

@@ -22,13 +22,20 @@ import {
 const mockExecFile = vi.mocked(execFile);
 
 function setupExecFileMock(): void {
-  mockExecFile.mockImplementation(
-    ((_file: string, _args: readonly string[], _options: unknown, callback?: (error: ExecFileException | null, stdout: string, stderr: string) => void) => {
-      if (callback) {
-        callback(null, '', '');
-      }
-    }) as typeof execFile
-  );
+  mockExecFile.mockImplementation(((
+    _file: string,
+    _args: readonly string[],
+    _options: unknown,
+    callback?: (
+      error: ExecFileException | null,
+      stdout: string,
+      stderr: string,
+    ) => void,
+  ) => {
+    if (callback) {
+      callback(null, '', '');
+    }
+  }) as typeof execFile);
 }
 
 describe('gitClone', () => {
@@ -38,46 +45,80 @@ describe('gitClone', () => {
   });
 
   it('constructs correct args for default shallow clone', async () => {
-    await gitClone('https://github.com/org/repo.git', 'D:/workspace/.repos/repo');
+    await gitClone(
+      'https://github.com/org/repo.git',
+      'D:/workspace/.repos/repo',
+    );
 
     expect(mockExecFile).toHaveBeenCalledWith(
       'git',
-      ['clone', '--depth', '1', 'https://github.com/org/repo.git', 'D:/workspace/.repos/repo'],
+      [
+        'clone',
+        '--depth',
+        '1',
+        'https://github.com/org/repo.git',
+        'D:/workspace/.repos/repo',
+      ],
       expect.any(Object),
-      expect.any(Function)
+      expect.any(Function),
     );
   });
 
   it('constructs correct args for full clone (depth 0)', async () => {
-    await gitClone('https://github.com/org/repo.git', 'D:/workspace/.repos/repo', { depth: 0 });
+    await gitClone(
+      'https://github.com/org/repo.git',
+      'D:/workspace/.repos/repo',
+      { depth: 0 },
+    );
 
     expect(mockExecFile).toHaveBeenCalledWith(
       'git',
       ['clone', 'https://github.com/org/repo.git', 'D:/workspace/.repos/repo'],
       expect.any(Object),
-      expect.any(Function)
+      expect.any(Function),
     );
   });
 
   it('constructs correct args when ref is specified', async () => {
-    await gitClone('https://github.com/org/repo.git', 'D:/workspace/.repos/repo', { ref: 'develop' });
+    await gitClone(
+      'https://github.com/org/repo.git',
+      'D:/workspace/.repos/repo',
+      { ref: 'develop' },
+    );
 
     expect(mockExecFile).toHaveBeenCalledWith(
       'git',
-      ['clone', '--depth', '1', '--branch', 'develop', 'https://github.com/org/repo.git', 'D:/workspace/.repos/repo'],
+      [
+        'clone',
+        '--depth',
+        '1',
+        '--branch',
+        'develop',
+        'https://github.com/org/repo.git',
+        'D:/workspace/.repos/repo',
+      ],
       expect.any(Object),
-      expect.any(Function)
+      expect.any(Function),
     );
   });
 
   it('normalizes backslashes in target directory to forward slashes', async () => {
-    await gitClone('https://github.com/org/repo.git', 'D:\\workspace\\.repos\\repo');
+    await gitClone(
+      'https://github.com/org/repo.git',
+      'D:\\workspace\\.repos\\repo',
+    );
 
     expect(mockExecFile).toHaveBeenCalledWith(
       'git',
-      ['clone', '--depth', '1', 'https://github.com/org/repo.git', 'D:/workspace/.repos/repo'],
+      [
+        'clone',
+        '--depth',
+        '1',
+        'https://github.com/org/repo.git',
+        'D:/workspace/.repos/repo',
+      ],
       expect.any(Object),
-      expect.any(Function)
+      expect.any(Function),
     );
   });
 });
@@ -95,7 +136,7 @@ describe('gitPull', () => {
       'git',
       ['pull'],
       expect.objectContaining({ cwd: 'D:/workspace/.repos/repo' }),
-      expect.any(Function)
+      expect.any(Function),
     );
   });
 });
@@ -113,7 +154,7 @@ describe('gitFetch', () => {
       'git',
       ['fetch'],
       expect.objectContaining({ cwd: 'D:/workspace/.repos/repo' }),
-      expect.any(Function)
+      expect.any(Function),
     );
   });
 });
@@ -131,7 +172,7 @@ describe('gitPullRebase', () => {
       'git',
       ['pull', '--rebase'],
       expect.objectContaining({ cwd: 'D:/workspace/.repos/repo' }),
-      expect.any(Function)
+      expect.any(Function),
     );
   });
 });
@@ -149,7 +190,7 @@ describe('gitPullFfOnly', () => {
       'git',
       ['pull', '--ff-only'],
       expect.objectContaining({ cwd: 'D:/workspace/.repos/repo' }),
-      expect.any(Function)
+      expect.any(Function),
     );
   });
 });
@@ -170,7 +211,7 @@ describe('gitFetchTag', () => {
       'git',
       ['fetch', '--depth', '1', 'origin', 'tag', 'v1.0.0'],
       expect.objectContaining({ cwd: 'D:/workspace/.repos/repo' }),
-      expect.any(Function)
+      expect.any(Function),
     );
 
     expect(mockExecFile).toHaveBeenNthCalledWith(
@@ -178,7 +219,7 @@ describe('gitFetchTag', () => {
       'git',
       ['checkout', 'v1.0.0'],
       expect.objectContaining({ cwd: 'D:/workspace/.repos/repo' }),
-      expect.any(Function)
+      expect.any(Function),
     );
   });
 
@@ -190,7 +231,7 @@ describe('gitFetchTag', () => {
       'git',
       ['fetch', '--depth', '5', 'origin', 'tag', 'v2.0.0'],
       expect.objectContaining({ cwd: 'D:/workspace/.repos/repo' }),
-      expect.any(Function)
+      expect.any(Function),
     );
   });
 });

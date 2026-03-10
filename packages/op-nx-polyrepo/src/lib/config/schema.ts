@@ -16,13 +16,18 @@ const localRepoObject = z
   })
   .strict();
 
-const repoEntry = z.union([z.string().min(1), remoteRepoObject, localRepoObject]);
+const repoEntry = z.union([
+  z.string().min(1),
+  remoteRepoObject,
+  localRepoObject,
+]);
 
 export const polyrepoConfigSchema = z.object({
-  repos: z.record(z.string().min(1), repoEntry).refine(
-    (repos) => Object.keys(repos).length > 0,
-    { message: 'repos must contain at least one entry' }
-  ),
+  repos: z
+    .record(z.string().min(1), repoEntry)
+    .refine((repos) => Object.keys(repos).length > 0, {
+      message: 'repos must contain at least one entry',
+    }),
 });
 
 export type PolyrepoConfig = z.infer<typeof polyrepoConfigSchema>;
