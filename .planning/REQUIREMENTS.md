@@ -10,8 +10,8 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Repo Assembly
 
 - [x] **ASSM-01**: User can configure repos (URL + optional local path alias) in nx.json plugin options
-- [ ] **ASSM-02**: Plugin clones configured repos into `.repos/` directory on first run
-- [ ] **ASSM-03**: Plugin pulls latest changes for already-cloned repos when assembly is triggered
+- [x] **ASSM-02**: Plugin clones configured repos into `.repos/` directory on first run
+- [x] **ASSM-03**: Plugin pulls latest changes for already-cloned repos when assembly is triggered
 - [x] **ASSM-04**: Config is validated at plugin load time with clear error messages for invalid entries
 
 ### Project Graph
@@ -74,8 +74,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | ASSM-01 | Phase 1 | Complete |
-| ASSM-02 | Phase 1 | Pending |
-| ASSM-03 | Phase 1 | Pending |
+| ASSM-02 | Phase 1 | Complete |
+| ASSM-03 | Phase 1 | Complete |
 | ASSM-04 | Phase 1 | Complete |
 | GRPH-01 | Phase 2 | Pending |
 | GRPH-02 | Phase 2 | Pending |
