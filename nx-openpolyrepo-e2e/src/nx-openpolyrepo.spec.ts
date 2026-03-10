@@ -1,7 +1,18 @@
 import { execSync } from 'child_process';
-import { join } from 'path';
+import { join, dirname } from 'path';
 import { rmSync, readFileSync, writeFileSync, mkdtempSync } from 'fs';
 import { tmpdir } from 'os';
+
+const createNxWorkspacePkgPath = require.resolve(
+  'create-nx-workspace/package.json'
+);
+const createNxWorkspacePkg = JSON.parse(
+  readFileSync(createNxWorkspacePkgPath, 'utf-8')
+);
+const createNxWorkspaceBin = join(
+  dirname(createNxWorkspacePkgPath),
+  createNxWorkspacePkg.bin['create-nx-workspace']
+);
 
 describe('nx-openpolyrepo', () => {
   let projectDirectory: string;
@@ -128,7 +139,7 @@ function createTestProject() {
   const projectDirectory = join(tempRoot, projectName);
 
   execSync(
-    `npx create-nx-workspace@latest ${projectName} --preset apps --ci=skip --interactive=false`,
+    `node "${createNxWorkspaceBin}" ${projectName} --preset apps --ci=skip --interactive=false`,
     {
       cwd: tempRoot,
       stdio: 'inherit',
