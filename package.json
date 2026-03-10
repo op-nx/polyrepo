@@ -2,8 +2,8 @@
   "name": "@nx-openpolyrepo/source",
   "version": "0.0.0",
   "license": "MIT",
-  "scripts": {},
   "private": true,
+  "scripts": {},
   "dependencies": {},
   "devDependencies": {
     "@nx/devkit": "^22.5.4",
