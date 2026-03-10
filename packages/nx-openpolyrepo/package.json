@@ -1,21 +1,26 @@
 {
   "name": "nx-openpolyrepo",
   "version": "0.0.1",
-  "private": true,
   "executors": "./executors.json",
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./src/index.js",
+  "types": "./src/index.d.ts",
   "exports": {
     "./package.json": "./package.json",
     ".": {
       "@nx-openpolyrepo/source": "./src/index.ts",
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "default": "./dist/index.js"
+      "types": "./src/index.d.ts",
+      "import": "./src/index.js",
+      "default": "./src/index.js"
     }
   },
   "nx": {
+    "release": {
+      "version": {
+        "manifestRootsToUpdate": ["dist/{projectRoot}"],
+        "currentVersionResolver": "git-tag",
+        "fallbackCurrentVersionResolver": "disk"
+      }
+    },
     "targets": {
       "build": {
         "executor": "@nx/js:tsc",
@@ -23,21 +28,19 @@
           "{options.outputPath}"
         ],
         "options": {
-          "outputPath": "packages/nx-openpolyrepo/dist",
+          "outputPath": "dist/packages/nx-openpolyrepo",
           "main": "packages/nx-openpolyrepo/src/index.ts",
           "tsConfig": "packages/nx-openpolyrepo/tsconfig.lib.json",
-          "rootDir": "packages/nx-openpolyrepo/src",
-          "generatePackageJson": false,
           "assets": [
             {
               "input": "./packages/nx-openpolyrepo/src",
               "glob": "**/!(*.ts)",
-              "output": "."
+              "output": "./src"
             },
             {
               "input": "./packages/nx-openpolyrepo/src",
               "glob": "**/*.d.ts",
-              "output": "."
+              "output": "./src"
             },
             {
               "input": "./packages/nx-openpolyrepo",
@@ -46,10 +49,18 @@
             }
           ]
         }
+      },
+      "nx-release-publish": {
+        "executor": "@nx/js:release-publish",
+        "options": {
+          "packageRoot": "dist/{projectRoot}"
+        }
       }
     }
   },
   "dependencies": {
-    "tslib": "^2.3.0"
+    "@nx/devkit": ">=20.0.0",
+    "tslib": "^2.3.0",
+    "zod": "^4.0.0"
   }
 }
