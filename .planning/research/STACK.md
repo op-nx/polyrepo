@@ -68,6 +68,16 @@ These are the specific `@nx/devkit` APIs the plugin must use. All are exported f
 | chalk | ^5.x | Colored CLI output | For multi-repo status display and error messages. Use dynamic import (ESM-only in v5). Alternatively, use Nx's built-in `output` utility from `@nx/devkit` which already handles coloring. | LOW |
 | ora | ^8.x | Spinner for long-running git operations | Clone/pull operations can take time. Provides visual feedback. Optional -- could use simple console output instead. | LOW |
 
+## Reference Plugins (Official Nx)
+
+Three official Nx plugins validate the "external tool + cached JSON + createNodesV2" architecture. Source code available from a local clone of the `nrwl/nx` repo on this machine:
+
+- **`@nx/gradle`** (`packages/gradle/src/plugin/`) -- Triggers on `build.gradle*`. Runs `gradlew nxProjectGraph` to get a `ProjectGraphReport` (nodes, dependencies, externalNodes). Caches to `workspaceDataDirectory` with hash-based invalidation. Uses `PluginCache` from `nx/src/utils/plugin-cache-utils`.
+- **`@nx/maven`** (`packages/maven/src/plugins/`) -- Triggers on `**/pom.xml`. Spawns `mvn nx-maven-plugin:analyze` (Kotlin analyzer). Writes JSON to Nx cache dir. Uses `calculateHashesForCreateNodes` for invalidation. Shares data between `createNodes` and `createDependencies` via module-level `setCurrentMavenData()`.
+- **`@nx/dotnet`** (`packages/dotnet/src/plugins/`) -- Triggers on `**/*.{csproj,fsproj,vbproj}`. Uses C# MSBuild analyzer binary. `createDependencies` reads from `readCachedAnalysisResult()` populated by `createNodes`. Maps cross-project references via `referencesByRoot` -- analogous to our cross-repo dependency detection.
+
+All three confirm the pattern: subprocess for discovery, JSON cache for bridge, `createNodesV2` + `createDependencies` for Nx integration.
+
 ## Alternatives Considered
 
 | Category | Recommended | Alternative | Why Not |
@@ -253,6 +263,9 @@ npx nx graph
 - [@nx/plugin Generators - Nx Docs](https://nx.dev/docs/reference/plugin/generators) -- HIGH confidence
 - [Nx Cloud Introducing Polygraph](https://nx.dev/blog/nx-cloud-introducing-polygraph) -- HIGH confidence (context on what Polygraph does)
 - [meta - GitHub](https://github.com/mateodelnorte/meta) -- MEDIUM confidence (DX pattern reference)
+- [@nx/gradle source](https://github.com/nrwl/nx/tree/master/packages/gradle) -- HIGH confidence (official Nx plugin, same createNodesV2 pattern)
+- [@nx/maven source](https://github.com/nrwl/nx/tree/master/packages/maven) -- HIGH confidence (official Nx plugin, subprocess + cache pattern)
+- [@nx/dotnet source](https://github.com/nrwl/nx/tree/master/packages/dotnet) -- HIGH confidence (official Nx plugin, cross-project dependency mapping)
 
 ---
 

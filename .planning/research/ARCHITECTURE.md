@@ -90,6 +90,28 @@ nx.json plugin options
    - `.gitignore` entries for assembled repos.
 2. Registered in `nx.json` under `sync.globalGenerators`.
 
+## Reference Plugins (Official Nx)
+
+Three official Nx plugins follow the same architectural pattern we need: trigger on config files, shell out to an external tool for project discovery, cache results, and serve via `createNodesV2` + `createDependencies`. Source code inspected from a local clone of the `nrwl/nx` repo (available on this machine).
+
+| Plugin | Glob trigger | External tool | Cache strategy | Key files |
+|--------|-------------|---------------|----------------|-----------|
+| `@nx/gradle` | `build.gradle*`, `settings.gradle*` | `gradlew nxProjectGraph` (custom Gradle task) | Module-level var + disk JSON with hash invalidation | `packages/gradle/src/plugin/nodes.ts`, `utils/get-project-graph-from-gradle-plugin.ts` |
+| `@nx/maven` | `**/pom.xml` | `mvn nx-maven-plugin:analyze` (Kotlin plugin) | `PluginCache` + module-level `setCurrentMavenData()` | `packages/maven/src/plugins/nodes.ts`, `maven-analyzer.ts` |
+| `@nx/dotnet` | `**/*.{csproj,fsproj,vbproj}` | C# MSBuild analyzer binary | `readCachedAnalysisResult()` shared between createNodes/createDependencies | `packages/dotnet/src/plugins/create-nodes.ts`, `create-dependencies.ts` |
+
+**Shared pattern across all three:**
+1. `createNodesV2` triggers on build system config files, delegates discovery to the native tool (subprocess), caches the result
+2. `createDependencies` reads from a cache populated by `createNodesV2` — never re-runs analysis
+3. Both functions share data via module-level variables or a shared cache utility
+4. Each uses hash-based cache invalidation (hashing config files + plugin options)
+
+**Key difference from our plugin:** These plugins integrate *one* external build system into an Nx workspace. Our plugin integrates *N* external Nx workspaces. The pattern is the same, applied per assembled repo.
+
+**`@nx/dotnet` relevance:** .NET solutions reference projects across directories via `<ProjectReference>` in `.csproj`, analogous to cross-repo dependencies. Its `create-dependencies.ts` maps source roots to target roots using `referencesByRoot` — our cross-repo dep detection follows a similar pattern but matches on `package.json` dependency names.
+
+**None of these are polyrepo tools**, but they validate the "external tool + cached JSON + createNodesV2" architecture as the Nx-blessed approach for integrating non-JS build systems — and by extension, external Nx workspaces.
+
 ## Patterns to Follow
 
 ### Pattern 1: Separate Entry Points Per Feature
@@ -331,3 +353,6 @@ packages/nx-openpolyrepo/
 - [meta - tool for turning many repos into a meta repo](https://github.com/mateodelnorte/meta)
 - [Integrate a New Tool with a Tooling Plugin | Nx](https://nx.dev/docs/extending-nx/tooling-plugin)
 - [ProjectGraph | Nx](https://nx.dev/docs/reference/devkit/ProjectGraph)
+- [@nx/gradle source](https://github.com/nrwl/nx/tree/master/packages/gradle) -- createNodesV2 + cached Gradle project graph report pattern
+- [@nx/maven source](https://github.com/nrwl/nx/tree/master/packages/maven) -- Kotlin analyzer subprocess + PluginCache pattern
+- [@nx/dotnet source](https://github.com/nrwl/nx/tree/master/packages/dotnet) -- C# MSBuild analyzer + cross-project dependency mapping
