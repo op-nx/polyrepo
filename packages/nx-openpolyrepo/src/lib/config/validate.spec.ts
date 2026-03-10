@@ -2,13 +2,23 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { validateConfig, warnIfReposNotGitignored, warnUnsyncedRepos } from './validate.js';
 import type { PolyrepoConfig } from './schema.js';
 
-vi.mock('node:fs/promises', () => ({
-  readFile: vi.fn(),
-}));
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>();
 
-vi.mock('node:fs', () => ({
-  existsSync: vi.fn(),
-}));
+  return {
+    ...actual,
+    readFile: vi.fn(),
+  };
+});
+
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+
+  return {
+    ...actual,
+    existsSync: vi.fn(),
+  };
+});
 
 vi.mock('@nx/devkit', () => ({
   logger: {
