@@ -4,6 +4,7 @@
   "license": "MIT",
   "scripts": {},
   "private": true,
+  "dependencies": {},
   "devDependencies": {
     "@nx/devkit": "^22.5.4",
     "@nx/esbuild": "^22.5.4",
