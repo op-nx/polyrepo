@@ -73,23 +73,23 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ASSM-01 | — | Pending |
-| ASSM-02 | — | Pending |
-| ASSM-03 | — | Pending |
-| ASSM-04 | — | Pending |
-| GRPH-01 | — | Pending |
-| GRPH-02 | — | Pending |
-| GRPH-03 | — | Pending |
-| GRPH-04 | — | Pending |
-| GITX-01 | — | Pending |
-| GITX-02 | — | Pending |
-| GITX-03 | — | Pending |
+| ASSM-01 | Phase 1 | Pending |
+| ASSM-02 | Phase 1 | Pending |
+| ASSM-03 | Phase 1 | Pending |
+| ASSM-04 | Phase 1 | Pending |
+| GRPH-01 | Phase 2 | Pending |
+| GRPH-02 | Phase 2 | Pending |
+| GRPH-03 | Phase 2 | Pending |
+| GRPH-04 | Phase 2 | Pending |
+| GITX-01 | Phase 3 | Pending |
+| GITX-02 | Phase 3 | Pending |
+| GITX-03 | Phase 3 | Pending |
 
 **Coverage:**
 - v1 requirements: 11 total
-- Mapped to phases: 0
-- Unmapped: 11
+- Mapped to phases: 11
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-10*
-*Last updated: 2026-03-10 after initial definition*
+*Last updated: 2026-03-10 after roadmap creation*
