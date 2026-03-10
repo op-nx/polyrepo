@@ -1,0 +1,55 @@
+{
+  "name": "nx-openpolyrepo",
+  "version": "0.0.1",
+  "private": true,
+  "executors": "./executors.json",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "@nx-openpolyrepo/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "nx": {
+    "targets": {
+      "build": {
+        "executor": "@nx/js:tsc",
+        "outputs": [
+          "{options.outputPath}"
+        ],
+        "options": {
+          "outputPath": "packages/nx-openpolyrepo/dist",
+          "main": "packages/nx-openpolyrepo/src/index.ts",
+          "tsConfig": "packages/nx-openpolyrepo/tsconfig.lib.json",
+          "rootDir": "packages/nx-openpolyrepo/src",
+          "generatePackageJson": false,
+          "assets": [
+            {
+              "input": "./packages/nx-openpolyrepo/src",
+              "glob": "**/!(*.ts)",
+              "output": "."
+            },
+            {
+              "input": "./packages/nx-openpolyrepo/src",
+              "glob": "**/*.d.ts",
+              "output": "."
+            },
+            {
+              "input": "./packages/nx-openpolyrepo",
+              "glob": "executors.json",
+              "output": "."
+            }
+          ]
+        }
+      }
+    }
+  },
+  "dependencies": {
+    "tslib": "^2.3.0"
+  }
+}

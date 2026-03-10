@@ -1,0 +1,14 @@
+{
+  "executors": {
+    "sync": {
+      "implementation": "./src/lib/executors/sync/executor",
+      "schema": "./src/lib/executors/sync/schema.json",
+      "description": "Clone missing repos and pull existing repos to sync workspace"
+    },
+    "status": {
+      "implementation": "./src/lib/executors/status/executor",
+      "schema": "./src/lib/executors/status/schema.json",
+      "description": "Show the sync state of all configured repos"
+    }
+  }
+}

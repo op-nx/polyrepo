@@ -4,7 +4,9 @@
   "license": "MIT",
   "private": true,
   "scripts": {},
-  "dependencies": {},
+  "dependencies": {
+    "zod": "^4.3.6"
+  },
   "devDependencies": {
     "@nx/devkit": "^22.5.4",
     "@nx/esbuild": "^22.5.4",
@@ -17,11 +19,15 @@
     "@nx/web": "^22.5.4",
     "@nx/workspace": "^22.5.4",
     "@swc-node/register": "~1.11.1",
+    "@swc/cli": "~0.8.0",
     "@swc/core": "~1.15.5",
     "@swc/helpers": "~0.5.18",
+    "@types/node": "20.19.9",
+    "@vitest/coverage-v8": "^4.0.0",
     "@vitest/ui": "^4.0.0",
     "esbuild": "^0.25.0",
     "jiti": "2.4.2",
+    "jsdom": "^27.1.0",
     "nx": "^22.5.4",
     "prettier": "~3.6.2",
     "tslib": "^2.3.0",
