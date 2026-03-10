@@ -2,9 +2,9 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { logger } from '@nx/devkit';
 import type { ExecutorContext, NxJsonConfiguration } from '@nx/devkit';
-import { validateConfig } from '../../config/validate.js';
-import { normalizeRepos, type NormalizedRepoEntry } from '../../config/schema.js';
-import { detectRepoState, getCurrentBranch, getCurrentRef } from '../../git/detect.js';
+import { validateConfig } from '../../config/validate';
+import { normalizeRepos, type NormalizedRepoEntry } from '../../config/schema';
+import { detectRepoState, getCurrentBranch, getCurrentRef } from '../../git/detect';
 
 export interface StatusExecutorOptions {
   // intentionally empty -- status takes no options

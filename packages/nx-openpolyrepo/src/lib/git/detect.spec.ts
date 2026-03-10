@@ -16,7 +16,7 @@ import {
   detectRepoState,
   getCurrentBranch,
   getCurrentRef,
-} from './detect.js';
+} from './detect';
 
 const mockExistsSync = vi.mocked(existsSync);
 const mockExecFile = vi.mocked(execFile);

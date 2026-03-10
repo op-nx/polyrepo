@@ -14,15 +14,15 @@ vi.mock('@nx/devkit', () => ({
   },
 }));
 
-vi.mock('../../config/validate.js', () => ({
+vi.mock('../../config/validate', () => ({
   validateConfig: vi.fn(),
 }));
 
-vi.mock('../../config/schema.js', () => ({
+vi.mock('../../config/schema', () => ({
   normalizeRepos: vi.fn(),
 }));
 
-vi.mock('../../git/detect.js', () => ({
+vi.mock('../../git/detect', () => ({
   detectRepoState: vi.fn(),
   getCurrentBranch: vi.fn(),
   getCurrentRef: vi.fn(),
@@ -30,11 +30,11 @@ vi.mock('../../git/detect.js', () => ({
 
 import { readFileSync } from 'node:fs';
 import { logger } from '@nx/devkit';
-import { validateConfig } from '../../config/validate.js';
-import { normalizeRepos } from '../../config/schema.js';
-import type { NormalizedRepoEntry, PolyrepoConfig } from '../../config/schema.js';
-import { detectRepoState, getCurrentBranch, getCurrentRef } from '../../git/detect.js';
-import statusExecutor from './executor.js';
+import { validateConfig } from '../../config/validate';
+import { normalizeRepos } from '../../config/schema';
+import type { NormalizedRepoEntry, PolyrepoConfig } from '../../config/schema';
+import { detectRepoState, getCurrentBranch, getCurrentRef } from '../../git/detect';
+import statusExecutor from './executor';
 
 const mockReadFileSync = vi.mocked(readFileSync);
 const mockValidateConfig = vi.mocked(validateConfig);

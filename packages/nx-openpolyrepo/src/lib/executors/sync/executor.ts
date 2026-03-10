@@ -2,8 +2,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { logger } from '@nx/devkit';
 import type { ExecutorContext, NxJsonConfiguration } from '@nx/devkit';
-import { validateConfig } from '../../config/validate.js';
-import { normalizeRepos, type NormalizedRepoEntry } from '../../config/schema.js';
+import { validateConfig } from '../../config/validate';
+import { normalizeRepos, type NormalizedRepoEntry } from '../../config/schema';
 import {
   gitClone,
   gitPull,
@@ -11,8 +11,8 @@ import {
   gitPullRebase,
   gitPullFfOnly,
   gitFetchTag,
-} from '../../git/commands.js';
-import { detectRepoState } from '../../git/detect.js';
+} from '../../git/commands';
+import { detectRepoState } from '../../git/detect';
 
 export interface SyncExecutorOptions {
   strategy?: 'fetch' | 'pull' | 'rebase' | 'ff-only';

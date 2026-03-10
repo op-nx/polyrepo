@@ -14,15 +14,15 @@ vi.mock('@nx/devkit', () => ({
   },
 }));
 
-vi.mock('../../config/validate.js', () => ({
+vi.mock('../../config/validate', () => ({
   validateConfig: vi.fn(),
 }));
 
-vi.mock('../../config/schema.js', () => ({
+vi.mock('../../config/schema', () => ({
   normalizeRepos: vi.fn(),
 }));
 
-vi.mock('../../git/commands.js', () => ({
+vi.mock('../../git/commands', () => ({
   gitClone: vi.fn(),
   gitPull: vi.fn(),
   gitFetch: vi.fn(),
@@ -31,15 +31,15 @@ vi.mock('../../git/commands.js', () => ({
   gitFetchTag: vi.fn(),
 }));
 
-vi.mock('../../git/detect.js', () => ({
+vi.mock('../../git/detect', () => ({
   detectRepoState: vi.fn(),
 }));
 
 import { readFileSync } from 'node:fs';
 import { logger } from '@nx/devkit';
-import { validateConfig } from '../../config/validate.js';
-import { normalizeRepos } from '../../config/schema.js';
-import type { NormalizedRepoEntry, PolyrepoConfig } from '../../config/schema.js';
+import { validateConfig } from '../../config/validate';
+import { normalizeRepos } from '../../config/schema';
+import type { NormalizedRepoEntry, PolyrepoConfig } from '../../config/schema';
 import {
   gitClone,
   gitPull,
@@ -47,9 +47,9 @@ import {
   gitPullRebase,
   gitPullFfOnly,
   gitFetchTag,
-} from '../../git/commands.js';
-import { detectRepoState } from '../../git/detect.js';
-import syncExecutor from './executor.js';
+} from '../../git/commands';
+import { detectRepoState } from '../../git/detect';
+import syncExecutor from './executor';
 
 const mockReadFileSync = vi.mocked(readFileSync);
 const mockValidateConfig = vi.mocked(validateConfig);

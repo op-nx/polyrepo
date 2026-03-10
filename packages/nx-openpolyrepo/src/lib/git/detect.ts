@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { execFile } from 'node:child_process';
-import type { NormalizedRepoEntry } from '../config/schema.js';
+import type { NormalizedRepoEntry } from '../config/schema';
 
 const gitUrlPattern = /^(git@|https?:\/\/|ssh:\/\/|file:\/\/)/;
 

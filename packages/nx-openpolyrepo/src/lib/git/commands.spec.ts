@@ -17,7 +17,7 @@ import {
   gitPullRebase,
   gitPullFfOnly,
   gitFetchTag,
-} from './commands.js';
+} from './commands';
 
 const mockExecFile = vi.mocked(execFile);
 

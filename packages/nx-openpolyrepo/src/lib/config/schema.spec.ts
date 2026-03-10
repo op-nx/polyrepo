@@ -4,7 +4,7 @@ import {
   normalizeRepos,
   type PolyrepoConfig,
   type NormalizedRepoEntry,
-} from './schema.js';
+} from './schema';
 
 describe('polyrepoConfigSchema', () => {
   describe('valid entries', () => {

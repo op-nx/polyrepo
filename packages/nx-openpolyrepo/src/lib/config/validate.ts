@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { logger } from '@nx/devkit';
-import { polyrepoConfigSchema, type PolyrepoConfig, normalizeRepos } from './schema.js';
+import { polyrepoConfigSchema, type PolyrepoConfig, normalizeRepos } from './schema';
 
 export function validateConfig(options: unknown): PolyrepoConfig {
   const result = polyrepoConfigSchema.safeParse(options);

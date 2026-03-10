@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createNodesV2 } from './index.js';
+import { createNodesV2 } from './index';
 import type { CreateNodesContextV2 } from '@nx/devkit';
 
 vi.mock('node:fs/promises', async (importOriginal) => {

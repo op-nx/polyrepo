@@ -2,8 +2,8 @@ import type {
   CreateNodesV2,
   CreateNodesResult,
 } from '@nx/devkit';
-import type { PolyrepoConfig } from './lib/config/schema.js';
-import { validateConfig, warnIfReposNotGitignored, warnUnsyncedRepos } from './lib/config/validate.js';
+import type { PolyrepoConfig } from './lib/config/schema';
+import { validateConfig, warnIfReposNotGitignored, warnUnsyncedRepos } from './lib/config/validate';
 
 export const createNodesV2: CreateNodesV2<PolyrepoConfig> = [
   'nx.json',

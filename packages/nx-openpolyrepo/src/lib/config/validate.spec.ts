@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { validateConfig, warnIfReposNotGitignored, warnUnsyncedRepos } from './validate.js';
-import type { PolyrepoConfig } from './schema.js';
+import { validateConfig, warnIfReposNotGitignored, warnUnsyncedRepos } from './validate';
+import type { PolyrepoConfig } from './schema';
 
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>();
