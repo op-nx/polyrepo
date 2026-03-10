@@ -5,6 +5,7 @@
 
 /// <reference path="registry.d.ts" />
 
+// Despite the path, this has no Jest dependency — it's a generic Verdaccio launcher
 import { startLocalRegistry } from '@nx/js/plugins/jest/local-registry';
 import { releasePublish, releaseVersion } from 'nx/release';
 
