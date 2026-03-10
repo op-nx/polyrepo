@@ -6,7 +6,7 @@
 <domain>
 ## Phase Boundary
 
-Users can configure external repos in nx.json plugin options and have them cloned/updated to disk via explicit Nx commands. The plugin validates config at load time, warns about unsynced repos during graph operations, and provides `polyrepo-sync` and `polyrepo-status` executors. Graph integration (createNodesV2, project namespacing) is Phase 2 scope.
+Users can configure external repos in nx.json plugin options and have them cloned/updated to disk via explicit Nx commands. The plugin validates config at load time, warns about unsynced repos during graph operations, and provides `polyrepo-sync` and `polyrepo-status` executors. Graph integration (project discovery via `nx show projects` in each repo workspace, project namespacing) is Phase 2 scope.
 
 </domain>
 
@@ -94,6 +94,7 @@ Config example:
     [ERROR] repo-c: authentication failed
   ```
 - Architecture validated by official Nx plugins (`@nx/gradle`, `@nx/maven`, `@nx/dotnet`) -- all use "external tool + cached JSON + createNodesV2" pattern. Source code available from a local clone of the `nrwl/nx` repo
+- **Phase 2 graph integration**: shell out to `nx show projects --json` and `nx graph --file=output.json` inside each `.repos/<alias>/` workspace to get the fully resolved project graph (including all inferred targets from each repo's own plugins). Do NOT manually walk `project.json` files -- that would miss plugin-inferred targets and require reimplementing Nx's graph engine. The "external tool" in the established pattern is Nx itself, run inside each repo
 
 </specifics>
 
@@ -110,6 +111,7 @@ Config example:
 - `@nx/maven` (`packages/maven/src/plugins/`): same pattern with Maven analyzer subprocess + `PluginCache`
 - `@nx/dotnet` (`packages/dotnet/src/plugins/`): same pattern with C# MSBuild analyzer, maps cross-project references via `referencesByRoot`
 - Key architectural insight: plugin triggers on a non-gitignored file (e.g., `nx.json`), reads `.repos/` explicitly in the callback. Gitignored `.repos/` prevents other Nx plugins from detecting external projects
+- **Graph discovery pattern (Phase 2)**: the "external tool" in the established pattern is Nx itself -- shell out to `nx show projects --json` / `nx graph --file=output.json` inside each repo workspace to get fully resolved graphs including inferred targets. This parallels how `@nx/gradle` shells out to `gradle` rather than parsing `build.gradle` files directly
 
 ### Integration Points
 - Plugin registers in `nx.json` under `plugins` array

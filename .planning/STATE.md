@@ -44,6 +44,7 @@ Recent decisions affecting current work:
 
 - [Roadmap]: 3-phase coarse structure derived from 3 requirement categories (ASSM, GRPH, GITX). Cross-repo deps and sync generators deferred to v2.
 - [Roadmap]: Phase 3 (Git DX) depends on Phase 1 only, not Phase 2, since git operations need assembled repos but not the project graph.
+- [Architecture]: Phase 2 graph integration must shell out to `nx show projects --json` / `nx graph --file=output.json` inside each repo workspace -- not manually walk project.json files. Each repo is a full Nx workspace with its own plugins and inferred targets. The "external tool" in the established Nx plugin pattern (gradle/maven/dotnet) is Nx itself.
 
 ### Pending Todos
 
