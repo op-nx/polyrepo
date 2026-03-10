@@ -49,6 +49,18 @@
         "ciTargetName": "test-ci",
         "testMode": "watch"
       }
+    },
+    {
+      "plugin": "nx-openpolyrepo",
+      "options": {
+        "repos": {
+          "nx": {
+            "url": "https://github.com/nrwl/nx.git",
+            "depth": 1,
+            "ref": "master"
+          }
+        }
+      }
     }
   ],
   "targetDefaults": {
