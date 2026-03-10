@@ -7,7 +7,7 @@
       "path": "./packages/nx-openpolyrepo"
     },
     {
-      "path": "./nx-openpolyrepo-e2e"
+      "path": "./packages/nx-openpolyrepo-e2e"
     }
   ]
 }

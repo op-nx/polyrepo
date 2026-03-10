@@ -4,14 +4,14 @@ import { rmSync, readFileSync, writeFileSync, mkdtempSync } from 'fs';
 import { tmpdir } from 'os';
 
 const createNxWorkspacePkgPath = require.resolve(
-  'create-nx-workspace/package.json'
+  'create-nx-workspace/package.json',
 );
 const createNxWorkspacePkg = JSON.parse(
-  readFileSync(createNxWorkspacePkgPath, 'utf-8')
+  readFileSync(createNxWorkspacePkgPath, 'utf-8'),
 );
 const createNxWorkspaceBin = join(
   dirname(createNxWorkspacePkgPath),
-  createNxWorkspacePkg.bin['create-nx-workspace']
+  createNxWorkspacePkg.bin['create-nx-workspace'],
 );
 
 describe('nx-openpolyrepo', () => {
@@ -79,12 +79,12 @@ describe('nx-openpolyrepo', () => {
       // create-nx-workspace --preset apps names the root project @org/source
       const output = runNx(
         projectDirectory,
-        'show project @org/source --json'
+        'show project @org/source --json',
       ).replace(/^[^{]*/, ''); // Strip any Nx warnings before JSON
       const project = JSON.parse(output);
       expect(project.targets['polyrepo-status']).toBeDefined();
       expect(project.targets['polyrepo-status'].executor).toBe(
-        'nx-openpolyrepo:status'
+        'nx-openpolyrepo:status',
       );
     });
   });
@@ -107,7 +107,7 @@ function runNx(projectDirectory: string, command: string): string {
 
 function registerPlugin(
   projectDirectory: string,
-  options: Record<string, unknown>
+  options: Record<string, unknown>,
 ): void {
   const nxJsonPath = join(projectDirectory, 'nx.json');
   const nxJson = JSON.parse(readFileSync(nxJsonPath, 'utf-8'));
@@ -117,7 +117,12 @@ function registerPlugin(
   // Remove existing registration if present
   nxJson.plugins = nxJson.plugins.filter(
     (p: unknown) =>
-      !(typeof p === 'object' && p !== null && 'plugin' in p && (p as { plugin: string }).plugin === 'nx-openpolyrepo')
+      !(
+        typeof p === 'object' &&
+        p !== null &&
+        'plugin' in p &&
+        (p as { plugin: string }).plugin === 'nx-openpolyrepo'
+      ),
   );
 
   nxJson.plugins.push({

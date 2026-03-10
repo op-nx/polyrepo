@@ -4,7 +4,7 @@
   "private": true,
   "nx": {
     "projectType": "application",
-    "sourceRoot": "nx-openpolyrepo-e2e/src",
+    "sourceRoot": "packages/nx-openpolyrepo-e2e/src",
     "implicitDependencies": [
       "nx-openpolyrepo"
     ],
@@ -15,7 +15,7 @@
           "{projectRoot}/test-output/jest/coverage"
         ],
         "options": {
-          "jestConfig": "nx-openpolyrepo-e2e/jest.config.cts",
+          "jestConfig": "packages/nx-openpolyrepo-e2e/jest.config.cts",
           "runInBand": true
         },
         "dependsOn": [

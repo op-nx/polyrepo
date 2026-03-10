@@ -51,8 +51,7 @@
     "vitest": "^4.0.0"
   },
   "workspaces": [
-    "packages/*",
-    "nx-openpolyrepo-e2e"
+    "packages/*"
   ],
   "nx": {
     "includedScripts": [],
