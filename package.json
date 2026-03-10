@@ -12,6 +12,7 @@
     "@nx/node": "^22.5.4",
     "@nx/plugin": "^22.5.4",
     "@nx/vite": "^22.5.4",
+    "@nx/vitest": "^22.5.4",
     "@nx/web": "^22.5.4",
     "@swc-node/register": "~1.11.1",
     "@swc/core": "~1.15.5",
@@ -28,6 +29,5 @@
   },
   "workspaces": [
     "packages/*"
-  ],
-  "dependencies": {}
+  ]
 }
