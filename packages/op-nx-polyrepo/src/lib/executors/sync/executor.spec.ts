@@ -39,6 +39,8 @@ vi.mock('../../git/commands', () => ({
 vi.mock('../../git/detect', () => ({
   detectRepoState: vi.fn(),
   getWorkingTreeState: vi.fn(),
+  getCurrentBranch: vi.fn(),
+  getCurrentRef: vi.fn(),
 }));
 
 vi.mock('../../format/table', () => ({
@@ -62,7 +64,7 @@ import {
   gitPullFfOnly,
   gitFetchTag,
 } from '../../git/commands';
-import { detectRepoState, getWorkingTreeState } from '../../git/detect';
+import { detectRepoState, getWorkingTreeState, getCurrentBranch, getCurrentRef } from '../../git/detect';
 import { formatAlignedTable } from '../../format/table';
 import syncExecutor from './executor';
 
@@ -79,6 +81,8 @@ const mockGitPullFfOnly = vi.mocked(gitPullFfOnly);
 const mockGitFetchTag = vi.mocked(gitFetchTag);
 const mockDetectRepoState = vi.mocked(detectRepoState);
 const mockGetWorkingTreeState = vi.mocked(getWorkingTreeState);
+const mockGetCurrentBranch = vi.mocked(getCurrentBranch);
+const mockGetCurrentRef = vi.mocked(getCurrentRef);
 const mockFormatAlignedTable = vi.mocked(formatAlignedTable);
 const mockLoggerInfo = vi.mocked(logger.info);
 const mockLoggerWarn = vi.mocked(logger.warn);
@@ -119,6 +123,8 @@ describe('syncExecutor', () => {
     mockGitPullRebase.mockResolvedValue(undefined);
     mockGitPullFfOnly.mockResolvedValue(undefined);
     mockGitFetchTag.mockResolvedValue(undefined);
+    // Default: getCurrentBranch returns a normal branch (not detached)
+    mockGetCurrentBranch.mockResolvedValue('main');
     // Default: getWorkingTreeState returns clean state
     mockGetWorkingTreeState.mockResolvedValue({
       modified: 0,
@@ -904,6 +910,120 @@ describe('syncExecutor', () => {
       const result = await syncExecutor({ dryRun: true }, createContext());
 
       expect(result).toEqual({ success: true });
+    });
+
+    it('shows [WARN: detached HEAD] in dry-run when repo has detached HEAD (non-tag)', async () => {
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          ref: 'main',
+          depth: 1,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('cloned');
+      mockGetCurrentBranch.mockResolvedValue(null);
+      mockGetCurrentRef.mockResolvedValue('abc1234');
+
+      await syncExecutor({ dryRun: true }, createContext());
+
+      const infoCalls = mockLoggerInfo.mock.calls.map((c) => String(c[0]));
+      const hasDetachedWarning = infoCalls.some(
+        (msg) => msg.includes('[WARN: detached HEAD]'),
+      );
+
+      expect(hasDetachedWarning).toBe(true);
+    });
+
+    it('shows [WARN: tag-pinned] in dry-run when repo is at a tag ref', async () => {
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          ref: 'v1.2.3',
+          depth: 1,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('cloned');
+      mockGetCurrentBranch.mockResolvedValue(null);
+      mockGetCurrentRef.mockResolvedValue('v1.2.3');
+
+      await syncExecutor({ dryRun: true }, createContext());
+
+      const infoCalls = mockLoggerInfo.mock.calls.map((c) => String(c[0]));
+      const hasTagPinnedWarning = infoCalls.some(
+        (msg) => msg.includes('[WARN: tag-pinned]'),
+      );
+
+      expect(hasTagPinnedWarning).toBe(true);
+    });
+
+    it('shows both dirty and detached HEAD warnings in dry-run', async () => {
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          ref: 'main',
+          depth: 1,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('cloned');
+      mockGetWorkingTreeState.mockResolvedValue({
+        modified: 2,
+        staged: 0,
+        deleted: 0,
+        untracked: 0,
+        conflicts: 0,
+      });
+      mockGetCurrentBranch.mockResolvedValue(null);
+      mockGetCurrentRef.mockResolvedValue('abc1234');
+
+      await syncExecutor({ dryRun: true }, createContext());
+
+      const infoCalls = mockLoggerInfo.mock.calls.map((c) => String(c[0]));
+      const hasBothWarnings = infoCalls.some(
+        (msg) =>
+          msg.includes('[WARN: dirty, may fail]') &&
+          msg.includes('[WARN: detached HEAD]'),
+      );
+
+      expect(hasBothWarnings).toBe(true);
+    });
+
+    it('shows both dirty and tag-pinned warnings in dry-run', async () => {
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          ref: 'v1.2.3',
+          depth: 1,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('cloned');
+      mockGetWorkingTreeState.mockResolvedValue({
+        modified: 1,
+        staged: 0,
+        deleted: 0,
+        untracked: 1,
+        conflicts: 0,
+      });
+      mockGetCurrentBranch.mockResolvedValue(null);
+      mockGetCurrentRef.mockResolvedValue('v1.2.3');
+
+      await syncExecutor({ dryRun: true }, createContext());
+
+      const infoCalls = mockLoggerInfo.mock.calls.map((c) => String(c[0]));
+      const hasBothWarnings = infoCalls.some(
+        (msg) =>
+          msg.includes('[WARN: dirty, may fail]') &&
+          msg.includes('[WARN: tag-pinned]'),
+      );
+
+      expect(hasBothWarnings).toBe(true);
     });
 
     it('does not call any git commands in dry-run mode', async () => {
