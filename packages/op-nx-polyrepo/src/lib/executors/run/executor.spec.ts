@@ -10,11 +10,11 @@ import runCommandsImpl from 'nx/src/executors/run-commands/run-commands.impl';
 
 const mockedRunCommandsImpl = vi.mocked(runCommandsImpl);
 
-const baseContext: ExecutorContext = {
+const baseContext = {
   root: '/workspace',
   cwd: '/workspace',
   isVerbose: false,
-};
+} as ExecutorContext;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -22,7 +22,7 @@ beforeEach(() => {
 
 describe('runExecutor', () => {
   it('constructs correct nx run command with forward-slashed nxBin', async () => {
-    mockedRunCommandsImpl.mockResolvedValue({ success: true });
+    mockedRunCommandsImpl.mockResolvedValue({ success: true, terminalOutput: '' });
 
     await runExecutor(
       {
@@ -46,7 +46,7 @@ describe('runExecutor', () => {
   });
 
   it('sets cwd to .repos/<repoAlias> joined with context.root', async () => {
-    mockedRunCommandsImpl.mockResolvedValue({ success: true });
+    mockedRunCommandsImpl.mockResolvedValue({ success: true, terminalOutput: '' });
 
     await runExecutor(
       {
@@ -67,7 +67,7 @@ describe('runExecutor', () => {
   });
 
   it('passes __unparsed__ args through to runCommandsImpl', async () => {
-    mockedRunCommandsImpl.mockResolvedValue({ success: true });
+    mockedRunCommandsImpl.mockResolvedValue({ success: true, terminalOutput: '' });
 
     await runExecutor(
       {
@@ -86,7 +86,7 @@ describe('runExecutor', () => {
   });
 
   it('returns { success: true } when runCommandsImpl succeeds', async () => {
-    mockedRunCommandsImpl.mockResolvedValue({ success: true });
+    mockedRunCommandsImpl.mockResolvedValue({ success: true, terminalOutput: '' });
 
     const result = await runExecutor(
       {
@@ -101,7 +101,7 @@ describe('runExecutor', () => {
   });
 
   it('returns { success: false } when runCommandsImpl fails', async () => {
-    mockedRunCommandsImpl.mockResolvedValue({ success: false });
+    mockedRunCommandsImpl.mockResolvedValue({ success: false, terminalOutput: '' });
 
     const result = await runExecutor(
       {
@@ -131,12 +131,12 @@ describe('runExecutor', () => {
   });
 
   it('uses forward slashes in paths for Windows compat', async () => {
-    mockedRunCommandsImpl.mockResolvedValue({ success: true });
+    mockedRunCommandsImpl.mockResolvedValue({ success: true, terminalOutput: '' });
 
-    const windowsContext: ExecutorContext = {
+    const windowsContext = {
       ...baseContext,
       root: 'C:\\Users\\dev\\workspace',
-    };
+    } as ExecutorContext;
 
     await runExecutor(
       {
@@ -155,7 +155,7 @@ describe('runExecutor', () => {
   });
 
   it('passes context through to runCommandsImpl', async () => {
-    mockedRunCommandsImpl.mockResolvedValue({ success: true });
+    mockedRunCommandsImpl.mockResolvedValue({ success: true, terminalOutput: '' });
 
     await runExecutor(
       {
@@ -173,7 +173,7 @@ describe('runExecutor', () => {
   });
 
   it('defaults __unparsed__ to empty array when not provided', async () => {
-    mockedRunCommandsImpl.mockResolvedValue({ success: true });
+    mockedRunCommandsImpl.mockResolvedValue({ success: true, terminalOutput: '' });
 
     await runExecutor(
       {

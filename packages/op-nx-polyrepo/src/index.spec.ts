@@ -283,6 +283,7 @@ describe('createDependencies', () => {
       },
       nxJsonConfiguration: {},
       workspaceRoot: '/workspace',
+      externalNodes: {},
       fileMap: { projectFileMap: {}, nonProjectFiles: [] },
       filesToProcess: { projectFileMap: {}, nonProjectFiles: [] },
     };
@@ -336,6 +337,7 @@ describe('createDependencies', () => {
       },
       nxJsonConfiguration: {},
       workspaceRoot: '/workspace',
+      externalNodes: {},
       fileMap: { projectFileMap: {}, nonProjectFiles: [] },
       filesToProcess: { projectFileMap: {}, nonProjectFiles: [] },
     };
@@ -359,6 +361,7 @@ describe('createDependencies', () => {
       projects: {},
       nxJsonConfiguration: {},
       workspaceRoot: '/workspace',
+      externalNodes: {},
       fileMap: { projectFileMap: {}, nonProjectFiles: [] },
       filesToProcess: { projectFileMap: {}, nonProjectFiles: [] },
     };
@@ -379,6 +382,7 @@ describe('createDependencies', () => {
       projects: {},
       nxJsonConfiguration: {},
       workspaceRoot: '/workspace',
+      externalNodes: {},
       fileMap: { projectFileMap: {}, nonProjectFiles: [] },
       filesToProcess: { projectFileMap: {}, nonProjectFiles: [] },
     };

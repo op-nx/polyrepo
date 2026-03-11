@@ -1,5 +1,15 @@
-import type { CreateNodesV2, CreateNodesResult } from '@nx/devkit';
+import type {
+  CreateNodesV2,
+  CreateNodesResult,
+  CreateDependencies,
+  RawProjectGraphDependency,
+  ProjectConfiguration,
+} from '@nx/devkit';
+import { DependencyType, logger } from '@nx/devkit';
+import { hashObject } from 'nx/src/devkit-internals';
 import type { PolyrepoConfig } from './lib/config/schema';
+import { populateGraphReport } from './lib/graph/cache';
+import type { PolyrepoGraphReport } from './lib/graph/types';
 import {
   validateConfig,
   warnIfReposNotGitignored,
@@ -14,30 +24,105 @@ export const createNodesV2: CreateNodesV2<PolyrepoConfig> = [
     await warnIfReposNotGitignored(context.workspaceRoot);
     warnUnsyncedRepos(config, context.workspaceRoot);
 
+    // Compute options hash for cache invalidation
+    const optionsHash = hashObject(options ?? {});
+
+    // Populate graph report (lazy extraction with caching)
+    let report: PolyrepoGraphReport | undefined;
+
+    try {
+      report = await populateGraphReport(
+        config,
+        context.workspaceRoot,
+        optionsHash,
+      );
+    } catch (error) {
+      logger.warn(
+        `Failed to extract external project graphs: ${error instanceof Error ? error.message : error}`,
+      );
+      logger.warn(
+        'External projects will not be visible. Run "nx polyrepo-sync" and retry.',
+      );
+    }
+
     const results: Array<readonly [string, CreateNodesResult]> = [];
 
     for (const configFile of configFiles) {
-      results.push([
-        configFile,
-        {
-          projects: {
-            '.': {
-              targets: {
-                'polyrepo-sync': {
-                  executor: '@op-nx/polyrepo:sync',
-                  options: {},
-                },
-                'polyrepo-status': {
-                  executor: '@op-nx/polyrepo:status',
-                  options: {},
-                },
-              },
+      const projects: Record<string, Omit<ProjectConfiguration, 'root'>> = {
+        '.': {
+          targets: {
+            'polyrepo-sync': {
+              executor: '@op-nx/polyrepo:sync',
+              options: {},
+            },
+            'polyrepo-status': {
+              executor: '@op-nx/polyrepo:status',
+              options: {},
             },
           },
         },
-      ]);
+      };
+
+      if (report) {
+        for (const [, repoReport] of Object.entries(report.repos)) {
+          for (const [, node] of Object.entries(repoReport.nodes)) {
+            projects[node.root] = {
+              name: node.name,
+              projectType: node.projectType as
+                | 'application'
+                | 'library'
+                | undefined,
+              sourceRoot: node.sourceRoot,
+              targets: node.targets,
+              tags: node.tags,
+              metadata: node.metadata,
+            };
+          }
+        }
+      }
+
+      results.push([configFile, { projects }]);
     }
 
     return results;
   },
 ];
+
+export const createDependencies: CreateDependencies<PolyrepoConfig> = async (
+  options,
+  context,
+) => {
+  const dependencies: RawProjectGraphDependency[] = [];
+
+  // Defensive: re-populate in case createNodesV2 hasn't run yet
+  let report: PolyrepoGraphReport | undefined;
+
+  try {
+    const config = validateConfig(options);
+    const optionsHash = hashObject(options ?? {});
+
+    report = await populateGraphReport(
+      config,
+      context.workspaceRoot,
+      optionsHash,
+    );
+  } catch {
+    // If extraction fails, return no dependencies (degraded mode)
+    return dependencies;
+  }
+
+  for (const [, repoReport] of Object.entries(report.repos)) {
+    for (const dep of repoReport.dependencies) {
+      // Only add if both source and target exist in the current project graph
+      if (context.projects[dep.source] && context.projects[dep.target]) {
+        dependencies.push({
+          source: dep.source,
+          target: dep.target,
+          type: DependencyType.implicit,
+        });
+      }
+    }
+  }
+
+  return dependencies;
+};

@@ -56,6 +56,8 @@ export function warnUnsyncedRepos(
 ): void {
   const entries = normalizeRepos(config);
 
+  const unsyncedAliases: string[] = [];
+
   for (const entry of entries) {
     if (entry.type !== 'remote') {
       continue;
@@ -64,9 +66,13 @@ export function warnUnsyncedRepos(
     const repoPath = join(workspaceRoot, '.repos', entry.alias);
 
     if (!existsSync(repoPath)) {
-      logger.warn(
-        `Repo "${entry.alias}" is not synced. Run "nx polyrepo-sync" to clone it to .repos/${entry.alias}/`,
-      );
+      unsyncedAliases.push(entry.alias);
     }
+  }
+
+  if (unsyncedAliases.length > 0) {
+    logger.warn(
+      `Repos not synced: ${unsyncedAliases.join(', ')}. Run "nx polyrepo-sync" to clone them.`,
+    );
   }
 }
