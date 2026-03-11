@@ -16,6 +16,8 @@ import {
   detectRepoState,
   getCurrentBranch,
   getCurrentRef,
+  getHeadSha,
+  getDirtyFiles,
 } from './detect';
 
 const mockExistsSync = vi.mocked(existsSync);
@@ -218,5 +220,97 @@ describe('getCurrentRef', () => {
     const result = await getCurrentRef('/workspace/.repos/repo');
 
     expect(result).toBe('abc1234');
+  });
+});
+
+describe('getHeadSha', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns trimmed SHA string for a repo directory', async () => {
+    setupExecFileMock('abc1234567890def\n');
+
+    const result = await getHeadSha('/workspace/.repos/repo');
+
+    expect(result).toBe('abc1234567890def');
+    expect(mockExecFile).toHaveBeenCalledWith(
+      'git',
+      ['rev-parse', 'HEAD'],
+      expect.objectContaining({ cwd: '/workspace/.repos/repo' }),
+      expect.any(Function),
+    );
+  });
+
+  it('rejects when git command fails', async () => {
+    mockExecFile.mockImplementation(((
+      _file: string,
+      _args: readonly string[],
+      _options: unknown,
+      callback?: (
+        error: ExecFileException | null,
+        stdout: string,
+        stderr: string,
+      ) => void,
+    ) => {
+      if (callback) {
+        const err = new Error('not a git repo') as ExecFileException;
+        callback(err, '', 'not a git repo');
+      }
+    }) as typeof execFile);
+
+    await expect(getHeadSha('/workspace/.repos/repo')).rejects.toThrow(
+      'not a git repo',
+    );
+  });
+});
+
+describe('getDirtyFiles', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns trimmed output of git diff --name-only HEAD', async () => {
+    setupExecFileMock('src/file1.ts\nsrc/file2.ts\n');
+
+    const result = await getDirtyFiles('/workspace/.repos/repo');
+
+    expect(result).toBe('src/file1.ts\nsrc/file2.ts');
+    expect(mockExecFile).toHaveBeenCalledWith(
+      'git',
+      ['diff', '--name-only', 'HEAD'],
+      expect.objectContaining({ cwd: '/workspace/.repos/repo' }),
+      expect.any(Function),
+    );
+  });
+
+  it('returns empty string when no dirty files', async () => {
+    setupExecFileMock('\n');
+
+    const result = await getDirtyFiles('/workspace/.repos/repo');
+
+    expect(result).toBe('');
+  });
+
+  it('rejects when git command fails', async () => {
+    mockExecFile.mockImplementation(((
+      _file: string,
+      _args: readonly string[],
+      _options: unknown,
+      callback?: (
+        error: ExecFileException | null,
+        stdout: string,
+        stderr: string,
+      ) => void,
+    ) => {
+      if (callback) {
+        const err = new Error('git failed') as ExecFileException;
+        callback(err, '', 'git failed');
+      }
+    }) as typeof execFile);
+
+    await expect(getDirtyFiles('/workspace/.repos/repo')).rejects.toThrow(
+      'git failed',
+    );
   });
 });
