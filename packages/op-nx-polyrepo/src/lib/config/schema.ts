@@ -9,6 +9,7 @@ const remoteRepoObject = z
     url: z.string().regex(gitUrlPattern, 'Must be a valid git URL'),
     ref: z.string().optional(),
     depth: z.number().int().min(0).optional(),
+    disableHooks: z.boolean().default(true),
   })
   .strict();
 
@@ -87,14 +88,14 @@ export const polyrepoConfigSchema = z.object({
 export type PolyrepoConfig = z.infer<typeof polyrepoConfigSchema>;
 
 export type NormalizedRepoEntry =
-  | { type: 'remote'; alias: string; url: string; ref?: string; depth: number }
+  | { type: 'remote'; alias: string; url: string; ref?: string; depth: number; disableHooks: boolean }
   | { type: 'local'; alias: string; path: string };
 
 export function normalizeRepos(config: PolyrepoConfig): NormalizedRepoEntry[] {
   return Object.entries(config.repos).map(([alias, entry]) => {
     if (typeof entry === 'string') {
       if (gitUrlPattern.test(entry)) {
-        return { type: 'remote', alias, url: entry, ref: undefined, depth: 1 };
+        return { type: 'remote', alias, url: entry, ref: undefined, depth: 1, disableHooks: true };
       }
 
       return { type: 'local', alias, path: entry };
@@ -107,6 +108,7 @@ export function normalizeRepos(config: PolyrepoConfig): NormalizedRepoEntry[] {
         url: entry.url,
         ref: entry.ref,
         depth: entry.depth ?? 1,
+        disableHooks: entry.disableHooks ?? true,
       };
     }
 
