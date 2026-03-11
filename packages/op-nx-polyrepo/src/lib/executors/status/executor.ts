@@ -87,13 +87,14 @@ function formatDirtySummary(state: WorkingTreeState): string {
     parts.push(`${state.conflicts}C`);
   }
 
-  return parts.length > 0 ? parts.join(' ') : 'clean';
+  return parts.length > 0 ? parts.join(' ') : 'ok';
 }
 
 interface RepoRowData {
   alias: string;
   branchDisplay: string;
   aheadBehind: string;
+  rawAheadBehind: AheadBehind | null;
   dirtySummary: string;
   projectCount: string;
   warnings: string;
@@ -228,6 +229,10 @@ export default async function statusExecutor(
         warnings.push('[WARN: detached HEAD]');
       }
 
+      if (isTagPinned) {
+        warnings.push('[WARN: tag-pinned]');
+      }
+
       if (workingTree.conflicts > 0) {
         warnings.push('[WARN: merge conflicts]');
       }
@@ -240,6 +245,7 @@ export default async function statusExecutor(
         alias: entry.alias,
         branchDisplay,
         aheadBehind: aheadBehindDisplay,
+        rawAheadBehind: aheadBehind,
         dirtySummary,
         projectCount: projectCountDisplay,
         warnings: warnings.join(' '),
@@ -260,6 +266,7 @@ export default async function statusExecutor(
       alias: entry.alias,
       branchDisplay: '[not synced]',
       aheadBehind: '',
+      rawAheadBehind: null,
       dirtySummary: '',
       projectCount: projectCountDisplay,
       warnings: '',
@@ -287,10 +294,29 @@ export default async function statusExecutor(
   const totalSynced = syncedEntries.length;
   const totalNotSynced = unsyncedEntries.length;
 
+  const reposBehind = rowData.filter(
+    (r) => r.rawAheadBehind !== null && r.rawAheadBehind.behind > 0,
+  ).length;
+  const reposAhead = rowData.filter(
+    (r) => r.rawAheadBehind !== null && r.rawAheadBehind.ahead > 0,
+  ).length;
+
+  const summaryParts = [
+    `${totalConfigured} configured`,
+    `${totalSynced} synced`,
+    `${totalNotSynced} not synced`,
+  ];
+
+  if (reposBehind > 0) {
+    summaryParts.push(`${reposBehind} behind`);
+  }
+
+  if (reposAhead > 0) {
+    summaryParts.push(`${reposAhead} ahead`);
+  }
+
   logger.info('');
-  logger.info(
-    `${totalConfigured} configured, ${totalSynced} synced, ${totalNotSynced} not synced`,
-  );
+  logger.info(summaryParts.join(', '));
 
   // Legend (always printed)
   logger.info('');
