@@ -1,5 +1,6 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { execFile } from 'node:child_process';
 import { logger } from '@nx/devkit';
 import type { ExecutorContext, NxJsonConfiguration } from '@nx/devkit';
 import { validateConfig } from '../../config/validate';
@@ -16,6 +17,40 @@ import { detectRepoState } from '../../git/detect';
 
 export interface SyncExecutorOptions {
   strategy?: 'fetch' | 'pull' | 'rebase' | 'ff-only';
+}
+
+function detectPackageManager(
+  repoPath: string,
+): 'pnpm' | 'yarn' | 'npm' {
+  if (existsSync(join(repoPath, 'pnpm-lock.yaml'))) {
+    return 'pnpm';
+  }
+
+  if (existsSync(join(repoPath, 'yarn.lock'))) {
+    return 'yarn';
+  }
+
+  return 'npm';
+}
+
+function installDeps(repoPath: string, alias: string): Promise<void> {
+  const pm = detectPackageManager(repoPath);
+  const args = pm === 'yarn' ? ['install'] : ['install'];
+
+  logger.info(`Installing dependencies for ${alias} (${pm})...`);
+
+  return new Promise((resolve, reject) => {
+    execFile(pm, args, { cwd: repoPath }, (error, _stdout, stderr) => {
+      if (error) {
+        reject(new Error(stderr || error.message));
+
+        return;
+      }
+
+      logger.info(`Done: ${alias} dependencies installed.`);
+      resolve();
+    });
+  });
 }
 
 const tagPattern = /^v?\d+\.\d+/;
@@ -50,6 +85,19 @@ function getStrategyFn(
   }
 }
 
+async function tryInstallDeps(
+  repoPath: string,
+  alias: string,
+): Promise<void> {
+  try {
+    await installDeps(repoPath, alias);
+  } catch (error) {
+    logger.warn(
+      `Failed to install dependencies for ${alias}: ${error}. Run install manually in .repos/${alias}/`,
+    );
+  }
+}
+
 async function syncRepo(
   entry: NormalizedRepoEntry,
   workspaceRoot: string,
@@ -67,6 +115,7 @@ async function syncRepo(
         ref: entry.ref,
       });
       logger.info(`Done: ${entry.alias} cloned.`);
+      await tryInstallDeps(repoPath, entry.alias);
 
       return;
     }
@@ -75,6 +124,7 @@ async function syncRepo(
       logger.info(`Fetching tag ${entry.ref} for ${entry.alias}...`);
       await gitFetchTag(repoPath, entry.ref, entry.depth);
       logger.info(`Done: ${entry.alias} at tag ${entry.ref}.`);
+      await tryInstallDeps(repoPath, entry.alias);
 
       return;
     }
@@ -83,6 +133,7 @@ async function syncRepo(
     logger.info(`Updating ${entry.alias} (${strategy ?? 'pull'})...`);
     await strategyFn(repoPath);
     logger.info(`Done: ${entry.alias} updated.`);
+    await tryInstallDeps(repoPath, entry.alias);
 
     return;
   }
@@ -100,6 +151,7 @@ async function syncRepo(
   logger.info(`Updating local repo ${entry.alias} (${strategy ?? 'pull'})...`);
   await strategyFn(entry.path);
   logger.info(`Done: ${entry.alias} updated.`);
+  await tryInstallDeps(entry.path, entry.alias);
 }
 
 export default async function syncExecutor(

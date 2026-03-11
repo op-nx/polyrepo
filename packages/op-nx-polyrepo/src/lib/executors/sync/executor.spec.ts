@@ -109,6 +109,23 @@ describe('syncExecutor', () => {
     mockGitPullRebase.mockResolvedValue(undefined);
     mockGitPullFfOnly.mockResolvedValue(undefined);
     mockGitFetchTag.mockResolvedValue(undefined);
+    // Default: existsSync returns false (no lock files detected -> npm)
+    mockExistsSync.mockReturnValue(false);
+    // Default: execFile (used for install) succeeds immediately
+    mockExecFile.mockImplementation(((
+      _file: string,
+      _args: readonly string[],
+      _options: unknown,
+      callback?: (
+        error: ExecFileException | null,
+        stdout: string,
+        stderr: string,
+      ) => void,
+    ) => {
+      if (callback) {
+        callback(null, '', '');
+      }
+    }) as typeof execFile);
   });
 
   it('clones remote repo when .repos/<alias> does not exist', async () => {

@@ -1,4 +1,6 @@
+import { resolve } from 'node:path';
 import { z } from 'zod';
+import { normalizeGitUrl } from '../git/normalize-url';
 
 const gitUrlPattern = /^(git@|https?:\/\/|ssh:\/\/|file:\/\/)/;
 
@@ -22,11 +24,63 @@ const repoEntry = z.union([
   localRepoObject,
 ]);
 
+/**
+ * Extract the URL or path string from a repo entry for normalization.
+ */
+function extractRepoUrl(entry: z.infer<typeof repoEntry>): string {
+  if (typeof entry === 'string') {
+    if (gitUrlPattern.test(entry)) {
+      return entry;
+    }
+
+    // Local path -- resolve to absolute for comparison
+    return resolve(entry);
+  }
+
+  if ('url' in entry) {
+    return entry.url;
+  }
+
+  // Local path object -- resolve to absolute for comparison
+  return resolve(entry.path);
+}
+
 export const polyrepoConfigSchema = z.object({
   repos: z
     .record(z.string().min(1), repoEntry)
     .refine((repos) => Object.keys(repos).length > 0, {
       message: 'repos must contain at least one entry',
+    })
+    .check((ctx) => {
+      const repos = ctx.value;
+      const urlToAliases = new Map<string, string[]>();
+
+      for (const [alias, entry] of Object.entries(repos)) {
+        const rawUrl = extractRepoUrl(entry);
+        const normalized = gitUrlPattern.test(rawUrl)
+          ? normalizeGitUrl(rawUrl)
+          : rawUrl;
+        const existing = urlToAliases.get(normalized) ?? [];
+        existing.push(alias);
+        urlToAliases.set(normalized, existing);
+      }
+
+      const duplicates: string[] = [];
+
+      for (const aliases of urlToAliases.values()) {
+        if (aliases.length > 1) {
+          duplicates.push(aliases.join(', '));
+        }
+      }
+
+      if (duplicates.length > 0) {
+        ctx.issues.push({
+          code: 'custom',
+          message: `Duplicate repo URLs detected: [${duplicates.join('; ')}] point to the same repository`,
+          input: repos,
+          path: [],
+        });
+      }
     }),
 });
 
