@@ -1,9 +1,27 @@
 ---
 phase: 03-multi-repo-git-dx
-verified: 2026-03-11T12:00:00Z
+verified: 2026-03-11T14:00:00Z
 status: passed
-score: 3/3 must-haves verified
-re_verification: false
+score: 6/6 must-haves verified
+re_verification: true
+previous_status: passed
+previous_score: 3/3 (pre-UAT)
+gaps_closed:
+  - "Summary line shows count of repos behind and repos ahead"
+  - "Status shows detached HEAD warning when repo is pinned to a tag (WARN: tag-pinned)"
+  - "Sync dry-run shows detached HEAD and tag-pinned warnings alongside dirty warning"
+gaps_remaining: []
+regressions: []
+human_verification:
+  - test: "Run polyrepo-status with repos in various states (branch, tag, dirty)"
+    expected: "Each repo on its own line with aligned columns; summary shows N behind / N ahead when applicable; tag-pinned repos show [WARN: tag-pinned]; clean repos display 'ok'"
+    why_human: "Column alignment depends on real terminal width and live git data"
+  - test: "Run polyrepo-sync -- --dryRun with a repo in detached HEAD state"
+    expected: "Output shows both [WARN: dirty, may fail] and [WARN: detached HEAD] (or [WARN: tag-pinned]) simultaneously in the same row"
+    why_human: "Requires live repos and detached HEAD state to confirm multiple-warning rendering in terminal"
+  - test: "Run a full polyrepo-sync"
+    expected: "Streaming progress then Results table with [OK] / [ERROR] per repo, then summary count"
+    why_human: "Requires real network access and repos to verify full output sequence"
 ---
 
 # Phase 3: Multi-Repo Git DX Verification Report
@@ -11,123 +29,107 @@ re_verification: false
 **Phase Goal:** Users can monitor and manage git state across all synced repos from a single command surface
 **Verified:** 2026-03-11
 **Status:** passed
-**Re-verification:** No — initial verification
+**Re-verification:** Yes — after UAT gap closure (plans 03-04 and 03-05)
+
+## Context
+
+The initial VERIFICATION.md (pre-UAT) was written before UAT execution revealed three gaps. This report supersedes it. Plans 03-04 and 03-05 were executed to close those gaps, and this re-verification confirms all six must-haves from the gap-closure plans now pass.
 
 ## Goal Achievement
 
 ### Observable Truths
 
-| #  | Truth                                                                       | Status     | Evidence                                                                                           |
-|----|-----------------------------------------------------------------------------|------------|----------------------------------------------------------------------------------------------------|
-| 1  | User can run a single command to see combined git status of all synced repos | VERIFIED | `statusExecutor` in `status/executor.ts` iterates all configured repos, auto-fetches, and prints aligned per-repo rows via `formatAlignedTable` |
-| 2  | User can pull or fetch all synced repos with one command                    | VERIFIED | `syncExecutor` in `sync/executor.ts` processes all entries via `Promise.allSettled`; `--dry-run` added in schema.json and `SyncExecutorOptions` |
-| 3  | Git operations display clear per-repo output showing which repo succeeded and which failed | VERIFIED | Status executor prints one aligned line per repo with branch/dirty/ahead-behind columns; sync executor prints `Results:` table with `[OK]` / `[ERROR]` per repo |
+| # | Truth | Status | Evidence |
+|---|-------|--------|----------|
+| 1 | User can run a single command to see combined git status of all synced repos | VERIFIED | `statusExecutor` in `status/executor.ts` iterates all configured repos, auto-fetches, and renders aligned per-repo rows via `formatAlignedTable` |
+| 2 | User can pull or fetch all synced repos with one command | VERIFIED | `syncExecutor` in `sync/executor.ts` processes all entries via `Promise.allSettled`; `--dry-run` in `SyncExecutorOptions` and `schema.json` |
+| 3 | Git operations display clear per-repo output showing which repo succeeded and which failed | VERIFIED | Status: one aligned row per repo with branch/dirty/warnings; Sync: streaming progress + `Results:` table with `[OK]` / `[ERROR]` per repo |
+| 4 | Summary line shows count of repos behind and repos ahead | VERIFIED | `reposBehind` and `reposAhead` aggregated from `rawAheadBehind` at lines 297-315 of `status/executor.ts`; conditionally appended to summary parts |
+| 5 | Status shows `[WARN: tag-pinned]` for repos pinned to a tag | VERIFIED | `if (isTagPinned) { warnings.push('[WARN: tag-pinned]') }` at line 232-234 of `status/executor.ts`; distinct from `[WARN: detached HEAD]` guard at line 228 |
+| 6 | Sync dry-run shows detached HEAD and tag-pinned warnings, multiple per repo | VERIFIED | `executeDryRun` uses `warnings: string[]` array (line 234 of `sync/executor.ts`); calls `getCurrentBranch` at line 248, `getCurrentRef` at line 252; `isTagRef` check at line 254; `warnings.join(' ')` at line 271 |
 
-**Score:** 3/3 truths verified
+**Score:** 6/6 truths verified
 
----
+## Required Artifacts
 
-### Required Artifacts
-
-#### Plan 01 Artifacts
-
-| Artifact | Expected | Status | Details |
-|----------|----------|--------|---------|
-| `packages/op-nx-polyrepo/src/lib/git/detect.ts` | `getWorkingTreeState`, `getAheadBehind`, `WorkingTreeState`, `AheadBehind` | VERIFIED | All four exported at lines 88-182; parses porcelain v1 output via `execGitRawOutput`, handles all conflict patterns and edge cases |
-| `packages/op-nx-polyrepo/src/lib/git/detect.spec.ts` | Tests for `getWorkingTreeState` and `getAheadBehind` | VERIFIED | 11 tests for `getWorkingTreeState` (empty output, all categories, mixed, MM, conflict patterns) and 5 for `getAheadBehind` (parse, zero, two failure cases, arg check) |
-| `packages/op-nx-polyrepo/src/lib/format/table.ts` | `formatAlignedTable`, `ColumnDef` | VERIFIED | Exported at lines 1-49; computes per-column max widths, pads with `padEnd`/`padStart`, joins with two-space separator |
-| `packages/op-nx-polyrepo/src/lib/format/table.spec.ts` | Tests for `formatAlignedTable` | VERIFIED | 6 tests covering empty input, single row, left/right alignment, mixed alignment, uneven row lengths, separator |
-
-#### Plan 02 Artifacts
+### Plan 03-04 Artifacts (Gap Closure: Status Executor)
 
 | Artifact | Expected | Status | Details |
 |----------|----------|--------|---------|
-| `packages/op-nx-polyrepo/src/lib/executors/status/executor.ts` | Enhanced status executor with aligned columns, auto-fetch, warnings, project counts | VERIFIED | 307 lines; parallel `gitFetch` via `Promise.allSettled`, parallel state gathering, `formatAlignedTable` for output, all four warning types, summary + legend |
-| `packages/op-nx-polyrepo/src/lib/executors/status/executor.spec.ts` | Tests for all status output scenarios | VERIFIED | 14 test cases covering: synced/dirty/unsynced/tag-pinned repos, auto-fetch parallel and failure, all four warning types, project count fallback, summary line, legend, always-success |
+| `packages/op-nx-polyrepo/src/lib/executors/status/executor.ts` | Enhanced summary with behind/ahead counts, tag-pinned warning, 'ok' dirty label | VERIFIED | `formatDirtySummary` returns `'ok'` at line 90; `rawAheadBehind: AheadBehind \| null` in `RepoRowData` at line 97; `[WARN: tag-pinned]` push at line 233; `reposBehind`/`reposAhead` aggregation at lines 297-315 |
+| `packages/op-nx-polyrepo/src/lib/executors/status/executor.spec.ts` | 5 new tests for summary counts, 'ok' label, tag-pinned warning | VERIFIED | 21 total test cases; includes: `'summary line includes behind count'`, `'summary line includes ahead count'`, `'summary line omits behind/ahead when all repos are even'`, `'shows [WARN: tag-pinned] for tag-pinned repo'`, `'shows both dirty and tag-pinned warnings'`; `'ok'` assertions at lines 187 and 580 |
 
-#### Plan 03 Artifacts
+### Plan 03-05 Artifacts (Gap Closure: Sync Dry-Run)
 
 | Artifact | Expected | Status | Details |
 |----------|----------|--------|---------|
-| `packages/op-nx-polyrepo/src/lib/executors/sync/executor.ts` | Enhanced sync executor with `--dry-run` and aligned summary table | VERIFIED | `dryRun?: boolean` in `SyncExecutorOptions`; `executeDryRun` function shows predicted actions without executing; Results table with `[OK]`/`[ERROR]` added after `Promise.allSettled` |
-| `packages/op-nx-polyrepo/src/lib/executors/sync/executor.spec.ts` | Tests for dry-run and summary table | VERIFIED | 7 dry-run tests + 4 summary table tests added to existing suite; all assertions on logger output and mock call counts |
-| `packages/op-nx-polyrepo/src/lib/executors/sync/schema.json` | `dryRun` boolean option | VERIFIED | `dryRun` property at line 11 with `type: boolean`, `default: false`, description |
+| `packages/op-nx-polyrepo/src/lib/executors/sync/executor.ts` | `executeDryRun` with detached HEAD detection and warnings array | VERIFIED | `const warnings: string[] = []` at line 234; `getCurrentBranch` import and call at lines 16/248; `getCurrentRef` import and call at lines 16/252; `isTagRef` check at line 254; `[WARN: detached HEAD]` at line 257; `[WARN: tag-pinned]` at line 255; `warnings.join(' ')` at line 271 |
+| `packages/op-nx-polyrepo/src/lib/executors/sync/executor.spec.ts` | 4 new tests for detached HEAD and tag-pinned in dry-run, plus getCurrentBranch/getCurrentRef mocks | VERIFIED | 40 total test cases; mocks for `getCurrentBranch` and `getCurrentRef` added to `vi.mock('../../git/detect')` at line 39-44; default `mockGetCurrentBranch.mockResolvedValue('main')` in `beforeEach` at line 127; 4 new dry-run tests at lines 915-1027 |
 
----
+## Key Link Verification
 
-### Key Link Verification
-
-#### Plan 01 Links
+### Plan 03-04 Links
 
 | From | To | Via | Status | Details |
 |------|----|-----|--------|---------|
-| `detect.ts` | `node:child_process execFile` | `execGitRawOutput` for porcelain | WIRED | `execGitRawOutput` at line 42 calls `execFile('git', ['status', '--porcelain=v1'], ...)` |
-| `format/table.ts` | `String.padEnd / String.padStart` | column width calculation | WIRED | `padStart` at line 42, `padEnd` at line 44 |
+| `RepoRowData` collection loop | summary line `logger.info` | `rawAheadBehind` retained and aggregated via `reposBehind`/`reposAhead` | WIRED | `rawAheadBehind: aheadBehind` stored at line 248; filtered at lines 297-302; pushed to `summaryParts` at lines 311/315 |
+| `isTagPinned` check | `warnings` array push | new `if (isTagPinned)` branch | WIRED | `if (isTagPinned) { warnings.push('[WARN: tag-pinned]'); }` at lines 232-234, separate from `if (isDetachedHead && !isTagPinned)` guard at line 228 |
 
-#### Plan 02 Links
-
-| From | To | Via | Status | Details |
-|------|----|-----|--------|---------|
-| `status/executor.ts` | `git/detect.ts` | `import getWorkingTreeState, getAheadBehind, getCurrentBranch, getCurrentRef, detectRepoState` | WIRED | Lines 7-13 import all five; all are called in the parallel state gathering block |
-| `status/executor.ts` | `format/table.ts` | `import formatAlignedTable` | WIRED | Line 16; called at line 279 with built `tableRows` |
-| `status/executor.ts` | `git/commands.ts` | `import gitFetch` | WIRED | Line 15; called at line 143 inside `Promise.allSettled` map |
-| `status/executor.ts` | `.repos/.polyrepo-graph-cache.json` | `readJsonFile` from `@nx/devkit` | WIRED | `getProjectCount` helper at line 48 reads cache via `readJsonFile<GraphCacheFile>(cachePath)` and returns `Object.keys(repoReport.nodes).length` |
-
-#### Plan 03 Links
+### Plan 03-05 Links
 
 | From | To | Via | Status | Details |
 |------|----|-----|--------|---------|
-| `sync/executor.ts` | `format/table.ts` | `import formatAlignedTable` | WIRED | Line 17; called in both `executeDryRun` (line 262) and main executor (line 335) |
-| `sync/executor.ts` | `git/detect.ts` | `import getWorkingTreeState` | WIRED | Line 16; called at line 240 inside `executeDryRun` for dirty detection |
-| `sync/schema.json` | `executors.json` | `schema` reference in executor registration | WIRED | `executors.json` line 4: `"schema": "./src/lib/executors/sync/schema.json"` |
+| `executeDryRun` for-loop | `getCurrentBranch` import | calls `getCurrentBranch` to detect detached HEAD | WIRED | Import at line 16; call at line 248 within `if (state !== 'not-synced')` block |
+| `warnings` array | table row construction | `warnings.join(' ')` replaces single string | WIRED | `{ value: warnings.join(' ') }` at line 271 in `rows.push(...)` call |
 
----
+## Requirements Coverage
 
-### Requirements Coverage
-
-| Requirement | Source Plan | Description | Status | Evidence |
+| Requirement | Source Plans | Description | Status | Evidence |
 |-------------|-------------|-------------|--------|----------|
-| GITX-01 | 03-01, 03-02 | User can see combined git status of all synced repos in one command | SATISFIED | `statusExecutor` collects state for all configured repos and outputs aligned table; marked complete in REQUIREMENTS.md |
-| GITX-02 | 03-03 | User can pull/fetch all synced repos with one command | SATISFIED | `syncExecutor` syncs all repos in parallel; `--dry-run` added to let user preview without executing; marked complete in REQUIREMENTS.md |
-| GITX-03 | 03-01, 03-02, 03-03 | Git operations show clear per-repo output (which repo succeeded/failed) | SATISFIED | Status: one aligned line per repo with branch/dirty/warnings; Sync: streaming progress + final Results table with `[OK]`/`[ERROR]` per repo; marked complete in REQUIREMENTS.md |
+| GITX-01 | 03-01, 03-02, 03-04 | User can see combined git status of all synced repos in one command | SATISFIED | `statusExecutor` outputs aligned table; summary now includes behind/ahead counts; 'ok' label; tag-pinned warning all implemented and tested |
+| GITX-02 | 03-03, 03-05 | User can pull/fetch all synced repos with one command | SATISFIED | `syncExecutor` syncs all repos in parallel; `--dry-run` shows predicted actions; detached HEAD detection added |
+| GITX-03 | 03-01, 03-02, 03-03, 03-04, 03-05 | Git operations show clear per-repo output (which repo succeeded/failed) | SATISFIED | Status: aligned row per repo with all warning types; Sync: `[OK]`/`[ERROR]` results table; multi-warning array displays both dirty and detached HEAD simultaneously |
 
-No orphaned requirements found. REQUIREMENTS.md traceability table marks all three as complete. No Phase 3 requirements were left unmapped.
+No orphaned requirements. All three GITX requirements are marked Complete in REQUIREMENTS.md traceability table. No Phase 3 requirements were left unmapped.
 
----
+## Anti-Patterns Found
 
-### Anti-Patterns Found
+None detected. Scanned `status/executor.ts` and `sync/executor.ts` for TODO/FIXME/HACK, placeholder comments, empty returns, and stub implementations. The two `return null` occurrences at lines 58 and 63 of `status/executor.ts` are legitimate error-path returns inside `getProjectCount`'s catch block, not stubs.
 
-None detected. Scanned all six phase-modified source files for TODO/FIXME/HACK/placeholder comments, empty returns, and stub implementations. All clear.
+## Human Verification Required
 
----
+The following behaviors require a running workspace to fully confirm.
 
-### Human Verification Required
+### 1. Status aligned output with all warning types
 
-The following behaviors require a running workspace to fully confirm. All automated checks passed; these are supplemental confidence checks.
+**Test:** Configure repos in different states (one on a branch, one tag-pinned, one dirty), run `npm exec nx polyrepo-status`
+**Expected:** Each repo on its own aligned line; tag-pinned repo shows `[WARN: tag-pinned]`; dirty repo shows `[WARN: dirty, sync may fail]`; summary line appends `N behind` / `N ahead` when applicable; clean repos display `ok`
+**Why human:** Column alignment depends on real terminal width and live git data; summary counts require actual ahead/behind values from live remotes
 
-#### 1. Status executor live output
+### 2. Sync dry-run multi-warning display
 
-**Test:** Configure two remote repos in nx.json, run `pnpm nx run @op-nx/source:polyrepo-status`
-**Expected:** One aligned line per repo with branch name, `+N -N` ahead/behind, dirty file count or `clean`, project count, and any warnings. Legend and summary line follow.
-**Why human:** Column alignment depends on actual terminal width and real git data; auto-fetch timing is runtime behavior.
+**Test:** Create a repo in detached HEAD state with a dirty working tree, run `npm exec nx polyrepo-sync -- --dryRun`
+**Expected:** That repo's row shows both `[WARN: dirty, may fail]` and `[WARN: detached HEAD]` (space-separated) in a single table cell
+**Why human:** Requires live repos with controlled detached HEAD state; confirms multi-warning rendering at terminal width
 
-#### 2. Sync dry-run live output
+### 3. Full sync Results table
 
-**Test:** Run `pnpm nx run @op-nx/source:polyrepo-sync -- --dryRun`
-**Expected:** Table showing `would clone` / `would pull` / `would fetch tag` per repo; dirty repos show `[WARN: dirty, may fail]`; no actual git commands executed.
-**Why human:** Requires live repos to confirm no git I/O occurs and the predicted actions are accurate.
+**Test:** Run `npm exec nx polyrepo-sync`
+**Expected:** Streaming progress lines (`Cloning...`, `Done:`), then `Results:` header, aligned table with `[OK]` or `[ERROR]` per repo, then `N synced, M failed` summary
+**Why human:** Requires real network access and cloneable repos to verify the full output sequence
 
-#### 3. Sync Results table after actual sync
+## Gaps Summary
 
-**Test:** Run `pnpm nx run @op-nx/source:polyrepo-sync`
-**Expected:** Streaming progress lines (`Cloning...`, `Done:`), then `Results:` header, then aligned table with `[OK]` or `[ERROR]` per repo, then summary count.
-**Why human:** Requires real network access and repos to verify the full output sequence.
+All three UAT gaps have been closed:
 
----
+**Gap 1 (UAT Test 1, minor) — Closed by plan 03-04:**
+Summary line now includes `N behind` / `N ahead` repo counts when applicable. `rawAheadBehind` field added to `RepoRowData`; filtered after table rendering; conditionally appended to `summaryParts`. Clean repos show `ok` instead of `clean`.
 
-### Gaps Summary
+**Gap 2 (UAT Test 4, major) — Closed by plan 03-04:**
+Tag-pinned repos now display `[WARN: tag-pinned]` via a dedicated `if (isTagPinned)` block placed after the detached HEAD guard. The two warnings are mutually exclusive (tag-pinned is a subset of detached HEAD), so they cannot both appear simultaneously. Separate tests confirm the tag-pinned-only case and the dirty+tag-pinned case.
 
-No gaps found. All three phase success criteria are fully implemented and wired. All 8 commit hashes documented in summaries are present in git log. The implementation is substantive — no stubs or placeholder handlers detected.
+**Gap 3 (UAT Test 6, major) — Closed by plan 03-05:**
+`executeDryRun` in `sync/executor.ts` now calls `getCurrentBranch` for each synced repo. When branch is null (detached HEAD), `getCurrentRef` is called and `isTagRef` determines whether to emit `[WARN: tag-pinned]` or `[WARN: detached HEAD]`. Warning accumulation refactored from a single `let warning = ''` string to `const warnings: string[]` array, enabling simultaneous multiple warnings per repo via `warnings.join(' ')`.
 
 ---
 
