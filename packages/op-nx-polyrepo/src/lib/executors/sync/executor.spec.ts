@@ -6,7 +6,6 @@ vi.mock('node:fs', () => ({
   readFileSync: vi.fn(),
   existsSync: vi.fn(),
   writeFileSync: vi.fn(),
-  unlinkSync: vi.fn(),
 }));
 
 vi.mock('node:child_process', () => ({
@@ -53,7 +52,7 @@ vi.mock('../../format/table', () => ({
   ),
 }));
 
-import { readFileSync, existsSync, writeFileSync, unlinkSync } from 'node:fs';
+import { readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { logger } from '@nx/devkit';
@@ -76,7 +75,6 @@ import syncExecutor from './executor';
 const mockReadFileSync = vi.mocked(readFileSync);
 const mockExistsSync = vi.mocked(existsSync);
 const mockWriteFileSync = vi.mocked(writeFileSync);
-const mockUnlinkSync = vi.mocked(unlinkSync);
 const mockSpawn = vi.mocked(spawn);
 
 function createMockChildProcess(exitCode = 0): ReturnType<typeof spawn> {
@@ -1498,7 +1496,56 @@ describe('syncExecutor', () => {
       mockSpawn.mockImplementation(() => createMockChildProcess(0));
     }
 
-    function setupUnchangedLockfile(): void {
+    /**
+     * Simulate deps already installed: lockfile exists and stored hash matches.
+     * needsInstall() returns false.
+     */
+    function setupDepsInstalled(): void {
+      const nxJsonContent = JSON.stringify({
+        plugins: [{ plugin: '@op-nx/polyrepo', options: fakeConfig }],
+      });
+      const lockContent = Buffer.from('lockfile-content');
+      const hash = require('node:crypto')
+        .createHash('sha256')
+        .update(lockContent)
+        .digest('hex');
+      mockExistsSync.mockImplementation((p) => {
+        const path = String(p);
+
+        if (path.endsWith('pnpm-lock.yaml')) {
+          return true;
+        }
+
+        if (path.endsWith('.op-nx-installed-lock-hash')) {
+          return true;
+        }
+
+        return false;
+      });
+      mockReadFileSync.mockImplementation((p) => {
+        const path = String(p);
+
+        if (path.endsWith('nx.json')) {
+          return nxJsonContent;
+        }
+
+        if (path.endsWith('pnpm-lock.yaml')) {
+          return lockContent;
+        }
+
+        if (path.endsWith('.op-nx-installed-lock-hash')) {
+          return hash;
+        }
+
+        return '';
+      });
+    }
+
+    /**
+     * Simulate deps need install: lockfile exists but no stored hash file.
+     * needsInstall() returns true.
+     */
+    function setupDepsNotInstalled(): void {
       const nxJsonContent = JSON.stringify({
         plugins: [{ plugin: '@op-nx/polyrepo', options: fakeConfig }],
       });
@@ -1515,43 +1562,14 @@ describe('syncExecutor', () => {
         }
 
         if (String(p).endsWith('pnpm-lock.yaml')) {
-          return Buffer.from('lockfile-content-unchanged');
+          return Buffer.from('lockfile-content');
         }
 
         return '';
       });
     }
 
-    function setupChangedLockfile(): void {
-      const nxJsonContent = JSON.stringify({
-        plugins: [{ plugin: '@op-nx/polyrepo', options: fakeConfig }],
-      });
-      let lockfileCallCount = 0;
-      mockExistsSync.mockImplementation((p) => {
-        if (String(p).endsWith('pnpm-lock.yaml')) {
-          return true;
-        }
-
-        return false;
-      });
-      mockReadFileSync.mockImplementation((p) => {
-        if (String(p).endsWith('nx.json')) {
-          return nxJsonContent;
-        }
-
-        if (String(p).endsWith('pnpm-lock.yaml')) {
-          lockfileCallCount++;
-
-          return Buffer.from(
-            lockfileCallCount <= 1 ? 'lockfile-v1' : 'lockfile-v2',
-          );
-        }
-
-        return '';
-      });
-    }
-
-    it('skips install after tag fetch when lockfile unchanged', async () => {
+    it('skips install when lockfile hash matches stored hash (deps up to date)', async () => {
       setupPluginConfig([
         {
           type: 'remote',
@@ -1564,7 +1582,7 @@ describe('syncExecutor', () => {
       ]);
       mockDetectRepoState.mockReturnValue('cloned');
       mockIsGitTag.mockResolvedValue(true);
-      setupUnchangedLockfile();
+      setupDepsInstalled();
       setupSpawnMockSuccess();
 
       await syncExecutor({}, createContext());
@@ -1572,7 +1590,7 @@ describe('syncExecutor', () => {
       expect(mockSpawn).not.toHaveBeenCalled();
     });
 
-    it('installs after tag fetch when lockfile changed', async () => {
+    it('installs when no stored hash exists (first install or failed previous)', async () => {
       setupPluginConfig([
         {
           type: 'remote',
@@ -1585,7 +1603,7 @@ describe('syncExecutor', () => {
       ]);
       mockDetectRepoState.mockReturnValue('cloned');
       mockIsGitTag.mockResolvedValue(true);
-      setupChangedLockfile();
+      setupDepsNotInstalled();
       setupSpawnMockSuccess();
 
       await syncExecutor({}, createContext());
@@ -1596,7 +1614,7 @@ describe('syncExecutor', () => {
       );
     });
 
-    it('skips install after pull when lockfile unchanged', async () => {
+    it('installs after pull when no stored hash exists', async () => {
       setupPluginConfig([
         {
           type: 'remote',
@@ -1608,35 +1626,35 @@ describe('syncExecutor', () => {
         },
       ]);
       mockDetectRepoState.mockReturnValue('cloned');
-      setupUnchangedLockfile();
+      setupDepsNotInstalled();
+      setupSpawnMockSuccess();
+
+      await syncExecutor({}, createContext());
+
+      expect(mockSpawn).toHaveBeenCalledWith(
+        expect.stringContaining('install'),
+        expect.objectContaining({ shell: true, windowsHide: true }),
+      );
+    });
+
+    it('skips install after pull when deps already installed', async () => {
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          ref: 'main',
+          depth: 1,
+          disableHooks: true,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('cloned');
+      setupDepsInstalled();
       setupSpawnMockSuccess();
 
       await syncExecutor({}, createContext());
 
       expect(mockSpawn).not.toHaveBeenCalled();
-    });
-
-    it('installs after pull when lockfile changed', async () => {
-      setupPluginConfig([
-        {
-          type: 'remote',
-          alias: 'repo-a',
-          url: 'https://github.com/org/repo-a.git',
-          ref: 'main',
-          depth: 1,
-          disableHooks: true,
-        },
-      ]);
-      mockDetectRepoState.mockReturnValue('cloned');
-      setupChangedLockfile();
-      setupSpawnMockSuccess();
-
-      await syncExecutor({}, createContext());
-
-      expect(mockSpawn).toHaveBeenCalledWith(
-        expect.stringContaining('install'),
-        expect.objectContaining({ shell: true, windowsHide: true }),
-      );
     });
 
     it('always installs after clone (new repo)', async () => {
@@ -1683,7 +1701,7 @@ describe('syncExecutor', () => {
       );
     });
 
-    it('retries install when lockfile unchanged but previous install failed (marker exists)', async () => {
+    it('retries install when previous install failed (no stored hash written)', async () => {
       setupPluginConfig([
         {
           type: 'remote',
@@ -1696,35 +1714,9 @@ describe('syncExecutor', () => {
       ]);
       mockDetectRepoState.mockReturnValue('cloned');
       mockIsGitTag.mockResolvedValue(true);
+      // Lockfile exists but no stored hash → needsInstall returns true
+      setupDepsNotInstalled();
       setupSpawnMockSuccess();
-
-      const nxJsonContent = JSON.stringify({
-        plugins: [{ plugin: '@op-nx/polyrepo', options: fakeConfig }],
-      });
-      mockExistsSync.mockImplementation((p) => {
-        const path = String(p);
-
-        if (path.endsWith('.op-nx-needs-install')) {
-          return true;
-        }
-
-        if (path.endsWith('pnpm-lock.yaml')) {
-          return true;
-        }
-
-        return false;
-      });
-      mockReadFileSync.mockImplementation((p) => {
-        if (String(p).endsWith('nx.json')) {
-          return nxJsonContent;
-        }
-
-        if (String(p).endsWith('pnpm-lock.yaml')) {
-          return Buffer.from('lockfile-content-unchanged');
-        }
-
-        return '';
-      });
 
       await syncExecutor({}, createContext());
 
@@ -1734,7 +1726,7 @@ describe('syncExecutor', () => {
       );
     });
 
-    it('writes marker before install and removes it on success', async () => {
+    it('writes stored hash after successful install', async () => {
       setupPluginConfig([
         {
           type: 'remote',
@@ -1745,27 +1737,18 @@ describe('syncExecutor', () => {
         },
       ]);
       mockDetectRepoState.mockReturnValue('not-synced');
-      mockExistsSync.mockImplementation((p) => {
-        if (String(p).endsWith('.op-nx-needs-install')) {
-          return true;
-        }
-
-        return false;
-      });
+      setupDepsNotInstalled();
       setupSpawnMockSuccess();
 
       await syncExecutor({}, createContext());
 
       expect(mockWriteFileSync).toHaveBeenCalledWith(
-        expect.stringContaining('.op-nx-needs-install'),
-        '',
-      );
-      expect(mockUnlinkSync).toHaveBeenCalledWith(
-        expect.stringContaining('.op-nx-needs-install'),
+        expect.stringContaining('.op-nx-installed-lock-hash'),
+        expect.any(String),
       );
     });
 
-    it('does not remove marker when install fails', async () => {
+    it('does not write stored hash when install fails', async () => {
       setupPluginConfig([
         {
           type: 'remote',
@@ -1781,19 +1764,19 @@ describe('syncExecutor', () => {
 
       await syncExecutor({}, createContext());
 
-      expect(mockWriteFileSync).toHaveBeenCalledWith(
-        expect.stringContaining('.op-nx-needs-install'),
-        '',
+      const hashWrites = mockWriteFileSync.mock.calls.filter(
+        (call) => String(call[0]).endsWith('.op-nx-installed-lock-hash'),
       );
-      expect(mockUnlinkSync).not.toHaveBeenCalled();
+
+      expect(hashWrites).toHaveLength(0);
     });
 
-    it('skips install for local repo when lockfile unchanged', async () => {
+    it('skips install for local repo when deps already installed', async () => {
       setupPluginConfig([
         { type: 'local', alias: 'repo-b', path: 'D:/projects/repo-b' },
       ]);
       mockDetectRepoState.mockReturnValue('referenced');
-      setupUnchangedLockfile();
+      setupDepsInstalled();
       setupSpawnMockSuccess();
 
       await syncExecutor({}, createContext());
