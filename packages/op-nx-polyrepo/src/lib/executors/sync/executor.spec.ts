@@ -158,6 +158,7 @@ describe('syncExecutor', () => {
         alias: 'repo-a',
         url: 'https://github.com/org/repo-a.git',
         depth: 1,
+        disableHooks: true,
       },
     ]);
     mockDetectRepoState.mockReturnValue('not-synced');
@@ -180,6 +181,7 @@ describe('syncExecutor', () => {
         url: 'https://github.com/org/repo-a.git',
         ref: 'main',
         depth: 1,
+        disableHooks: true,
       },
     ]);
     mockDetectRepoState.mockReturnValue('cloned');
@@ -199,6 +201,7 @@ describe('syncExecutor', () => {
         url: 'https://github.com/org/repo-a.git',
         ref: 'v1.2.3',
         depth: 1,
+        disableHooks: true,
       },
     ]);
     mockDetectRepoState.mockReturnValue('cloned');
@@ -248,6 +251,7 @@ describe('syncExecutor', () => {
         alias: 'repo-a',
         url: 'https://github.com/org/repo-a.git',
         depth: 0,
+        disableHooks: true,
       },
     ]);
     mockDetectRepoState.mockReturnValue('not-synced');
@@ -269,6 +273,7 @@ describe('syncExecutor', () => {
         url: 'https://github.com/org/repo-a.git',
         ref: 'develop',
         depth: 1,
+        disableHooks: true,
       },
     ]);
     mockDetectRepoState.mockReturnValue('not-synced');
@@ -289,12 +294,14 @@ describe('syncExecutor', () => {
         alias: 'repo-a',
         url: 'https://github.com/org/repo-a.git',
         depth: 1,
+        disableHooks: true,
       },
       {
         type: 'remote',
         alias: 'repo-b',
         url: 'https://github.com/org/repo-b.git',
         depth: 1,
+        disableHooks: true,
       },
       { type: 'local', alias: 'repo-c', path: 'D:/projects/repo-c' },
     ]);
@@ -315,6 +322,7 @@ describe('syncExecutor', () => {
         alias: 'repo-a',
         url: 'https://github.com/org/repo-a.git',
         depth: 1,
+        disableHooks: true,
       },
     ]);
     mockDetectRepoState.mockReturnValue('not-synced');
@@ -331,12 +339,14 @@ describe('syncExecutor', () => {
         alias: 'repo-a',
         url: 'https://github.com/org/repo-a.git',
         depth: 1,
+        disableHooks: true,
       },
       {
         type: 'remote',
         alias: 'repo-b',
         url: 'https://github.com/org/repo-b.git',
         depth: 1,
+        disableHooks: true,
       },
     ]);
     mockDetectRepoState.mockReturnValue('not-synced');
@@ -356,6 +366,7 @@ describe('syncExecutor', () => {
         alias: 'repo-a',
         url: 'https://github.com/org/repo-a.git',
         depth: 1,
+        disableHooks: true,
       },
     ]);
     mockDetectRepoState.mockReturnValue('not-synced');
@@ -374,6 +385,7 @@ describe('syncExecutor', () => {
         alias: 'repo-a',
         url: 'https://github.com/org/repo-a.git',
         depth: 1,
+        disableHooks: true,
       },
     ]);
     mockDetectRepoState.mockReturnValue('not-synced');
@@ -428,6 +440,7 @@ describe('syncExecutor', () => {
           alias: 'repo-a',
           url: 'https://github.com/org/repo-a.git',
           depth: 1,
+          disableHooks: true,
         },
       ]);
       mockDetectRepoState.mockReturnValue('not-synced');
@@ -453,6 +466,7 @@ describe('syncExecutor', () => {
           alias: 'repo-a',
           url: 'https://github.com/org/repo-a.git',
           depth: 1,
+          disableHooks: true,
         },
       ]);
       mockDetectRepoState.mockReturnValue('not-synced');
@@ -485,6 +499,7 @@ describe('syncExecutor', () => {
           alias: 'repo-a',
           url: 'https://github.com/org/repo-a.git',
           depth: 1,
+          disableHooks: true,
         },
       ]);
       mockDetectRepoState.mockReturnValue('not-synced');
@@ -517,6 +532,7 @@ describe('syncExecutor', () => {
           alias: 'repo-a',
           url: 'https://github.com/org/repo-a.git',
           depth: 1,
+          disableHooks: true,
         },
       ]);
       mockDetectRepoState.mockReturnValue('cloned');
@@ -562,6 +578,7 @@ describe('syncExecutor', () => {
           alias: 'repo-a',
           url: 'https://github.com/org/repo-a.git',
           depth: 1,
+          disableHooks: true,
         },
       ]);
       mockDetectRepoState.mockReturnValue('not-synced');
@@ -608,6 +625,7 @@ describe('syncExecutor', () => {
           alias: 'repo-a',
           url: 'https://github.com/org/repo-a.git',
           depth: 1,
+          disableHooks: true,
         },
       ]);
       mockDetectRepoState.mockReturnValue('not-synced');
@@ -651,6 +669,7 @@ describe('syncExecutor', () => {
           alias: 'repo-a',
           url: 'https://github.com/org/repo-a.git',
           depth: 1,
+          disableHooks: true,
         },
       ]);
       mockDetectRepoState.mockReturnValue('not-synced');
@@ -698,6 +717,7 @@ describe('syncExecutor', () => {
           alias: 'repo-a',
           url: 'https://github.com/org/repo-a.git',
           depth: 1,
+          disableHooks: true,
         },
       ]);
       mockDetectRepoState.mockReturnValue('not-synced');
@@ -721,6 +741,7 @@ describe('syncExecutor', () => {
           alias: 'repo-a',
           url: 'https://github.com/org/repo-a.git',
           depth: 1,
+          disableHooks: true,
         },
       ]);
       mockDetectRepoState.mockReturnValue('cloned');
@@ -737,6 +758,7 @@ describe('syncExecutor', () => {
           alias: 'repo-a',
           url: 'https://github.com/org/repo-a.git',
           depth: 1,
+          disableHooks: true,
         },
       ]);
       mockDetectRepoState.mockReturnValue('cloned');
@@ -754,6 +776,7 @@ describe('syncExecutor', () => {
           alias: 'repo-a',
           url: 'https://github.com/org/repo-a.git',
           depth: 1,
+          disableHooks: true,
         },
       ]);
       mockDetectRepoState.mockReturnValue('cloned');
@@ -771,6 +794,7 @@ describe('syncExecutor', () => {
           alias: 'repo-a',
           url: 'https://github.com/org/repo-a.git',
           depth: 1,
+          disableHooks: true,
         },
       ]);
       mockDetectRepoState.mockReturnValue('cloned');
@@ -790,6 +814,7 @@ describe('syncExecutor', () => {
           alias: 'repo-a',
           url: 'https://github.com/org/repo-a.git',
           depth: 1,
+          disableHooks: true,
         },
       ]);
       mockDetectRepoState.mockReturnValue('not-synced');
@@ -813,6 +838,7 @@ describe('syncExecutor', () => {
           url: 'https://github.com/org/repo-a.git',
           ref: 'main',
           depth: 1,
+          disableHooks: true,
         },
       ]);
       mockDetectRepoState.mockReturnValue('cloned');
@@ -836,6 +862,7 @@ describe('syncExecutor', () => {
           url: 'https://github.com/org/repo-a.git',
           ref: 'v1.2.3',
           depth: 1,
+          disableHooks: true,
         },
       ]);
       mockDetectRepoState.mockReturnValue('cloned');
@@ -859,6 +886,7 @@ describe('syncExecutor', () => {
           url: 'https://github.com/org/repo-a.git',
           ref: 'main',
           depth: 1,
+          disableHooks: true,
         },
       ]);
       mockDetectRepoState.mockReturnValue('cloned');
@@ -903,6 +931,7 @@ describe('syncExecutor', () => {
           alias: 'repo-a',
           url: 'https://github.com/org/repo-a.git',
           depth: 1,
+          disableHooks: true,
         },
       ]);
       mockDetectRepoState.mockReturnValue('not-synced');
@@ -920,6 +949,7 @@ describe('syncExecutor', () => {
           url: 'https://github.com/org/repo-a.git',
           ref: 'main',
           depth: 1,
+          disableHooks: true,
         },
       ]);
       mockDetectRepoState.mockReturnValue('cloned');
@@ -944,6 +974,7 @@ describe('syncExecutor', () => {
           url: 'https://github.com/org/repo-a.git',
           ref: 'v1.2.3',
           depth: 1,
+          disableHooks: true,
         },
       ]);
       mockDetectRepoState.mockReturnValue('cloned');
@@ -968,6 +999,7 @@ describe('syncExecutor', () => {
           url: 'https://github.com/org/repo-a.git',
           ref: 'main',
           depth: 1,
+          disableHooks: true,
         },
       ]);
       mockDetectRepoState.mockReturnValue('cloned');
@@ -1001,6 +1033,7 @@ describe('syncExecutor', () => {
           url: 'https://github.com/org/repo-a.git',
           ref: 'v1.2.3',
           depth: 1,
+          disableHooks: true,
         },
       ]);
       mockDetectRepoState.mockReturnValue('cloned');
@@ -1034,6 +1067,7 @@ describe('syncExecutor', () => {
           url: 'https://github.com/org/repo-a.git',
           ref: 'main',
           depth: 1,
+          disableHooks: true,
         },
         {
           type: 'remote',
@@ -1041,6 +1075,7 @@ describe('syncExecutor', () => {
           url: 'https://github.com/org/repo-b.git',
           ref: 'v1.2.3',
           depth: 1,
+          disableHooks: true,
         },
       ]);
       mockDetectRepoState.mockReturnValue('cloned');
@@ -1064,12 +1099,14 @@ describe('syncExecutor', () => {
           alias: 'repo-a',
           url: 'https://github.com/org/repo-a.git',
           depth: 1,
+          disableHooks: true,
         },
         {
           type: 'remote',
           alias: 'repo-b',
           url: 'https://github.com/org/repo-b.git',
           depth: 1,
+          disableHooks: true,
         },
       ]);
       mockDetectRepoState.mockReturnValue('not-synced');
@@ -1090,12 +1127,14 @@ describe('syncExecutor', () => {
           alias: 'repo-a',
           url: 'https://github.com/org/repo-a.git',
           depth: 1,
+          disableHooks: true,
         },
         {
           type: 'remote',
           alias: 'repo-b',
           url: 'https://github.com/org/repo-b.git',
           depth: 1,
+          disableHooks: true,
         },
       ]);
       mockDetectRepoState.mockReturnValue('not-synced');
@@ -1124,6 +1163,7 @@ describe('syncExecutor', () => {
           alias: 'repo-a',
           url: 'https://github.com/org/repo-a.git',
           depth: 1,
+          disableHooks: true,
         },
       ]);
       mockDetectRepoState.mockReturnValue('not-synced');
@@ -1151,12 +1191,14 @@ describe('syncExecutor', () => {
           alias: 'repo-a',
           url: 'https://github.com/org/repo-a.git',
           depth: 1,
+          disableHooks: true,
         },
         {
           type: 'remote',
           alias: 'repo-b',
           url: 'https://github.com/org/repo-b.git',
           depth: 1,
+          disableHooks: true,
         },
       ]);
       mockDetectRepoState.mockReturnValue('not-synced');
@@ -1174,6 +1216,106 @@ describe('syncExecutor', () => {
       expect(summaryLine).toBeDefined();
       expect(summaryLine).toContain('1 synced');
       expect(summaryLine).toContain('1 failed');
+    });
+  });
+
+  describe('disableHooks', () => {
+    it('passes disableHooks=true to gitClone by default for remote repos', async () => {
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          depth: 1,
+          disableHooks: true,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('not-synced');
+
+      await syncExecutor({}, createContext());
+
+      expect(mockGitClone).toHaveBeenCalledWith(
+        'https://github.com/org/repo-a.git',
+        expect.stringContaining('.repos'),
+        expect.objectContaining({ disableHooks: true }),
+      );
+    });
+
+    it('passes disableHooks=true to gitPull by default for synced remote repos', async () => {
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          depth: 1,
+          disableHooks: true,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('cloned');
+
+      await syncExecutor({}, createContext());
+
+      expect(mockGitPull).toHaveBeenCalledWith(
+        expect.stringContaining('.repos'),
+        true,
+      );
+    });
+
+    it('passes disableHooks=true to gitFetchTag for tag ref repos', async () => {
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          ref: 'v1.2.3',
+          depth: 1,
+          disableHooks: true,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('cloned');
+
+      await syncExecutor({}, createContext());
+
+      expect(mockGitFetchTag).toHaveBeenCalledWith(
+        expect.stringContaining('.repos'),
+        'v1.2.3',
+        1,
+        true,
+      );
+    });
+
+    it('does not pass disableHooks for local repos', async () => {
+      setupPluginConfig([
+        { type: 'local', alias: 'repo-b', path: 'D:/projects/repo-b' },
+      ]);
+      mockDetectRepoState.mockReturnValue('referenced');
+
+      await syncExecutor({}, createContext());
+
+      expect(mockGitPull).toHaveBeenCalledWith(
+        'D:/projects/repo-b',
+        undefined,
+      );
+    });
+
+    it('passes disableHooks=false when explicitly set to false', async () => {
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          depth: 1,
+          disableHooks: false,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('cloned');
+
+      await syncExecutor({}, createContext());
+
+      expect(mockGitPull).toHaveBeenCalledWith(
+        expect.stringContaining('.repos'),
+        false,
+      );
     });
   });
 });
