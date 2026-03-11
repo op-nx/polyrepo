@@ -1,7 +1,6 @@
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { hashArray, readJsonFile, writeJsonFile } from '@nx/devkit';
-import { workspaceDataDirectory } from 'nx/src/utils/cache-directory';
 import { getHeadSha, getDirtyFiles } from '../git/detect';
 import { normalizeRepos } from '../config/schema';
 import { extractGraphFromRepo } from './extract';
@@ -16,15 +15,21 @@ import type { PolyrepoGraphReport } from './types';
 let graphReport: PolyrepoGraphReport | undefined;
 let currentHash: string | undefined;
 
-const CACHE_FILENAME = 'polyrepo-graph-cache.json';
+const CACHE_FILENAME = '.polyrepo-graph-cache.json';
 
 interface CacheFile {
   hash: string;
   report: PolyrepoGraphReport;
 }
 
-function getCachePath(): string {
-  return join(workspaceDataDirectory, CACHE_FILENAME);
+/**
+ * Store cache in `.repos/` rather than `.nx/workspace-data/`.
+ * `nx reset` wipes `.nx/`, which forces a costly re-extraction
+ * that exceeds the daemon's plugin worker timeout for large repos.
+ * `.repos/` is already gitignored and survives resets.
+ */
+function getCachePath(workspaceRoot: string): string {
+  return join(workspaceRoot, '.repos', CACHE_FILENAME);
 }
 
 /**
@@ -83,7 +88,7 @@ export async function populateGraphReport(
 
   // Layer 2: disk cache (cold start)
   try {
-    const cached = readJsonFile<CacheFile>(getCachePath());
+    const cached = readJsonFile<CacheFile>(getCachePath(workspaceRoot));
 
     if (cached.hash === hash) {
       currentHash = hash;
@@ -133,9 +138,15 @@ export async function populateGraphReport(
   currentHash = hash;
   graphReport = report;
 
-  // Persist to disk
+  // Persist to disk (ensure .repos/ directory exists)
   try {
-    writeJsonFile(getCachePath(), { hash, report });
+    const reposDir = join(workspaceRoot, '.repos');
+
+    if (!existsSync(reposDir)) {
+      mkdirSync(reposDir, { recursive: true });
+    }
+
+    writeJsonFile(getCachePath(workspaceRoot), { hash, report });
   } catch {
     // Non-fatal -- in-memory cache is still valid
   }

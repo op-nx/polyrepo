@@ -30,10 +30,6 @@ vi.mock('@nx/devkit', () => ({
   writeJsonFile: vi.fn(),
 }));
 
-vi.mock('nx/src/utils/cache-directory', () => ({
-  workspaceDataDirectory: '/mock/.nx/workspace-data',
-}));
-
 import { existsSync } from 'node:fs';
 import { extractGraphFromRepo } from './extract';
 import { transformGraphForRepo } from './transform';
@@ -136,9 +132,6 @@ describe('cache', () => {
       hashArray: vi.fn(),
       readJsonFile: vi.fn(),
       writeJsonFile: vi.fn(),
-    }));
-    vi.mock('nx/src/utils/cache-directory', () => ({
-      workspaceDataDirectory: '/mock/.nx/workspace-data',
     }));
   });
 
@@ -312,7 +305,7 @@ describe('cache', () => {
       await populateGraphReport(testConfig, '/workspace', 'opts-hash');
 
       expect(mocks.writeJsonFile).toHaveBeenCalledWith(
-        expect.stringContaining('polyrepo-graph-cache.json'),
+        expect.stringContaining('.repos'),
         expect.objectContaining({ hash: expect.any(String) }),
       );
     });
