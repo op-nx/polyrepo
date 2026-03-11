@@ -18,6 +18,8 @@ import {
   getCurrentRef,
   getHeadSha,
   getDirtyFiles,
+  getWorkingTreeState,
+  getAheadBehind,
 } from './detect';
 
 const mockExistsSync = vi.mocked(existsSync);
@@ -311,6 +313,220 @@ describe('getDirtyFiles', () => {
 
     await expect(getDirtyFiles('/workspace/.repos/repo')).rejects.toThrow(
       'git failed',
+    );
+  });
+});
+
+describe('getWorkingTreeState', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns all zeros for empty porcelain output', async () => {
+    setupExecFileMock('');
+
+    const result = await getWorkingTreeState('/workspace/.repos/repo');
+
+    expect(result).toEqual({
+      modified: 0,
+      staged: 0,
+      deleted: 0,
+      untracked: 0,
+      conflicts: 0,
+    });
+  });
+
+  it('counts ?? lines as untracked', async () => {
+    setupExecFileMock('?? newfile.ts\n?? another.ts\n');
+
+    const result = await getWorkingTreeState('/workspace/.repos/repo');
+
+    expect(result.untracked).toBe(2);
+    expect(result.modified).toBe(0);
+    expect(result.staged).toBe(0);
+  });
+
+  it('counts lines where Y=M as modified (working tree changes)', async () => {
+    // ' M' = modified in working tree only
+    setupExecFileMock(' M src/file.ts\n M src/other.ts\n');
+
+    const result = await getWorkingTreeState('/workspace/.repos/repo');
+
+    expect(result.modified).toBe(2);
+    expect(result.staged).toBe(0);
+  });
+
+  it('counts lines where X in MADRC as staged', async () => {
+    // 'M ' = staged modification
+    // 'A ' = staged addition
+    // 'D ' = staged deletion
+    setupExecFileMock('M  src/changed.ts\nA  src/added.ts\nD  src/deleted.ts\n');
+
+    const result = await getWorkingTreeState('/workspace/.repos/repo');
+
+    expect(result.staged).toBe(3);
+  });
+
+  it('counts X=D as deleted when Y is not D', async () => {
+    // 'D ' = staged deletion
+    setupExecFileMock('D  src/removed.ts\n');
+
+    const result = await getWorkingTreeState('/workspace/.repos/repo');
+
+    expect(result.deleted).toBe(1);
+    expect(result.staged).toBe(1);
+  });
+
+  it('counts Y=D as deleted', async () => {
+    // ' D' = deleted in working tree
+    setupExecFileMock(' D src/removed.ts\n');
+
+    const result = await getWorkingTreeState('/workspace/.repos/repo');
+
+    expect(result.deleted).toBe(1);
+    expect(result.modified).toBe(0);
+  });
+
+  it('handles MM (both staged and modified) incrementing both counts', async () => {
+    // 'MM' = staged modification + working tree modification
+    setupExecFileMock('MM src/file.ts\n');
+
+    const result = await getWorkingTreeState('/workspace/.repos/repo');
+
+    expect(result.staged).toBe(1);
+    expect(result.modified).toBe(1);
+  });
+
+  it('counts conflict patterns as conflicts', async () => {
+    setupExecFileMock('UU src/conflict1.ts\nAA src/conflict2.ts\nDD src/conflict3.ts\n');
+
+    const result = await getWorkingTreeState('/workspace/.repos/repo');
+
+    expect(result.conflicts).toBe(3);
+    expect(result.staged).toBe(0);
+    expect(result.modified).toBe(0);
+  });
+
+  it('counts AU, UA, DU, UD conflict patterns', async () => {
+    setupExecFileMock('AU src/c1.ts\nUA src/c2.ts\nDU src/c3.ts\nUD src/c4.ts\n');
+
+    const result = await getWorkingTreeState('/workspace/.repos/repo');
+
+    expect(result.conflicts).toBe(4);
+  });
+
+  it('handles mixed statuses correctly', async () => {
+    const porcelain = [
+      'M  src/staged.ts',       // staged
+      ' M src/modified.ts',     // modified
+      '?? src/new.ts',          // untracked
+      'UU src/conflict.ts',     // conflict
+      ' D src/deleted.ts',      // deleted in working tree
+      'A  src/added.ts',        // staged addition
+    ].join('\n') + '\n';
+
+    setupExecFileMock(porcelain);
+
+    const result = await getWorkingTreeState('/workspace/.repos/repo');
+
+    expect(result.staged).toBe(2);
+    expect(result.modified).toBe(1);
+    expect(result.untracked).toBe(1);
+    expect(result.conflicts).toBe(1);
+    expect(result.deleted).toBe(1);
+  });
+
+  it('calls git status with --porcelain=v1', async () => {
+    setupExecFileMock('');
+
+    await getWorkingTreeState('/workspace/.repos/repo');
+
+    expect(mockExecFile).toHaveBeenCalledWith(
+      'git',
+      ['status', '--porcelain=v1'],
+      expect.objectContaining({ cwd: '/workspace/.repos/repo' }),
+      expect.any(Function),
+    );
+  });
+});
+
+describe('getAheadBehind', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('parses ahead and behind counts from rev-list output', async () => {
+    setupExecFileMock('2\t3\n');
+
+    const result = await getAheadBehind('/workspace/.repos/repo');
+
+    expect(result).toEqual({ ahead: 2, behind: 3 });
+  });
+
+  it('returns { ahead: 0, behind: 0 } for "0\\t0" output', async () => {
+    setupExecFileMock('0\t0\n');
+
+    const result = await getAheadBehind('/workspace/.repos/repo');
+
+    expect(result).toEqual({ ahead: 0, behind: 0 });
+  });
+
+  it('returns null when command fails (detached HEAD)', async () => {
+    mockExecFile.mockImplementation(((
+      _file: string,
+      _args: readonly string[],
+      _options: unknown,
+      callback?: (
+        error: ExecFileException | null,
+        stdout: string,
+        stderr: string,
+      ) => void,
+    ) => {
+      if (callback) {
+        const err = new Error('fatal: no upstream') as ExecFileException;
+        callback(err, '', 'fatal: no upstream');
+      }
+    }) as typeof execFile);
+
+    const result = await getAheadBehind('/workspace/.repos/repo');
+
+    expect(result).toBeNull();
+  });
+
+  it('returns null when command fails (no upstream)', async () => {
+    mockExecFile.mockImplementation(((
+      _file: string,
+      _args: readonly string[],
+      _options: unknown,
+      callback?: (
+        error: ExecFileException | null,
+        stdout: string,
+        stderr: string,
+      ) => void,
+    ) => {
+      if (callback) {
+        const err = new Error(
+          'fatal: no upstream configured',
+        ) as ExecFileException;
+        callback(err, '', 'fatal: no upstream configured');
+      }
+    }) as typeof execFile);
+
+    const result = await getAheadBehind('/workspace/.repos/repo');
+
+    expect(result).toBeNull();
+  });
+
+  it('calls git rev-list with correct args', async () => {
+    setupExecFileMock('0\t0\n');
+
+    await getAheadBehind('/workspace/.repos/repo');
+
+    expect(mockExecFile).toHaveBeenCalledWith(
+      'git',
+      ['rev-list', '--left-right', '--count', 'HEAD...@{u}'],
+      expect.objectContaining({ cwd: '/workspace/.repos/repo' }),
+      expect.any(Function),
     );
   });
 });
