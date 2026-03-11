@@ -18,8 +18,8 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [ ] **GRPH-01**: Projects from assembled repos appear in `nx graph` visualization
 - [ ] **GRPH-02**: Projects from assembled repos appear in `nx show projects` output
-- [ ] **GRPH-03**: External repo projects are namespaced with repo prefix (e.g., `repo-b/my-lib`) to prevent collisions
-- [ ] **GRPH-04**: Graph extraction uses cached JSON files (pre-computed during assembly, not on every nx command)
+- [x] **GRPH-03**: External repo projects are namespaced with repo prefix (e.g., `repo-b/my-lib`) to prevent collisions
+- [x] **GRPH-04**: Graph extraction uses cached JSON files (pre-computed during assembly, not on every nx command)
 
 ### Multi-Repo Git DX
 
@@ -79,8 +79,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ASSM-04 | Phase 1 | Complete |
 | GRPH-01 | Phase 2 | Pending |
 | GRPH-02 | Phase 2 | Pending |
-| GRPH-03 | Phase 2 | Pending |
-| GRPH-04 | Phase 2 | Pending |
+| GRPH-03 | Phase 2 | Complete |
+| GRPH-04 | Phase 2 | Complete |
 | GITX-01 | Phase 3 | Pending |
 | GITX-02 | Phase 3 | Pending |
 | GITX-03 | Phase 3 | Pending |
