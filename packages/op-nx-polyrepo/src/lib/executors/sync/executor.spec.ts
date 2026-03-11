@@ -38,6 +38,13 @@ vi.mock('../../git/commands', () => ({
 
 vi.mock('../../git/detect', () => ({
   detectRepoState: vi.fn(),
+  getWorkingTreeState: vi.fn(),
+}));
+
+vi.mock('../../format/table', () => ({
+  formatAlignedTable: vi.fn((rows: Array<Array<{ value: string }>>) =>
+    rows.map((r) => r.map((c) => c.value).join(' | ')),
+  ),
 }));
 
 import { readFileSync, existsSync } from 'node:fs';
@@ -55,7 +62,8 @@ import {
   gitPullFfOnly,
   gitFetchTag,
 } from '../../git/commands';
-import { detectRepoState } from '../../git/detect';
+import { detectRepoState, getWorkingTreeState } from '../../git/detect';
+import { formatAlignedTable } from '../../format/table';
 import syncExecutor from './executor';
 
 const mockReadFileSync = vi.mocked(readFileSync);
@@ -70,6 +78,8 @@ const mockGitPullRebase = vi.mocked(gitPullRebase);
 const mockGitPullFfOnly = vi.mocked(gitPullFfOnly);
 const mockGitFetchTag = vi.mocked(gitFetchTag);
 const mockDetectRepoState = vi.mocked(detectRepoState);
+const mockGetWorkingTreeState = vi.mocked(getWorkingTreeState);
+const mockFormatAlignedTable = vi.mocked(formatAlignedTable);
 const mockLoggerInfo = vi.mocked(logger.info);
 const mockLoggerWarn = vi.mocked(logger.warn);
 
@@ -109,6 +119,14 @@ describe('syncExecutor', () => {
     mockGitPullRebase.mockResolvedValue(undefined);
     mockGitPullFfOnly.mockResolvedValue(undefined);
     mockGitFetchTag.mockResolvedValue(undefined);
+    // Default: getWorkingTreeState returns clean state
+    mockGetWorkingTreeState.mockResolvedValue({
+      modified: 0,
+      staged: 0,
+      deleted: 0,
+      untracked: 0,
+      conflicts: 0,
+    });
     // Default: existsSync returns false (no lock files detected -> npm)
     mockExistsSync.mockReturnValue(false);
     // Default: exec (used for install) succeeds immediately
@@ -755,6 +773,287 @@ describe('syncExecutor', () => {
 
       expect(mockGitPullFfOnly).toHaveBeenCalled();
       expect(mockGitPull).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('dry-run mode', () => {
+    it('shows "would clone" for unsynced remote repos', async () => {
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          depth: 1,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('not-synced');
+
+      await syncExecutor({ dryRun: true }, createContext());
+
+      const infoCalls = mockLoggerInfo.mock.calls.map((c) => String(c[0]));
+      const hasWouldClone = infoCalls.some(
+        (msg) => msg.includes('repo-a') && msg.includes('would clone'),
+      );
+
+      expect(hasWouldClone).toBe(true);
+      expect(mockGitClone).not.toHaveBeenCalled();
+    });
+
+    it('shows "would pull" for synced remote repos with branch ref', async () => {
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          ref: 'main',
+          depth: 1,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('cloned');
+
+      await syncExecutor({ dryRun: true }, createContext());
+
+      const infoCalls = mockLoggerInfo.mock.calls.map((c) => String(c[0]));
+      const hasWouldPull = infoCalls.some(
+        (msg) => msg.includes('repo-a') && msg.includes('would pull'),
+      );
+
+      expect(hasWouldPull).toBe(true);
+      expect(mockGitPull).not.toHaveBeenCalled();
+    });
+
+    it('shows "would fetch tag" for synced remote repos with tag ref', async () => {
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          ref: 'v1.2.3',
+          depth: 1,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('cloned');
+
+      await syncExecutor({ dryRun: true }, createContext());
+
+      const infoCalls = mockLoggerInfo.mock.calls.map((c) => String(c[0]));
+      const hasWouldFetchTag = infoCalls.some(
+        (msg) => msg.includes('repo-a') && msg.includes('would fetch tag'),
+      );
+
+      expect(hasWouldFetchTag).toBe(true);
+      expect(mockGitFetchTag).not.toHaveBeenCalled();
+    });
+
+    it('shows dirty warning in dry-run when working tree is dirty', async () => {
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          ref: 'main',
+          depth: 1,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('cloned');
+      mockGetWorkingTreeState.mockResolvedValue({
+        modified: 3,
+        staged: 0,
+        deleted: 0,
+        untracked: 1,
+        conflicts: 0,
+      });
+
+      await syncExecutor({ dryRun: true }, createContext());
+
+      const infoCalls = mockLoggerInfo.mock.calls.map((c) => String(c[0]));
+      const hasDirtyWarning = infoCalls.some(
+        (msg) => msg.includes('[WARN: dirty, may fail]'),
+      );
+
+      expect(hasDirtyWarning).toBe(true);
+    });
+
+    it('shows "would skip" for local repos that do not exist', async () => {
+      setupPluginConfig([
+        { type: 'local', alias: 'repo-b', path: 'D:/projects/repo-b' },
+      ]);
+      mockDetectRepoState.mockReturnValue('not-synced');
+
+      await syncExecutor({ dryRun: true }, createContext());
+
+      const infoCalls = mockLoggerInfo.mock.calls.map((c) => String(c[0]));
+      const hasWouldSkip = infoCalls.some(
+        (msg) => msg.includes('repo-b') && msg.includes('would skip'),
+      );
+
+      expect(hasWouldSkip).toBe(true);
+    });
+
+    it('returns success:true in dry-run mode', async () => {
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          depth: 1,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('not-synced');
+
+      const result = await syncExecutor({ dryRun: true }, createContext());
+
+      expect(result).toEqual({ success: true });
+    });
+
+    it('does not call any git commands in dry-run mode', async () => {
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          ref: 'main',
+          depth: 1,
+        },
+        {
+          type: 'remote',
+          alias: 'repo-b',
+          url: 'https://github.com/org/repo-b.git',
+          ref: 'v1.2.3',
+          depth: 1,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('cloned');
+
+      await syncExecutor({ dryRun: true }, createContext());
+
+      expect(mockGitClone).not.toHaveBeenCalled();
+      expect(mockGitPull).not.toHaveBeenCalled();
+      expect(mockGitFetch).not.toHaveBeenCalled();
+      expect(mockGitPullRebase).not.toHaveBeenCalled();
+      expect(mockGitPullFfOnly).not.toHaveBeenCalled();
+      expect(mockGitFetchTag).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('summary table', () => {
+    it('prints aligned Results table after sync completes', async () => {
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          depth: 1,
+        },
+        {
+          type: 'remote',
+          alias: 'repo-b',
+          url: 'https://github.com/org/repo-b.git',
+          depth: 1,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('not-synced');
+
+      await syncExecutor({}, createContext());
+
+      const infoCalls = mockLoggerInfo.mock.calls.map((c) => String(c[0]));
+      const hasResults = infoCalls.some((msg) => msg === 'Results:');
+
+      expect(hasResults).toBe(true);
+      expect(mockFormatAlignedTable).toHaveBeenCalled();
+    });
+
+    it('shows [OK] for successful repos and [ERROR] for failed repos', async () => {
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          depth: 1,
+        },
+        {
+          type: 'remote',
+          alias: 'repo-b',
+          url: 'https://github.com/org/repo-b.git',
+          depth: 1,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('not-synced');
+      mockGitClone
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new Error('auth denied'));
+
+      await syncExecutor({}, createContext());
+
+      const tableCallArgs = mockFormatAlignedTable.mock.calls[0][0];
+      const hasOk = tableCallArgs.some((row: Array<{ value: string }>) =>
+        row.some((cell) => cell.value === '[OK]'),
+      );
+      const hasError = tableCallArgs.some((row: Array<{ value: string }>) =>
+        row.some((cell) => cell.value.includes('[ERROR]')),
+      );
+
+      expect(hasOk).toBe(true);
+      expect(hasError).toBe(true);
+    });
+
+    it('summary table appears after streaming progress lines', async () => {
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          depth: 1,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('not-synced');
+
+      await syncExecutor({}, createContext());
+
+      const infoCalls = mockLoggerInfo.mock.calls.map((c) => String(c[0]));
+      const cloningIndex = infoCalls.findIndex((msg) =>
+        msg.includes('Cloning'),
+      );
+      const doneIndex = infoCalls.findIndex((msg) =>
+        msg.includes('Done:'),
+      );
+      const resultsIndex = infoCalls.findIndex((msg) => msg === 'Results:');
+
+      expect(cloningIndex).toBeGreaterThanOrEqual(0);
+      expect(doneIndex).toBeGreaterThan(cloningIndex);
+      expect(resultsIndex).toBeGreaterThan(doneIndex);
+    });
+
+    it('summary line still shows N synced, M failed', async () => {
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          depth: 1,
+        },
+        {
+          type: 'remote',
+          alias: 'repo-b',
+          url: 'https://github.com/org/repo-b.git',
+          depth: 1,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('not-synced');
+      mockGitClone
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new Error('failed'));
+
+      await syncExecutor({}, createContext());
+
+      const infoCalls = mockLoggerInfo.mock.calls.map((c) => String(c[0]));
+      const summaryLine = infoCalls.find(
+        (msg) => msg.includes('synced') && msg.includes('failed'),
+      );
+
+      expect(summaryLine).toBeDefined();
+      expect(summaryLine).toContain('1 synced');
+      expect(summaryLine).toContain('1 failed');
     });
   });
 });
