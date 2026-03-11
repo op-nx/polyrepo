@@ -42,6 +42,7 @@ vi.mock('../../git/detect', () => ({
   getCurrentBranch: vi.fn(),
   getCurrentRef: vi.fn(),
   isGitTag: vi.fn(),
+  getHeadSha: vi.fn(),
 }));
 
 vi.mock('../../format/table', () => ({
@@ -65,7 +66,7 @@ import {
   gitPullFfOnly,
   gitFetchTag,
 } from '../../git/commands';
-import { detectRepoState, getWorkingTreeState, getCurrentBranch, getCurrentRef, isGitTag } from '../../git/detect';
+import { detectRepoState, getWorkingTreeState, getCurrentBranch, getCurrentRef, isGitTag, getHeadSha } from '../../git/detect';
 import { formatAlignedTable } from '../../format/table';
 import syncExecutor from './executor';
 
@@ -85,6 +86,7 @@ const mockGetWorkingTreeState = vi.mocked(getWorkingTreeState);
 const mockGetCurrentBranch = vi.mocked(getCurrentBranch);
 const mockGetCurrentRef = vi.mocked(getCurrentRef);
 const mockIsGitTag = vi.mocked(isGitTag);
+const mockGetHeadSha = vi.mocked(getHeadSha);
 const mockFormatAlignedTable = vi.mocked(formatAlignedTable);
 const mockLoggerInfo = vi.mocked(logger.info);
 const mockLoggerWarn = vi.mocked(logger.warn);
@@ -125,6 +127,10 @@ describe('syncExecutor', () => {
     mockGitPullRebase.mockResolvedValue(undefined);
     mockGitPullFfOnly.mockResolvedValue(undefined);
     mockGitFetchTag.mockResolvedValue(undefined);
+    // Default: HEAD changes on every call (unique SHAs) so existing tests that
+    // expect install behavior still pass once conditional install is implemented
+    let headShaCounter = 0;
+    mockGetHeadSha.mockImplementation(() => Promise.resolve(`sha-${++headShaCounter}`));
     // Default: isGitTag returns false (most tests don't involve tags)
     mockIsGitTag.mockResolvedValue(false);
     // Default: getCurrentBranch returns a normal branch (not detached)
@@ -1326,6 +1332,154 @@ describe('syncExecutor', () => {
         expect.stringContaining('.repos'),
         false,
       );
+    });
+  });
+
+  describe('conditional dependency installation', () => {
+    function setupExecMockSuccess(): void {
+      mockExec.mockImplementation(((
+        _command: string,
+        _options: unknown,
+        callback?: (
+          error: ExecException | null,
+          stdout: string,
+          stderr: string,
+        ) => void,
+      ) => {
+        if (callback) {
+          callback(null, '', '');
+        }
+      }) as typeof exec);
+    }
+
+    it('skips install after tag fetch when HEAD did not change', async () => {
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          ref: 'v1.2.3',
+          depth: 1,
+          disableHooks: true,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('cloned');
+      mockIsGitTag.mockResolvedValue(true);
+      mockGetHeadSha.mockResolvedValue('same-sha');
+      setupExecMockSuccess();
+
+      await syncExecutor({}, createContext());
+
+      expect(mockExec).not.toHaveBeenCalled();
+    });
+
+    it('installs after tag fetch when HEAD changed', async () => {
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          ref: 'v1.2.3',
+          depth: 1,
+          disableHooks: true,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('cloned');
+      mockIsGitTag.mockResolvedValue(true);
+      mockGetHeadSha
+        .mockResolvedValueOnce('sha-old')
+        .mockResolvedValueOnce('sha-new');
+      setupExecMockSuccess();
+
+      await syncExecutor({}, createContext());
+
+      expect(mockExec).toHaveBeenCalledWith(
+        expect.stringContaining('install'),
+        expect.objectContaining({ windowsHide: true }),
+        expect.any(Function),
+      );
+    });
+
+    it('skips install after pull when HEAD did not change (already up to date)', async () => {
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          ref: 'main',
+          depth: 1,
+          disableHooks: true,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('cloned');
+      mockGetHeadSha.mockResolvedValue('same-sha');
+      setupExecMockSuccess();
+
+      await syncExecutor({}, createContext());
+
+      expect(mockExec).not.toHaveBeenCalled();
+    });
+
+    it('installs after pull when HEAD changed', async () => {
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          ref: 'main',
+          depth: 1,
+          disableHooks: true,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('cloned');
+      mockGetHeadSha
+        .mockResolvedValueOnce('sha-old')
+        .mockResolvedValueOnce('sha-new');
+      setupExecMockSuccess();
+
+      await syncExecutor({}, createContext());
+
+      expect(mockExec).toHaveBeenCalledWith(
+        expect.stringContaining('install'),
+        expect.objectContaining({ windowsHide: true }),
+        expect.any(Function),
+      );
+    });
+
+    it('always installs after clone (new repo)', async () => {
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          depth: 1,
+          disableHooks: true,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('not-synced');
+      setupExecMockSuccess();
+
+      await syncExecutor({}, createContext());
+
+      expect(mockExec).toHaveBeenCalledWith(
+        expect.stringContaining('install'),
+        expect.objectContaining({ windowsHide: true }),
+        expect.any(Function),
+      );
+      expect(mockGetHeadSha).not.toHaveBeenCalled();
+    });
+
+    it('skips install for local repo when HEAD did not change', async () => {
+      setupPluginConfig([
+        { type: 'local', alias: 'repo-b', path: 'D:/projects/repo-b' },
+      ]);
+      mockDetectRepoState.mockReturnValue('referenced');
+      mockGetHeadSha.mockResolvedValue('same-sha');
+      setupExecMockSuccess();
+
+      await syncExecutor({}, createContext());
+
+      expect(mockExec).not.toHaveBeenCalled();
     });
   });
 });
