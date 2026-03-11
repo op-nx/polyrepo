@@ -43,11 +43,12 @@ Plans:
   2. Running `nx show projects` lists external repo projects in its output
   3. External repo projects are prefixed with their repo name (e.g., `repo-b/my-lib`) to prevent name collisions
   4. Graph data is extracted from cached JSON files produced during assembly, not recomputed on every Nx command
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 02-01: TBD
-- [ ] 02-02: TBD
+- [ ] 02-01-PLAN.md -- Graph types, git utilities, config duplicate URL detection, sync dep install
+- [ ] 02-02-PLAN.md -- Graph extraction pipeline (nx graph --print), two-layer cache, transformation (namespacing, tags, target rewriting)
+- [ ] 02-03-PLAN.md -- Run executor, createNodesV2 extension for external projects, createDependencies for intra-repo edges
 
 ### Phase 3: Multi-Repo Git DX
 **Goal**: Users can monitor and manage git state across all assembled repos from a single command surface
@@ -70,5 +71,5 @@ Phases execute in numeric order: 1 -> 2 -> 3
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Plugin Foundation + Repo Assembly | 3/3 | Complete | 2026-03-10 |
-| 2. Unified Project Graph | 0/0 | Not started | - |
+| 2. Unified Project Graph | 0/3 | Planning complete | - |
 | 3. Multi-Repo Git DX | 0/0 | Not started | - |
