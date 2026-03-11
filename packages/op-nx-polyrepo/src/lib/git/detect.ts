@@ -48,6 +48,14 @@ export async function getCurrentBranch(cwd: string): Promise<string | null> {
   return branch === 'HEAD' ? null : branch;
 }
 
+export async function getHeadSha(cwd: string): Promise<string> {
+  return execGitOutput(['rev-parse', 'HEAD'], cwd);
+}
+
+export async function getDirtyFiles(cwd: string): Promise<string> {
+  return execGitOutput(['diff', '--name-only', 'HEAD'], cwd);
+}
+
 export async function getCurrentRef(cwd: string): Promise<string> {
   try {
     const tag = await execGitOutput(
