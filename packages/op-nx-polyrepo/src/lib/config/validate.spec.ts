@@ -81,7 +81,7 @@ describe('warnIfReposNotGitignored', () => {
 });
 
 describe('warnUnsyncedRepos', () => {
-  it('warns for remote repos missing from .repos/ directory', () => {
+  it('emits single grouped warning for one unsynced remote repo', () => {
     const config: PolyrepoConfig = {
       repos: { 'repo-a': 'git@github.com:org/repo-a.git' },
     };
@@ -90,15 +90,54 @@ describe('warnUnsyncedRepos', () => {
 
     warnUnsyncedRepos(config, '/workspace');
 
+    expect(mockedLoggerWarn).toHaveBeenCalledTimes(1);
     expect(mockedLoggerWarn).toHaveBeenCalledWith(
       expect.stringContaining('repo-a'),
     );
+    expect(mockedLoggerWarn).toHaveBeenCalledWith(
+      expect.stringContaining('polyrepo-sync'),
+    );
+  });
+
+  it('emits single grouped warning listing all unsynced repos', () => {
+    const config: PolyrepoConfig = {
+      repos: {
+        'repo-a': 'git@github.com:org/repo-a.git',
+        'repo-b': 'git@github.com:org/repo-b.git',
+        'repo-c': 'git@github.com:org/repo-c.git',
+      },
+    };
+
+    mockedExistsSync.mockReturnValue(false);
+
+    warnUnsyncedRepos(config, '/workspace');
+
+    // Single warning, not three
+    expect(mockedLoggerWarn).toHaveBeenCalledTimes(1);
+
+    const message = mockedLoggerWarn.mock.calls[0][0];
+
+    expect(message).toContain('repo-a');
+    expect(message).toContain('repo-b');
+    expect(message).toContain('repo-c');
   });
 
   it('does not warn for local path repos', () => {
     const config: PolyrepoConfig = {
       repos: { 'repo-b': 'D:/projects/repo-b' },
     };
+
+    warnUnsyncedRepos(config, '/workspace');
+
+    expect(mockedLoggerWarn).not.toHaveBeenCalled();
+  });
+
+  it('does not warn when all remote repos are synced', () => {
+    const config: PolyrepoConfig = {
+      repos: { 'repo-a': 'git@github.com:org/repo-a.git' },
+    };
+
+    mockedExistsSync.mockReturnValue(true);
 
     warnUnsyncedRepos(config, '/workspace');
 
