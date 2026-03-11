@@ -46,7 +46,10 @@ function rewriteDependsOn(
 
 /**
  * Rewrite a single target configuration to use the `@op-nx/polyrepo:run`
- * proxy executor while preserving cacheable metadata.
+ * proxy executor. Inputs, outputs, and cache are intentionally omitted:
+ * the child repo resolves its own named inputs and manages its own cache.
+ * Copying them would fail because named inputs (e.g. "native") are defined
+ * in the external repo's nx.json, not the host workspace's.
  */
 function rewriteTarget(
   repoAlias: string,
@@ -57,9 +60,7 @@ function rewriteTarget(
   return {
     executor: '@op-nx/polyrepo:run',
     options: { repoAlias, originalProject, targetName },
-    inputs: targetConfig.inputs,
-    outputs: targetConfig.outputs,
-    cache: targetConfig.cache,
+    cache: false,
     dependsOn: rewriteDependsOn(targetConfig.dependsOn, repoAlias),
     configurations: targetConfig.configurations,
     parallelism: targetConfig.parallelism,

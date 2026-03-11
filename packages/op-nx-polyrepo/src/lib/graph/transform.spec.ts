@@ -253,27 +253,27 @@ describe('transformGraphForRepo', () => {
       });
     });
 
-    it('copies inputs from original target to proxy target', () => {
+    it('omits inputs from proxy target (child repo resolves its own named inputs)', () => {
       const graph = makeFixtureGraph();
       const result = transformGraphForRepo(repoAlias, graph, workspaceRoot);
       const buildTarget = result.nodes['repo-b/my-lib'].targets['build'];
 
-      expect(buildTarget.inputs).toEqual(['production', '^production']);
+      expect(buildTarget.inputs).toBeUndefined();
     });
 
-    it('copies outputs from original target to proxy target', () => {
+    it('omits outputs from proxy target (child repo manages its own outputs)', () => {
       const graph = makeFixtureGraph();
       const result = transformGraphForRepo(repoAlias, graph, workspaceRoot);
       const testTarget = result.nodes['repo-b/my-lib'].targets['test'];
 
-      expect(testTarget.outputs).toEqual(['{projectRoot}/coverage']);
+      expect(testTarget.outputs).toBeUndefined();
     });
 
-    it('copies cache from original target', () => {
+    it('sets cache to false on proxy targets (child repo handles caching)', () => {
       const graph = makeFixtureGraph();
       const result = transformGraphForRepo(repoAlias, graph, workspaceRoot);
 
-      expect(result.nodes['repo-b/my-lib'].targets['build'].cache).toBe(true);
+      expect(result.nodes['repo-b/my-lib'].targets['build'].cache).toBe(false);
     });
 
     it('copies parallelism from original target', () => {
