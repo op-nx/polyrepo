@@ -160,8 +160,6 @@ function getStrategyFn(
   }
 }
 
-const INSTALLED_HASH_FILE = '.op-nx-installed-lock-hash';
-
 function hashLockfile(repoPath: string): string | null {
   const lockfiles = ['pnpm-lock.yaml', 'yarn.lock', 'package-lock.json'];
 
@@ -182,8 +180,12 @@ function hashLockfile(repoPath: string): string | null {
   return null;
 }
 
-function readInstalledHash(repoPath: string): string | null {
-  const hashPath = join(repoPath, INSTALLED_HASH_FILE);
+function hashFilePath(workspaceRoot: string, alias: string): string {
+  return join(workspaceRoot, '.repos', `.${alias}.lock-hash`);
+}
+
+function readInstalledHash(workspaceRoot: string, alias: string): string | null {
+  const hashPath = hashFilePath(workspaceRoot, alias);
 
   if (!existsSync(hashPath)) {
     return null;
@@ -196,13 +198,13 @@ function readInstalledHash(repoPath: string): string | null {
   }
 }
 
-function writeInstalledHash(repoPath: string, hash: string): void {
-  writeFileSync(join(repoPath, INSTALLED_HASH_FILE), hash);
+function writeInstalledHash(workspaceRoot: string, alias: string, hash: string): void {
+  writeFileSync(hashFilePath(workspaceRoot, alias), hash);
 }
 
-function needsInstall(repoPath: string): boolean {
+function needsInstall(repoPath: string, workspaceRoot: string, alias: string): boolean {
   const currentHash = hashLockfile(repoPath);
-  const installedHash = readInstalledHash(repoPath);
+  const installedHash = readInstalledHash(workspaceRoot, alias);
 
   if (currentHash === null) {
     return true;
@@ -215,13 +217,14 @@ async function tryInstallDeps(
   repoPath: string,
   alias: string,
   verbose: boolean,
+  workspaceRoot: string,
 ): Promise<boolean> {
   try {
     await installDeps(repoPath, alias, verbose);
     const hash = hashLockfile(repoPath);
 
     if (hash) {
-      writeInstalledHash(repoPath, hash);
+      writeInstalledHash(workspaceRoot, alias, hash);
     }
 
     return true;
@@ -258,7 +261,7 @@ async function syncRepo(
         disableHooks: entry.disableHooks,
       });
       logger.info(`Done: ${entry.alias} cloned.`);
-      const installed = await tryInstallDeps(repoPath, entry.alias, verbose);
+      const installed = await tryInstallDeps(repoPath, entry.alias, verbose, workspaceRoot);
 
       return { action: 'cloned', installFailed: !installed };
     }
@@ -268,8 +271,8 @@ async function syncRepo(
       await gitFetchTag(repoPath, entry.ref, entry.depth, entry.disableHooks);
       logger.info(`Done: ${entry.alias} synced to tag ${entry.ref}.`);
 
-      if (needsInstall(repoPath)) {
-        const installed = await tryInstallDeps(repoPath, entry.alias, verbose);
+      if (needsInstall(repoPath, workspaceRoot, entry.alias)) {
+        const installed = await tryInstallDeps(repoPath, entry.alias, verbose, workspaceRoot);
 
         return { action: `synced to tag ${entry.ref}`, installFailed: !installed };
       }
@@ -290,8 +293,8 @@ async function syncRepo(
     await strategyFn(repoPath, entry.disableHooks);
     logger.info(`Done: ${entry.alias} updated.`);
 
-    if (needsInstall(repoPath)) {
-      const installed = await tryInstallDeps(repoPath, entry.alias, verbose);
+    if (needsInstall(repoPath, workspaceRoot, entry.alias)) {
+      const installed = await tryInstallDeps(repoPath, entry.alias, verbose, workspaceRoot);
 
       return { action: strategy ?? 'pull', installFailed: !installed };
     }
@@ -313,8 +316,8 @@ async function syncRepo(
   await strategyFn(entry.path, undefined);
   logger.info(`Done: ${entry.alias} updated.`);
 
-  if (needsInstall(entry.path)) {
-    const installed = await tryInstallDeps(entry.path, entry.alias, verbose);
+  if (needsInstall(entry.path, workspaceRoot, entry.alias)) {
+    const installed = await tryInstallDeps(entry.path, entry.alias, verbose, workspaceRoot);
 
     return { action: strategy ?? 'pull', installFailed: !installed };
   }

@@ -1516,7 +1516,7 @@ describe('syncExecutor', () => {
           return true;
         }
 
-        if (path.endsWith('.op-nx-installed-lock-hash')) {
+        if (path.endsWith('.lock-hash')) {
           return true;
         }
 
@@ -1533,7 +1533,7 @@ describe('syncExecutor', () => {
           return lockContent;
         }
 
-        if (path.endsWith('.op-nx-installed-lock-hash')) {
+        if (path.endsWith('.lock-hash')) {
           return hash;
         }
 
@@ -1743,7 +1743,7 @@ describe('syncExecutor', () => {
       await syncExecutor({}, createContext());
 
       expect(mockWriteFileSync).toHaveBeenCalledWith(
-        expect.stringContaining('.op-nx-installed-lock-hash'),
+        expect.stringContaining('.lock-hash'),
         expect.any(String),
       );
     });
@@ -1765,7 +1765,7 @@ describe('syncExecutor', () => {
       await syncExecutor({}, createContext());
 
       const hashWrites = mockWriteFileSync.mock.calls.filter(
-        (call) => String(call[0]).endsWith('.op-nx-installed-lock-hash'),
+        (call) => String(call[0]).endsWith('.lock-hash'),
       );
 
       expect(hashWrites).toHaveLength(0);
