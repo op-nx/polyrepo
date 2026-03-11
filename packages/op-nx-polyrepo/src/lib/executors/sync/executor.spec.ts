@@ -726,6 +726,9 @@ describe('syncExecutor', () => {
         expect.any(String),
         expect.objectContaining({
           stdio: ['ignore', 'pipe', 'pipe'],
+          env: expect.objectContaining({
+            COREPACK_ENABLE_DOWNLOAD_PROMPT: '0',
+          }),
         }),
       );
     });

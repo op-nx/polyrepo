@@ -110,6 +110,7 @@ function installDeps(repoPath: string, alias: string, verbose: boolean): Promise
       shell: true,
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...process.env, COREPACK_ENABLE_DOWNLOAD_PROMPT: '0' },
     });
 
     child.stdout.on('data', (chunk: Buffer) => {
