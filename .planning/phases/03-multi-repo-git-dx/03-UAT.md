@@ -1,9 +1,9 @@
 ---
-status: complete
+status: diagnosed
 phase: 03-multi-repo-git-dx
 source: 03-01-SUMMARY.md, 03-02-SUMMARY.md, 03-03-SUMMARY.md
 started: 2026-03-11T12:00:00Z
-updated: 2026-03-11T12:15:00Z
+updated: 2026-03-11T12:20:00Z
 ---
 
 ## Current Test
@@ -62,19 +62,34 @@ skipped: 0
   reason: "User reported: works but summary line should list how many repos are behind and how many are ahead (e.g. '1 behind'), and 'clean' label could be more descriptive"
   severity: minor
   test: 1
-  artifacts: []
-  missing: []
+  root_cause: "Summary line at executor.ts:285-292 only shows configured/synced/not-synced counts. Raw AheadBehind struct is available at line 176 but discarded after formatting to display string. 'clean' is hardcoded at executor.ts:90 in formatDirtySummary."
+  artifacts:
+    - path: "packages/op-nx-polyrepo/src/lib/executors/status/executor.ts"
+      issue: "Summary line missing ahead/behind repo counts; AheadBehind data discarded after formatting"
+  missing:
+    - "Retain raw AheadBehind counts per repo, aggregate repos with behind>0 and ahead>0, add to summary line"
+    - "Replace 'clean' label with more descriptive alternative (e.g. 'ok')"
 - truth: "Status shows detached HEAD warning when repo is pinned to a tag"
   status: failed
   reason: "User reported: says 'dirty, sync may fail' instead of 'detached HEAD' when repo is pinned to a tag"
   severity: major
   test: 4
-  artifacts: []
-  missing: []
+  root_cause: "Status executor line 227 uses `isDetachedHead && !isTagPinned` — tag-pinned repos are explicitly excluded from detached HEAD warning. No separate [WARN: tag-pinned] or equivalent exists."
+  artifacts:
+    - path: "packages/op-nx-polyrepo/src/lib/executors/status/executor.ts"
+      issue: "Line 227: detached HEAD warning guard excludes tag-pinned repos"
+  missing:
+    - "Add warning for tag-pinned state (e.g. '[WARN: tag-pinned]' or show detached HEAD regardless)"
+    - "Add test for tag-pinned + dirty intersection scenario"
 - truth: "Sync dry-run shows detached HEAD warning alongside dirty warning"
   status: failed
   reason: "User reported: dirty warning shows but masks detached HEAD warning — same root cause as Test 4"
   severity: major
   test: 6
-  artifacts: []
-  missing: []
+  root_cause: "executeDryRun (sync/executor.ts:221-275) never calls getCurrentBranch — zero detached HEAD detection. Also uses single `let warning = ''` string (line 234) instead of array, so only one warning can appear per repo."
+  artifacts:
+    - path: "packages/op-nx-polyrepo/src/lib/executors/sync/executor.ts"
+      issue: "executeDryRun has no detached HEAD detection; warning is single string not array"
+  missing:
+    - "Add getCurrentBranch/isTagRef check in executeDryRun"
+    - "Refactor warning to string[] array for multiple simultaneous warnings"
