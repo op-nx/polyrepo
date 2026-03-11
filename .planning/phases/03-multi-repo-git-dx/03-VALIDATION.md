@@ -1,10 +1,11 @@
 ---
 phase: 3
 slug: multi-repo-git-dx
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: approved
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-03-11
+audited: 2026-03-11
 ---
 
 # Phase 3 — Validation Strategy
@@ -21,7 +22,9 @@ created: 2026-03-11
 | **Config file** | `packages/op-nx-polyrepo/vitest.config.mts` |
 | **Quick run command** | `npm exec nx test @op-nx/polyrepo` |
 | **Full suite command** | `npm exec nx test @op-nx/polyrepo` |
-| **Estimated runtime** | ~5 seconds |
+| **Estimated runtime** | ~1 second |
+| **Total tests** | 275 |
+| **Test files** | 13 |
 
 ---
 
@@ -38,15 +41,24 @@ created: 2026-03-11
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 03-01-01 | 01 | 1 | GITX-01 | unit | `npm exec nx test @op-nx/polyrepo -- --reporter=verbose -t "getWorkingTreeState"` | No - W0 | pending |
-| 03-01-02 | 01 | 1 | GITX-01 | unit | `npm exec nx test @op-nx/polyrepo -- --reporter=verbose -t "getAheadBehind"` | No - W0 | pending |
-| 03-01-03 | 01 | 1 | GITX-03 | unit | `npm exec nx test @op-nx/polyrepo -- --reporter=verbose -t "formatAlignedTable"` | No - W0 | pending |
-| 03-02-01 | 02 | 2 | GITX-01 | unit | `npm exec nx test @op-nx/polyrepo -- --reporter=verbose -t "statusExecutor"` | Yes - rewrite | pending |
-| 03-02-02 | 02 | 2 | GITX-01 | unit | `npm exec nx test @op-nx/polyrepo -- --reporter=verbose -t "auto-fetch"` | No - W0 | pending |
-| 03-02-03 | 02 | 2 | GITX-01 | unit | `npm exec nx test @op-nx/polyrepo -- --reporter=verbose -t "project count"` | No - W0 | pending |
-| 03-02-04 | 02 | 2 | GITX-01 | unit | `npm exec nx test @op-nx/polyrepo -- --reporter=verbose -t "WARN"` | No - W0 | pending |
-| 03-03-01 | 03 | 2 | GITX-02 | unit | `npm exec nx test @op-nx/polyrepo -- --reporter=verbose -t "dry-run"` | No - W0 | pending |
-| 03-03-02 | 03 | 2 | GITX-03 | unit | `npm exec nx test @op-nx/polyrepo -- --reporter=verbose -t "summary table"` | No - W0 | pending |
+| 03-01-01 | 01 | 1 | GITX-01 | unit | `npm exec nx test @op-nx/polyrepo -- --reporter=verbose -t "getWorkingTreeState"` | Yes | green |
+| 03-01-02 | 01 | 1 | GITX-01 | unit | `npm exec nx test @op-nx/polyrepo -- --reporter=verbose -t "getAheadBehind"` | Yes | green |
+| 03-01-03 | 01 | 1 | GITX-03 | unit | `npm exec nx test @op-nx/polyrepo -- --reporter=verbose -t "formatAlignedTable"` | Yes | green |
+| 03-02-01 | 02 | 2 | GITX-01 | unit | `npm exec nx test @op-nx/polyrepo -- --reporter=verbose -t "statusExecutor"` | Yes | green |
+| 03-02-02 | 02 | 2 | GITX-01 | unit | `npm exec nx test @op-nx/polyrepo -- --reporter=verbose -t "auto-fetch"` | Yes | green |
+| 03-02-03 | 02 | 2 | GITX-01 | unit | `npm exec nx test @op-nx/polyrepo -- --reporter=verbose -t "project count"` | Yes | green |
+| 03-02-04 | 02 | 2 | GITX-01 | unit | `npm exec nx test @op-nx/polyrepo -- --reporter=verbose -t "WARN"` | Yes | green |
+| 03-03-01 | 03 | 2 | GITX-02 | unit | `npm exec nx test @op-nx/polyrepo -- --reporter=verbose -t "dry-run"` | Yes | green |
+| 03-03-02 | 03 | 2 | GITX-03 | unit | `npm exec nx test @op-nx/polyrepo -- --reporter=verbose -t "summary table"` | Yes | green |
+| 03-04-01 | 04 | 3 | GITX-01 | unit | `npm exec nx test @op-nx/polyrepo -- --reporter=verbose -t "behind"` | Yes | green |
+| 03-04-02 | 04 | 3 | GITX-01 | unit | `npm exec nx test @op-nx/polyrepo -- --reporter=verbose -t "tag-pinned"` | Yes | green |
+| 03-05-01 | 05 | 3 | GITX-02 | unit | `npm exec nx test @op-nx/polyrepo -- --reporter=verbose -t "detached HEAD"` | Yes | green |
+| 03-05-02 | 05 | 3 | GITX-03 | unit | `npm exec nx test @op-nx/polyrepo -- --reporter=verbose -t "multi-warning"` | Yes | green |
+| 03-06-01 | 06 | 4 | GITX-01 | unit | `npm exec nx test @op-nx/polyrepo -- --reporter=verbose -t "behind"` | Yes | green |
+| 03-07-01 | 07 | 4 | GITX-02 | unit | `npm exec nx test @op-nx/polyrepo -- --reporter=verbose -t "disableHooks"` | Yes | green |
+| 03-08-01 | 08 | 5 | GITX-01, GITX-02 | unit | `npm exec nx test @op-nx/polyrepo -- --reporter=verbose -t "isGitTag"` | Yes | green |
+| 03-08-02 | 08 | 5 | GITX-02 | unit | `npm exec nx test @op-nx/polyrepo -- --reporter=verbose -t "branch transition"` | Yes | green |
+| 03-09-01 | 09 | 5 | GITX-02 | unit | `npm exec nx test @op-nx/polyrepo -- --reporter=verbose -t "conditional"` | Yes | green |
 
 *Status: pending / green / red / flaky*
 
@@ -54,12 +66,12 @@ created: 2026-03-11
 
 ## Wave 0 Requirements
 
-- [ ] `detect.spec.ts` — stubs for `getWorkingTreeState`, `getAheadBehind` (GITX-01)
-- [ ] `format/table.spec.ts` — stubs for `formatAlignedTable` (GITX-03)
-- [ ] `status/executor.spec.ts` — rewritten stubs for new output format, auto-fetch, project counts, warnings (GITX-01)
-- [ ] `sync/executor.spec.ts` — stubs for `--dry-run` and summary table (GITX-02, GITX-03)
+- [x] `detect.spec.ts` -- tests for `getWorkingTreeState`, `getAheadBehind` (GITX-01)
+- [x] `format/table.spec.ts` -- tests for `formatAlignedTable` (GITX-03)
+- [x] `status/executor.spec.ts` -- tests for output format, auto-fetch, project counts, warnings (GITX-01)
+- [x] `sync/executor.spec.ts` -- tests for `--dry-run` and summary table (GITX-02, GITX-03)
 
-*Existing framework detected. No new test framework installation needed.*
+*All Wave 0 requirements fulfilled via TDD during execution (RED-GREEN commits).*
 
 ---
 
@@ -73,11 +85,25 @@ created: 2026-03-11
 
 ## Validation Sign-Off
 
-- [ ] All tasks have automated verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 10s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have automated verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 10s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** approved 2026-03-11
+
+---
+
+## Validation Audit 2026-03-11
+
+| Metric | Count |
+|--------|-------|
+| Gaps found | 0 |
+| Resolved | 0 |
+| Escalated | 0 |
+| Total tasks audited | 18 |
+| Total tests in suite | 275 |
+| Test files | 13 |
+| UAT tests passed | 14/14 |
