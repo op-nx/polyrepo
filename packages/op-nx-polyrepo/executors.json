@@ -9,6 +9,11 @@
       "implementation": "./src/lib/executors/status/executor",
       "schema": "./src/lib/executors/status/schema.json",
       "description": "Show the sync state of all configured repos"
+    },
+    "run": {
+      "implementation": "./src/lib/executors/run/executor",
+      "schema": "./src/lib/executors/run/schema.json",
+      "description": "Proxy executor that delegates target execution to a child repo Nx workspace"
     }
   }
 }
