@@ -1,4 +1,5 @@
 import { readFileSync, existsSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { exec } from 'node:child_process';
 import { logger } from '@nx/devkit';
@@ -13,7 +14,7 @@ import {
   gitPullFfOnly,
   gitFetchTag,
 } from '../../git/commands';
-import { detectRepoState, getWorkingTreeState, getCurrentBranch, getCurrentRef, getHeadSha, isGitTag } from '../../git/detect';
+import { detectRepoState, getWorkingTreeState, getCurrentBranch, getCurrentRef, isGitTag } from '../../git/detect';
 import { formatAlignedTable, type ColumnDef } from '../../format/table';
 
 export interface SyncExecutorOptions {
@@ -126,6 +127,34 @@ async function tryInstallDeps(
   }
 }
 
+function hashLockfile(repoPath: string): string | null {
+  const lockfiles = ['pnpm-lock.yaml', 'yarn.lock', 'package-lock.json'];
+
+  for (const name of lockfiles) {
+    const fullPath = join(repoPath, name);
+
+    if (existsSync(fullPath)) {
+      try {
+        const content = readFileSync(fullPath);
+
+        return createHash('sha256').update(content).digest('hex');
+      } catch {
+        return null;
+      }
+    }
+  }
+
+  return null;
+}
+
+function lockfileChanged(hashBefore: string | null, hashAfter: string | null): boolean {
+  if (hashBefore === null || hashAfter === null) {
+    return true;
+  }
+
+  return hashBefore !== hashAfter;
+}
+
 interface SyncResult {
   action: string;
 }
@@ -154,13 +183,12 @@ async function syncRepo(
     }
 
     if (entry.ref && await isGitTag(repoPath, entry.ref)) {
-      const headBefore = await getHeadSha(repoPath);
+      const lockBefore = hashLockfile(repoPath);
       logger.info(`Fetching tag ${entry.ref} for ${entry.alias}...`);
       await gitFetchTag(repoPath, entry.ref, entry.depth, entry.disableHooks);
       logger.info(`Done: ${entry.alias} at tag ${entry.ref}.`);
-      const headAfter = await getHeadSha(repoPath);
 
-      if (headBefore !== headAfter) {
+      if (lockfileChanged(lockBefore, hashLockfile(repoPath))) {
         await tryInstallDeps(repoPath, entry.alias);
       }
 
@@ -168,13 +196,12 @@ async function syncRepo(
     }
 
     const strategyFn = getStrategyFn(strategy);
-    const headBefore = await getHeadSha(repoPath);
+    const lockBefore = hashLockfile(repoPath);
     logger.info(`Updating ${entry.alias} (${strategy ?? 'pull'})...`);
     await strategyFn(repoPath, entry.disableHooks);
     logger.info(`Done: ${entry.alias} updated.`);
-    const headAfter = await getHeadSha(repoPath);
 
-    if (headBefore !== headAfter) {
+    if (lockfileChanged(lockBefore, hashLockfile(repoPath))) {
       await tryInstallDeps(repoPath, entry.alias);
     }
 
@@ -191,13 +218,12 @@ async function syncRepo(
   }
 
   const strategyFn = getStrategyFn(strategy);
-  const headBefore = await getHeadSha(entry.path);
+  const lockBefore = hashLockfile(entry.path);
   logger.info(`Updating local repo ${entry.alias} (${strategy ?? 'pull'})...`);
   await strategyFn(entry.path, undefined);
   logger.info(`Done: ${entry.alias} updated.`);
-  const headAfter = await getHeadSha(entry.path);
 
-  if (headBefore !== headAfter) {
+  if (lockfileChanged(lockBefore, hashLockfile(entry.path))) {
     await tryInstallDeps(entry.path, entry.alias);
   }
 
