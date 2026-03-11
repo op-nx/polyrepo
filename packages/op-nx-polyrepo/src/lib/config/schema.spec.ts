@@ -271,6 +271,7 @@ describe('normalizeRepos', () => {
         url: 'git@github.com:org/repo-a.git',
         ref: undefined,
         depth: 1,
+        disableHooks: true,
       },
     ]);
   });
@@ -311,6 +312,7 @@ describe('normalizeRepos', () => {
         url: 'https://github.com/org/repo-c.git',
         ref: 'develop',
         depth: 3,
+        disableHooks: true,
       },
     ]);
   });
@@ -349,7 +351,69 @@ describe('normalizeRepos', () => {
         url: 'https://github.com/org/repo-a.git',
         ref: undefined,
         depth: 1,
+        disableHooks: true,
       },
     ]);
+  });
+
+  it('defaults disableHooks to true for string URL remote entries', () => {
+    const config: PolyrepoConfig = {
+      repos: { 'repo-a': 'git@github.com:org/repo-a.git' },
+    };
+
+    const result = normalizeRepos(config);
+
+    expect(result[0]).toMatchObject({
+      type: 'remote',
+      disableHooks: true,
+    });
+  });
+
+  it('defaults disableHooks to true for object URL remote entries', () => {
+    const config: PolyrepoConfig = {
+      repos: {
+        'repo-a': { url: 'https://github.com/org/repo-a.git' },
+      },
+    };
+
+    const result = normalizeRepos(config);
+
+    expect(result[0]).toMatchObject({
+      type: 'remote',
+      disableHooks: true,
+    });
+  });
+
+  it('preserves disableHooks: false when explicitly set', () => {
+    const config: PolyrepoConfig = {
+      repos: {
+        'repo-a': {
+          url: 'https://github.com/org/repo-a.git',
+          disableHooks: false,
+        },
+      },
+    };
+
+    const result = normalizeRepos(config);
+
+    expect(result[0]).toMatchObject({
+      type: 'remote',
+      disableHooks: false,
+    });
+  });
+
+  it('does not add disableHooks to local repo entries', () => {
+    const config: PolyrepoConfig = {
+      repos: { 'repo-b': 'D:/projects/repo-b' },
+    };
+
+    const result = normalizeRepos(config);
+
+    expect(result[0]).toEqual({
+      type: 'local',
+      alias: 'repo-b',
+      path: 'D:/projects/repo-b',
+    });
+    expect('disableHooks' in result[0]).toBe(false);
   });
 });

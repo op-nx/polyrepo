@@ -235,3 +235,171 @@ describe('gitFetchTag', () => {
     );
   });
 });
+
+describe('disableHooks', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setupExecFileMock();
+  });
+
+  it('gitClone prepends -c core.hooksPath=__op-nx_polyrepo_disable-hooks__ when disableHooks is true', async () => {
+    await gitClone(
+      'https://github.com/org/repo.git',
+      'D:/workspace/.repos/repo',
+      { disableHooks: true },
+    );
+
+    expect(mockExecFile).toHaveBeenCalledWith(
+      'git',
+      [
+        '-c',
+        'core.hooksPath=__op-nx_polyrepo_disable-hooks__',
+        'clone',
+        '--depth',
+        '1',
+        'https://github.com/org/repo.git',
+        'D:/workspace/.repos/repo',
+      ],
+      expect.any(Object),
+      expect.any(Function),
+    );
+  });
+
+  it('gitClone does NOT prepend hooks args when disableHooks is false', async () => {
+    await gitClone(
+      'https://github.com/org/repo.git',
+      'D:/workspace/.repos/repo',
+      { disableHooks: false },
+    );
+
+    expect(mockExecFile).toHaveBeenCalledWith(
+      'git',
+      [
+        'clone',
+        '--depth',
+        '1',
+        'https://github.com/org/repo.git',
+        'D:/workspace/.repos/repo',
+      ],
+      expect.any(Object),
+      expect.any(Function),
+    );
+  });
+
+  it('gitClone does NOT prepend hooks args when disableHooks is undefined', async () => {
+    await gitClone(
+      'https://github.com/org/repo.git',
+      'D:/workspace/.repos/repo',
+    );
+
+    expect(mockExecFile).toHaveBeenCalledWith(
+      'git',
+      [
+        'clone',
+        '--depth',
+        '1',
+        'https://github.com/org/repo.git',
+        'D:/workspace/.repos/repo',
+      ],
+      expect.any(Object),
+      expect.any(Function),
+    );
+  });
+
+  it('gitPull prepends -c core.hooksPath when disableHooks is true', async () => {
+    await gitPull('D:/workspace/.repos/repo', true);
+
+    expect(mockExecFile).toHaveBeenCalledWith(
+      'git',
+      ['-c', 'core.hooksPath=__op-nx_polyrepo_disable-hooks__', 'pull'],
+      expect.objectContaining({ cwd: 'D:/workspace/.repos/repo' }),
+      expect.any(Function),
+    );
+  });
+
+  it('gitPull does NOT prepend hooks args when disableHooks is false', async () => {
+    await gitPull('D:/workspace/.repos/repo', false);
+
+    expect(mockExecFile).toHaveBeenCalledWith(
+      'git',
+      ['pull'],
+      expect.objectContaining({ cwd: 'D:/workspace/.repos/repo' }),
+      expect.any(Function),
+    );
+  });
+
+  it('gitFetch prepends -c core.hooksPath when disableHooks is true', async () => {
+    await gitFetch('D:/workspace/.repos/repo', true);
+
+    expect(mockExecFile).toHaveBeenCalledWith(
+      'git',
+      ['-c', 'core.hooksPath=__op-nx_polyrepo_disable-hooks__', 'fetch'],
+      expect.objectContaining({ cwd: 'D:/workspace/.repos/repo' }),
+      expect.any(Function),
+    );
+  });
+
+  it('gitPullRebase prepends -c core.hooksPath when disableHooks is true', async () => {
+    await gitPullRebase('D:/workspace/.repos/repo', true);
+
+    expect(mockExecFile).toHaveBeenCalledWith(
+      'git',
+      ['-c', 'core.hooksPath=__op-nx_polyrepo_disable-hooks__', 'pull', '--rebase'],
+      expect.objectContaining({ cwd: 'D:/workspace/.repos/repo' }),
+      expect.any(Function),
+    );
+  });
+
+  it('gitPullFfOnly prepends -c core.hooksPath when disableHooks is true', async () => {
+    await gitPullFfOnly('D:/workspace/.repos/repo', true);
+
+    expect(mockExecFile).toHaveBeenCalledWith(
+      'git',
+      ['-c', 'core.hooksPath=__op-nx_polyrepo_disable-hooks__', 'pull', '--ff-only'],
+      expect.objectContaining({ cwd: 'D:/workspace/.repos/repo' }),
+      expect.any(Function),
+    );
+  });
+
+  it('gitFetchTag prepends -c core.hooksPath to both fetch and checkout when disableHooks is true', async () => {
+    await gitFetchTag('D:/workspace/.repos/repo', 'v1.0.0', 1, true);
+
+    expect(mockExecFile).toHaveBeenCalledTimes(2);
+
+    expect(mockExecFile).toHaveBeenNthCalledWith(
+      1,
+      'git',
+      ['-c', 'core.hooksPath=__op-nx_polyrepo_disable-hooks__', 'fetch', '--depth', '1', 'origin', 'tag', 'v1.0.0'],
+      expect.objectContaining({ cwd: 'D:/workspace/.repos/repo' }),
+      expect.any(Function),
+    );
+
+    expect(mockExecFile).toHaveBeenNthCalledWith(
+      2,
+      'git',
+      ['-c', 'core.hooksPath=__op-nx_polyrepo_disable-hooks__', 'checkout', 'v1.0.0'],
+      expect.objectContaining({ cwd: 'D:/workspace/.repos/repo' }),
+      expect.any(Function),
+    );
+  });
+
+  it('gitFetchTag does NOT prepend hooks args when disableHooks is not passed', async () => {
+    await gitFetchTag('D:/workspace/.repos/repo', 'v1.0.0');
+
+    expect(mockExecFile).toHaveBeenNthCalledWith(
+      1,
+      'git',
+      ['fetch', '--depth', '1', 'origin', 'tag', 'v1.0.0'],
+      expect.objectContaining({ cwd: 'D:/workspace/.repos/repo' }),
+      expect.any(Function),
+    );
+
+    expect(mockExecFile).toHaveBeenNthCalledWith(
+      2,
+      'git',
+      ['checkout', 'v1.0.0'],
+      expect.objectContaining({ cwd: 'D:/workspace/.repos/repo' }),
+      expect.any(Function),
+    );
+  });
+});
