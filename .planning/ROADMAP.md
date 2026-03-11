@@ -58,10 +58,12 @@ Plans:
   1. User can run a single command to see combined git status of all synced repos
   2. User can pull or fetch all synced repos with one command
   3. Git operations display clear per-repo output showing which repo succeeded and which failed
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 03-01: TBD
+- [ ] 03-01-PLAN.md -- Git state detection (getWorkingTreeState, getAheadBehind) and column alignment utility
+- [ ] 03-02-PLAN.md -- Status executor rewrite with aligned output, auto-fetch, warnings, project counts
+- [ ] 03-03-PLAN.md -- Sync executor enhancements: --dry-run option and aligned results summary table
 
 ## Progress
 
@@ -72,4 +74,4 @@ Phases execute in numeric order: 1 -> 2 -> 3
 |-------|----------------|--------|-----------|
 | 1. Plugin Foundation + Repo Assembly | 3/3 | Complete | 2026-03-10 |
 | 2. Unified Project Graph | 3/3 | Complete | 2026-03-11 |
-| 3. Multi-Repo Git DX | 0/0 | Not started | - |
+| 3. Multi-Repo Git DX | 0/3 | In progress | - |
