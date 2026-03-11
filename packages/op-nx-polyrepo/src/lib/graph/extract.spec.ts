@@ -224,7 +224,7 @@ describe('extractGraphFromRepo', () => {
   it('handles large stdout (1.4MB+ JSON) without truncation', async () => {
     const largeNodes: Record<string, unknown> = {};
 
-    for (let i = 0; i < 5000; i++) {
+    for (let i = 0; i < 12000; i++) {
       largeNodes[`project-${i}`] = {
         name: `project-${i}`,
         type: 'lib',
@@ -260,6 +260,6 @@ describe('extractGraphFromRepo', () => {
 
     const result = await extractGraphFromRepo('/workspace/.repos/repo-a');
 
-    expect(Object.keys(result.graph.nodes)).toHaveLength(5000);
+    expect(Object.keys(result.graph.nodes)).toHaveLength(12000);
   });
 });
