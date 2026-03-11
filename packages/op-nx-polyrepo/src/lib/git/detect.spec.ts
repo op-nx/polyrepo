@@ -20,6 +20,7 @@ import {
   getDirtyFiles,
   getWorkingTreeState,
   getAheadBehind,
+  isGitTag,
 } from './detect';
 
 const mockExistsSync = vi.mocked(existsSync);
@@ -528,5 +529,68 @@ describe('getAheadBehind', () => {
       expect.objectContaining({ cwd: '/workspace/.repos/repo' }),
       expect.any(Function),
     );
+  });
+});
+
+describe('isGitTag', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns true when git show-ref --verify refs/tags/<ref> succeeds', async () => {
+    setupExecFileMock('abc123 refs/tags/v1.0.0\n');
+
+    const result = await isGitTag('/workspace/.repos/repo', 'v1.0.0');
+
+    expect(result).toBe(true);
+    expect(mockExecFile).toHaveBeenCalledWith(
+      'git',
+      ['show-ref', '--verify', 'refs/tags/v1.0.0'],
+      expect.objectContaining({ cwd: '/workspace/.repos/repo' }),
+      expect.any(Function),
+    );
+  });
+
+  it('returns true for non-version tag name like 20.x', async () => {
+    setupExecFileMock('abc123 refs/tags/20.x\n');
+
+    const result = await isGitTag('/workspace/.repos/repo', '20.x');
+
+    expect(result).toBe(true);
+    expect(mockExecFile).toHaveBeenCalledWith(
+      'git',
+      ['show-ref', '--verify', 'refs/tags/20.x'],
+      expect.objectContaining({ cwd: '/workspace/.repos/repo' }),
+      expect.any(Function),
+    );
+  });
+
+  it('returns false when git command fails (tag does not exist)', async () => {
+    mockExecFile.mockImplementation(((
+      _file: string,
+      _args: readonly string[],
+      _options: unknown,
+      callback?: (
+        error: ExecFileException | null,
+        stdout: string,
+        stderr: string,
+      ) => void,
+    ) => {
+      if (callback) {
+        const err = new Error('fatal: not a valid ref') as ExecFileException;
+        callback(err, '', 'fatal: not a valid ref');
+      }
+    }) as typeof execFile);
+
+    const result = await isGitTag('/workspace/.repos/repo', 'main');
+
+    expect(result).toBe(false);
+  });
+
+  it('returns false for undefined ref without calling git', async () => {
+    const result = await isGitTag('/workspace/.repos/repo', undefined);
+
+    expect(result).toBe(false);
+    expect(mockExecFile).not.toHaveBeenCalled();
   });
 });
