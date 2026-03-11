@@ -5,6 +5,8 @@ import type { ExecutorContext } from '@nx/devkit';
 vi.mock('node:fs', () => ({
   readFileSync: vi.fn(),
   existsSync: vi.fn(),
+  writeFileSync: vi.fn(),
+  unlinkSync: vi.fn(),
 }));
 
 vi.mock('node:child_process', () => ({
@@ -51,7 +53,7 @@ vi.mock('../../format/table', () => ({
   ),
 }));
 
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, writeFileSync, unlinkSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { logger } from '@nx/devkit';
@@ -73,6 +75,8 @@ import syncExecutor from './executor';
 
 const mockReadFileSync = vi.mocked(readFileSync);
 const mockExistsSync = vi.mocked(existsSync);
+const mockWriteFileSync = vi.mocked(writeFileSync);
+const mockUnlinkSync = vi.mocked(unlinkSync);
 const mockSpawn = vi.mocked(spawn);
 
 function createMockChildProcess(exitCode = 0): ReturnType<typeof spawn> {
@@ -1677,6 +1681,111 @@ describe('syncExecutor', () => {
         expect.stringContaining('install'),
         expect.objectContaining({ shell: true, windowsHide: true }),
       );
+    });
+
+    it('retries install when lockfile unchanged but previous install failed (marker exists)', async () => {
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          ref: 'v1.2.3',
+          depth: 1,
+          disableHooks: true,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('cloned');
+      mockIsGitTag.mockResolvedValue(true);
+      setupSpawnMockSuccess();
+
+      const nxJsonContent = JSON.stringify({
+        plugins: [{ plugin: '@op-nx/polyrepo', options: fakeConfig }],
+      });
+      mockExistsSync.mockImplementation((p) => {
+        const path = String(p);
+
+        if (path.endsWith('.op-nx-needs-install')) {
+          return true;
+        }
+
+        if (path.endsWith('pnpm-lock.yaml')) {
+          return true;
+        }
+
+        return false;
+      });
+      mockReadFileSync.mockImplementation((p) => {
+        if (String(p).endsWith('nx.json')) {
+          return nxJsonContent;
+        }
+
+        if (String(p).endsWith('pnpm-lock.yaml')) {
+          return Buffer.from('lockfile-content-unchanged');
+        }
+
+        return '';
+      });
+
+      await syncExecutor({}, createContext());
+
+      expect(mockSpawn).toHaveBeenCalledWith(
+        expect.stringContaining('install'),
+        expect.objectContaining({ shell: true, windowsHide: true }),
+      );
+    });
+
+    it('writes marker before install and removes it on success', async () => {
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          depth: 1,
+          disableHooks: true,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('not-synced');
+      mockExistsSync.mockImplementation((p) => {
+        if (String(p).endsWith('.op-nx-needs-install')) {
+          return true;
+        }
+
+        return false;
+      });
+      setupSpawnMockSuccess();
+
+      await syncExecutor({}, createContext());
+
+      expect(mockWriteFileSync).toHaveBeenCalledWith(
+        expect.stringContaining('.op-nx-needs-install'),
+        '',
+      );
+      expect(mockUnlinkSync).toHaveBeenCalledWith(
+        expect.stringContaining('.op-nx-needs-install'),
+      );
+    });
+
+    it('does not remove marker when install fails', async () => {
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          depth: 1,
+          disableHooks: true,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('not-synced');
+      mockExistsSync.mockReturnValue(false);
+      mockSpawn.mockImplementation(() => createMockChildProcess(1));
+
+      await syncExecutor({}, createContext());
+
+      expect(mockWriteFileSync).toHaveBeenCalledWith(
+        expect.stringContaining('.op-nx-needs-install'),
+        '',
+      );
+      expect(mockUnlinkSync).not.toHaveBeenCalled();
     });
 
     it('skips install for local repo when lockfile unchanged', async () => {

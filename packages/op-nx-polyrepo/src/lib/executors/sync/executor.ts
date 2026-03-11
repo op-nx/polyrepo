@@ -1,4 +1,4 @@
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, writeFileSync, unlinkSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
@@ -160,13 +160,34 @@ function getStrategyFn(
   }
 }
 
+const NEEDS_INSTALL_MARKER = '.op-nx-needs-install';
+
+function markNeedsInstall(repoPath: string): void {
+  writeFileSync(join(repoPath, NEEDS_INSTALL_MARKER), '');
+}
+
+function clearNeedsInstall(repoPath: string): void {
+  const markerPath = join(repoPath, NEEDS_INSTALL_MARKER);
+
+  if (existsSync(markerPath)) {
+    unlinkSync(markerPath);
+  }
+}
+
+function hasInstallMarker(repoPath: string): boolean {
+  return existsSync(join(repoPath, NEEDS_INSTALL_MARKER));
+}
+
 async function tryInstallDeps(
   repoPath: string,
   alias: string,
   verbose: boolean,
 ): Promise<boolean> {
+  markNeedsInstall(repoPath);
+
   try {
     await installDeps(repoPath, alias, verbose);
+    clearNeedsInstall(repoPath);
 
     return true;
   } catch (error) {
@@ -241,7 +262,7 @@ async function syncRepo(
       await gitFetchTag(repoPath, entry.ref, entry.depth, entry.disableHooks);
       logger.info(`Done: ${entry.alias} synced to tag ${entry.ref}.`);
 
-      if (lockfileChanged(lockBefore, hashLockfile(repoPath))) {
+      if (lockfileChanged(lockBefore, hashLockfile(repoPath)) || hasInstallMarker(repoPath)) {
         const installed = await tryInstallDeps(repoPath, entry.alias, verbose);
 
         return { action: `synced to tag ${entry.ref}`, installFailed: !installed };
@@ -264,7 +285,7 @@ async function syncRepo(
     await strategyFn(repoPath, entry.disableHooks);
     logger.info(`Done: ${entry.alias} updated.`);
 
-    if (lockfileChanged(lockBefore, hashLockfile(repoPath))) {
+    if (lockfileChanged(lockBefore, hashLockfile(repoPath)) || hasInstallMarker(repoPath)) {
       const installed = await tryInstallDeps(repoPath, entry.alias, verbose);
 
       return { action: strategy ?? 'pull', installFailed: !installed };
@@ -288,7 +309,7 @@ async function syncRepo(
   await strategyFn(entry.path, undefined);
   logger.info(`Done: ${entry.alias} updated.`);
 
-  if (lockfileChanged(lockBefore, hashLockfile(entry.path))) {
+  if (lockfileChanged(lockBefore, hashLockfile(entry.path)) || hasInstallMarker(entry.path)) {
     const installed = await tryInstallDeps(entry.path, entry.alias, verbose);
 
     return { action: strategy ?? 'pull', installFailed: !installed };
