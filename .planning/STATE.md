@@ -81,7 +81,9 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-None yet.
+2 pending:
+- [sync] Optimize sync skip package install when lockfile unchanged
+- [sync] Parse pnpm ndjson reporter for concise install progress
 
 ### Quick Tasks Completed
 
