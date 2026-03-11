@@ -21,15 +21,15 @@ These are the specific `@nx/devkit` APIs the plugin must use. All are exported f
 
 | API | Purpose | Why | Confidence |
 |-----|---------|-----|------------|
-| `createNodesV2` / `CreateNodesV2<T>` | Register external repo projects as Nx project nodes | The v2 API (current in Nx 22) lets the plugin return project configurations for each assembled repo. The glob pattern matches a marker file (e.g., `**/.openpolyrepo.json` or external repo `nx.json` files) and the handler returns `ProjectConfiguration` objects for discovered projects. In Nx 22, export both `createNodes` and `createNodesV2` with identical v2 implementations for forward compatibility with Nx 23 (where `createNodesV2` name is deprecated in favor of `createNodes` with v2 signature). | HIGH |
+| `createNodesV2` / `CreateNodesV2<T>` | Register external repo projects as Nx project nodes | The v2 API (current in Nx 22) lets the plugin return project configurations for each synced repo. The glob pattern matches a marker file (e.g., `**/.openpolyrepo.json` or external repo `nx.json` files) and the handler returns `ProjectConfiguration` objects for discovered projects. In Nx 22, export both `createNodes` and `createNodesV2` with identical v2 implementations for forward compatibility with Nx 23 (where `createNodesV2` name is deprecated in favor of `createNodes` with v2 signature). | HIGH |
 | `createDependencies` / `CreateDependencies<T>` | Wire cross-repo dependency edges in the project graph | Returns `CandidateDependency[]` describing edges between projects. Used for: (1) auto-detected cross-repo deps from package.json, (2) explicit manual dependency overrides from plugin config. Use `DependencyType.implicit` for cross-repo edges since they are not tied to specific source files. | HIGH |
-| `createProjectGraphAsync` | Read project graph from assembled repos | Call inside each cloned repo to extract its project graph, then merge nodes and dependencies into the host workspace graph. | HIGH |
+| `createProjectGraphAsync` | Read project graph from synced repos | Call inside each cloned repo to extract its project graph, then merge nodes and dependencies into the host workspace graph. | HIGH |
 | `ProjectGraph`, `ProjectGraphProjectNode`, `ProjectGraphExternalNode` | Type definitions for graph manipulation | Core types for working with project graph nodes and dependencies. `ProjectGraphProjectNode` has `type: 'app' \| 'e2e' \| 'lib'`, `name`, and `data: ProjectConfiguration`. | HIGH |
 | `DependencyType` enum | Classify dependency edges | `static`, `dynamic`, `implicit`. Cross-repo deps should use `implicit` since they are inferred from package.json or config, not from source file analysis. | HIGH |
 | `validateDependency` | Validate candidate dependencies before returning | Catches invalid dependency references early. Throws if source/target projects do not exist in the graph. | HIGH |
 | `Tree` | File system abstraction for generators | Used in sync generators and scaffolding generators. Provides `read`, `write`, `exists`, `delete` operations on a virtual file tree. | HIGH |
 | `SyncGeneratorResult` (from `nx/src/utils/sync-generators`) | Return type for sync generators | Sync generators return `{ outOfSyncMessage?: string }` to indicate whether workspace files need updating. | HIGH |
-| `workspaceRoot` | Get absolute path to workspace root | Needed for resolving paths to assembled repos relative to workspace. | HIGH |
+| `workspaceRoot` | Get absolute path to workspace root | Needed for resolving paths to synced repos relative to workspace. | HIGH |
 | `readProjectConfiguration` | Read single project config from Tree | Utility for generator implementations. | HIGH |
 | `joinPathFragments` | Cross-platform path joining | Normalizes path separators. Use instead of `path.join` in Nx plugin code. | HIGH |
 
@@ -150,12 +150,12 @@ const createNodesInternal = async (
   options: OpenPolyrepoPluginOptions | undefined,
   context: CreateNodesContextV2
 ) => {
-  // Read assembled repo's project graph
+  // Read synced repo's project graph
   // Return ProjectConfiguration objects for each project
 };
 
 export const createNodesV2: CreateNodesV2<OpenPolyrepoPluginOptions> = [
-  '**/.openpolyrepo.json',  // or assembled repo marker files
+  '**/.openpolyrepo.json',  // or synced repo marker files
   async (configFiles, options, context) =>
     createNodesFromFiles(createNodesInternal, configFiles, options, context),
 ];

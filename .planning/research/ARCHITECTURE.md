@@ -39,7 +39,7 @@ nx.json plugin options
 |-----------|---------------|-------------------|
 | **Plugin Entry** (`src/index.ts`) | Exports `createNodes`, `createDependencies`, generators, executors. Thin barrel file per feature to avoid bundling unrelated code. | Nx runtime |
 | **Repo Assembler** | Clones/pulls configured repos to a local assembly directory. Manages branch/commit/tag checkout. Detects staleness. | Git CLI, filesystem |
-| **Graph Extractor** | Reads each assembled repo's `nx.json` and runs Nx project graph construction against it. Produces a `ProjectGraph` per repo. | `@nx/devkit` (`createProjectGraphAsync`), assembled repo filesystem |
+| **Graph Extractor** | Reads each synced repo's `nx.json` and runs Nx project graph construction against it. Produces a `ProjectGraph` per repo. | `@nx/devkit` (`createProjectGraphAsync`), synced repo filesystem |
 | **Graph Merger** | Namespaces external projects (prefix with repo name), resolves cross-repo dependencies from `package.json` and explicit overrides, deduplicates external nodes (npm packages). | Graph Extractor output, host workspace graph context |
 | **Project Graph Plugin** (`createNodes` + `createDependencies`) | Surfaces merged projects and cross-repo dependencies to the host Nx workspace graph via the official plugin API. | Nx project graph construction pipeline |
 | **Sync Generator** | Keeps derived files (e.g., tsconfig paths for cross-repo imports) in sync with the merged graph. Runs via `nx sync`. | Nx sync infrastructure, merged graph |
@@ -63,7 +63,7 @@ nx.json plugin options
 
 **Phase 3: Graph Extraction**
 
-1. For each assembled repo directory, the Graph Extractor constructs a project graph.
+1. For each synced repo directory, the Graph Extractor constructs a project graph.
 2. **Critical constraint**: Cannot call `createProjectGraphAsync` inside `createNodes`/`createDependencies` -- this causes infinite recursion (protected by `global.NX_GRAPH_CREATION` guard).
 3. **Solution**: Use a lower-level approach. Read each repo's `nx.json`, enumerate its projects by scanning `project.json`/`package.json` files per the repo's workspaces config, and parse their configuration directly. This avoids invoking the full Nx graph pipeline recursively.
 4. Alternative: Run graph extraction as a **pre-step** (during assembly or via sync generator), serialize each repo's graph to a JSON cache file (`.repos/<repo-name>/.nx-graph-cache.json`), and read the cached graphs during `createNodes`.
@@ -80,14 +80,14 @@ nx.json plugin options
 
 **Phase 5: Plugin API Integration**
 
-1. `createNodes` returns the merged project configurations keyed by a sentinel file in each assembled repo (e.g., `<assembly-dir>/<repo-name>/nx.json` as the glob pattern).
+1. `createNodes` returns the merged project configurations keyed by a sentinel file in each synced repo (e.g., `<assembly-dir>/<repo-name>/nx.json` as the glob pattern).
 2. `createDependencies` returns cross-repo dependency edges as `CandidateDependency[]` with type `implicit` (since they are not file-associated within the host workspace).
 
 **Phase 6: Sync Generator (optional, post-graph)**
 
 1. A global sync generator reads the merged graph and updates host workspace files:
    - `tsconfig.base.json` path mappings for cross-repo TypeScript imports.
-   - `.gitignore` entries for assembled repos.
+   - `.gitignore` entries for synced repos.
 2. Registered in `nx.json` under `sync.globalGenerators`.
 
 ## Reference Plugins (Official Nx)
@@ -106,7 +106,7 @@ Three official Nx plugins follow the same architectural pattern we need: trigger
 3. Both functions share data via module-level variables or a shared cache utility
 4. Each uses hash-based cache invalidation (hashing config files + plugin options)
 
-**Key difference from our plugin:** These plugins integrate *one* external build system into an Nx workspace. Our plugin integrates *N* external Nx workspaces. The pattern is the same, applied per assembled repo.
+**Key difference from our plugin:** These plugins integrate *one* external build system into an Nx workspace. Our plugin integrates *N* external Nx workspaces. The pattern is the same, applied per synced repo.
 
 **`@nx/dotnet` relevance:** .NET solutions reference projects across directories via `<ProjectReference>` in `.csproj`, analogous to cross-repo dependencies. Its `create-dependencies.ts` maps source roots to target roots using `referencesByRoot` — our cross-repo dep detection follows a similar pattern but matches on `package.json` dependency names.
 
@@ -147,7 +147,7 @@ export { createNodes, createDependencies } from './graph/plugin';
 import { execSync } from 'child_process';
 
 function extractAndCacheGraph(repoDir: string): void {
-  // Run nx graph in the assembled repo as a subprocess
+  // Run nx graph in the synced repo as a subprocess
   const result = execSync('npx nx graph --file=.nx-graph-cache.json', {
     cwd: repoDir,
     env: { ...process.env, NX_DAEMON: 'false' },
@@ -185,7 +185,7 @@ function namespaceProject(
 
 ### Pattern 4: Dependency Detection via Package Name Matching
 
-**What:** Match `package.json` dependency entries against known project package names across all assembled repos to auto-wire cross-repo dependency edges.
+**What:** Match `package.json` dependency entries against known project package names across all synced repos to auto-wire cross-repo dependency edges.
 **When:** For detecting implicit cross-repo dependencies without manual configuration.
 **Example:**
 ```typescript
@@ -231,7 +231,7 @@ function detectCrossRepoDependencies(
 
 **What:** Cloning or pulling repos every time `createNodes` is called.
 **Why bad:** Graph construction happens frequently (every `nx` command). Git operations add seconds to every invocation. The Nx daemon caches plugin results, but cold starts would be severely impacted.
-**Instead:** Assembly is an explicit step (generator, executor, or sync generator). Graph plugin reads from the assembled directory assuming it exists. Staleness checks use filesystem timestamps, not git fetch.
+**Instead:** Assembly is an explicit step (generator, executor, or sync generator). Graph plugin reads from the synced directory assuming it exists. Staleness checks use filesystem timestamps, not git fetch.
 
 ### Anti-Pattern 3: Deep-Merging Target Configurations
 
@@ -314,7 +314,7 @@ packages/nx-openpolyrepo/
     index.ts                # Graph plugin entry: exports createNodes, createDependencies
     graph/
       plugin.ts             # createNodes + createDependencies implementation
-      extractor.ts          # Graph extraction from assembled repos
+      extractor.ts          # Graph extraction from synced repos
       merger.ts             # Graph merging + namespacing logic
       types.ts              # RepoConfig, MergedProject, etc.
     assembly/

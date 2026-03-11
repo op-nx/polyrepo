@@ -1,7 +1,7 @@
 # Requirements: nx-openpolyrepo
 
 **Defined:** 2026-03-10
-**Core Value:** `nx graph` displays projects from all assembled repos with cross-repo dependency edges, and all relevant Nx CLI commands output projects from multiple repos
+**Core Value:** `nx graph` displays projects from all synced repos with cross-repo dependency edges, and all relevant Nx CLI commands output projects from multiple repos
 
 ## v1 Requirements
 
@@ -16,15 +16,15 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Project Graph
 
-- [ ] **GRPH-01**: Projects from assembled repos appear in `nx graph` visualization
-- [ ] **GRPH-02**: Projects from assembled repos appear in `nx show projects` output
+- [ ] **GRPH-01**: Projects from synced repos appear in `nx graph` visualization
+- [ ] **GRPH-02**: Projects from synced repos appear in `nx show projects` output
 - [x] **GRPH-03**: External repo projects are namespaced with repo prefix (e.g., `repo-b/my-lib`) to prevent collisions
 - [x] **GRPH-04**: Graph extraction uses cached JSON files (pre-computed during assembly, not on every nx command)
 
 ### Multi-Repo Git DX
 
-- [ ] **GITX-01**: User can see combined git status of all assembled repos in one command
-- [ ] **GITX-02**: User can pull/fetch all assembled repos with one command
+- [ ] **GITX-01**: User can see combined git status of all synced repos in one command
+- [ ] **GITX-02**: User can pull/fetch all synced repos with one command
 - [ ] **GITX-03**: Git operations show clear per-repo output (which repo succeeded/failed)
 
 ## v2 Requirements

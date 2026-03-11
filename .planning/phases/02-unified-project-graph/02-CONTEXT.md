@@ -6,7 +6,7 @@
 <domain>
 ## Phase Boundary
 
-External repo projects appear in the unified Nx project graph with proper namespacing and fast cached extraction. Users can run `nx graph`, `nx show projects`, `nx run-many`, and `nx affected` and see projects from all assembled repos alongside host workspace projects. Cross-repo dependency wiring and sync generators are out of scope (v2).
+External repo projects appear in the unified Nx project graph with proper namespacing and fast cached extraction. Users can run `nx graph`, `nx show projects`, `nx run-many`, and `nx affected` and see projects from all synced repos alongside host workspace projects. Cross-repo dependency wiring and sync generators are out of scope (v2).
 
 </domain>
 
@@ -115,7 +115,7 @@ NOT usable for .repos/ content:
 - `createNodesV2` entry point: Already exists from Phase 1 — extend to register external projects
 - `createDependencies` hook: New — add for intra-repo dependency edges
 - `nx.json` plugin options: Already has repos config — graph extraction reads from same config
-- `.repos/` directory: Already created by sync — graph extraction reads from assembled repos here
+- `.repos/` directory: Already created by sync — graph extraction reads from synced repos here
 
 </code_context>
 
@@ -125,7 +125,7 @@ NOT usable for .repos/ content:
 - **Configurable namespace separator** — the repo-alias/project-name separator is currently `/`. If it causes collisions, make it configurable in plugin options (e.g., `--`, `::`, or custom). Not needed now since host projects rarely use `/` in names
 - **Add-repo generator** that auto-runs polyrepo-sync — convenience feature for onboarding repos
 - **Cross-repo dependency auto-detection** from package.json — Phase 2 scope covers intra-repo edges only, cross-repo deps are v2
-- **Nx sync generators** for keeping assembled workspace in sync — evaluate during later phases
+- **Nx sync generators** for keeping synced workspace in sync — evaluate during later phases
 
 </deferred>
 

@@ -65,7 +65,7 @@ created: 2026-03-11
 | Behavior | Requirement | Why Manual | Test Instructions |
 |----------|-------------|------------|-------------------|
 | `nx graph` visualizes external projects | GRPH-01 | Visual graph rendering requires browser | Run `nx graph` and verify external projects appear in visualization |
-| `nx show projects` lists external projects | GRPH-02 | Requires assembled repos in .repos/ | Clone a test repo, run sync, then `nx show projects` |
+| `nx show projects` lists external projects | GRPH-02 | Requires synced repos in .repos/ | Clone a test repo, run sync, then `nx show projects` |
 
 ---
 

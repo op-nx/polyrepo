@@ -9,7 +9,7 @@
 
 nx-openpolyrepo is an Nx plugin that creates a "synthetic monorepo" experience by cloning external repos into a host workspace and merging their project graphs into a unified Nx project graph. This is a free, open-source alternative to Nx Enterprise's Polygraph feature. The core value proposition is that standard Nx commands (`nx graph`, `nx affected`, `nx run-many`) work transparently across repo boundaries without requiring teams to consolidate into an actual monorepo. The closest existing tools (meta, mu-repo, myrepos) provide multi-repo git coordination but none integrate with Nx's project graph, task orchestration, or affected analysis -- that integration is the key differentiator.
 
-The recommended approach is to build a standard Nx project graph plugin using `createNodesV2` and `createDependencies` from `@nx/devkit`, with `simple-git` for git operations and `zod` for configuration validation. This architecture is validated by three official Nx plugins (`@nx/gradle`, `@nx/maven`, `@nx/dotnet`) that follow the same pattern: trigger on config files, shell out to an external tool for project discovery, cache the JSON result, and serve it via `createNodesV2`. The architecture has five components: Repo Assembler (git clone/pull), Graph Extractor (read each repo's project structure), Graph Merger (namespace and merge into host graph), Plugin API surface (createNodes + createDependencies), and optional Sync Generator (auto-generate tsconfig paths). The critical architectural constraint is that graph extraction from assembled repos must NOT call `createProjectGraphAsync` (causes infinite recursion) -- instead, graphs must be pre-computed and cached as JSON during the assembly step.
+The recommended approach is to build a standard Nx project graph plugin using `createNodesV2` and `createDependencies` from `@nx/devkit`, with `simple-git` for git operations and `zod` for configuration validation. This architecture is validated by three official Nx plugins (`@nx/gradle`, `@nx/maven`, `@nx/dotnet`) that follow the same pattern: trigger on config files, shell out to an external tool for project discovery, cache the JSON result, and serve it via `createNodesV2`. The architecture has five components: Repo Assembler (git clone/pull), Graph Extractor (read each repo's project structure), Graph Merger (namespace and merge into host graph), Plugin API surface (createNodes + createDependencies), and optional Sync Generator (auto-generate tsconfig paths). The critical architectural constraint is that graph extraction from synced repos must NOT call `createProjectGraphAsync` (causes infinite recursion) -- instead, graphs must be pre-computed and cached as JSON during the assembly step.
 
 The top risks are: (1) performance -- naive implementations that shell out to `nx graph` per repo on every graph computation will destroy DX, so caching must be baked in from day one; (2) project name collisions -- namespacing must be applied during graph construction, not as an afterthought; (3) external npm node version conflicts across repos silently overwrite each other; (4) Windows path length limits with deep clone directories. All four are Phase 1 concerns that cannot be deferred.
 
@@ -34,13 +34,13 @@ The stack is almost entirely Nx-native. The plugin is built with `@nx/devkit` (v
 - Project namespacing to prevent name collisions across repos
 - Cross-repo dependency detection from package.json
 - Affected analysis across repo boundaries (`nx affected` works cross-repo)
-- Multi-repo git status (combined view across assembled repos)
+- Multi-repo git status (combined view across synced repos)
 - Cross-repo task orchestration awareness (build order respects cross-repo deps)
 
 **Should have (competitive, v1.x):**
 - Bulk git operations (pull, fetch, checkout across all repos)
 - Explicit cross-repo dependency overrides (for non-npm deps like APIs/services)
-- Stale repo detection (warn when assembled repo diverges from remote)
+- Stale repo detection (warn when synced repo diverges from remote)
 - Selective repo assembly (profiles/groups for large teams)
 - Sync generator for tsconfig paths (auto-generate cross-repo TypeScript imports)
 
@@ -52,15 +52,15 @@ The stack is almost entirely Nx-native. The plugin is built with `@nx/devkit` (v
 
 ### Architecture Approach
 
-The plugin follows a pipeline architecture: config reading -> repo assembly -> graph extraction -> graph merging -> Nx plugin API integration. Each stage is a distinct component with clear boundaries. The critical design decision is that graph extraction happens as a pre-step (during assembly), not during `createNodes` execution, to avoid the `createProjectGraphAsync` recursion trap and keep graph computation fast. Cached graph JSON files in each assembled repo directory serve as the bridge between assembly and graph construction.
+The plugin follows a pipeline architecture: config reading -> repo assembly -> graph extraction -> graph merging -> Nx plugin API integration. Each stage is a distinct component with clear boundaries. The critical design decision is that graph extraction happens as a pre-step (during assembly), not during `createNodes` execution, to avoid the `createProjectGraphAsync` recursion trap and keep graph computation fast. Cached graph JSON files in each synced repo directory serve as the bridge between assembly and graph construction.
 
 **Major components:**
 1. **Repo Assembler** -- clones/pulls repos to `.repos/` directory, manages branch/tag checkout, detects staleness
-2. **Graph Extractor** -- reads each assembled repo's project structure, produces cached graph JSON per repo
+2. **Graph Extractor** -- reads each synced repo's project structure, produces cached graph JSON per repo
 3. **Graph Merger** -- namespaces external projects with repo prefix, resolves cross-repo deps, deduplicates external npm nodes
 4. **Project Graph Plugin** -- `createNodes` + `createDependencies` that surface merged graph to host Nx workspace
 5. **Generators** -- `init` for first-time setup, `add-repo` for adding repos to config
-6. **Sync Generator** -- keeps tsconfig paths and .gitignore in sync with assembled repos
+6. **Sync Generator** -- keeps tsconfig paths and .gitignore in sync with synced repos
 
 ### Critical Pitfalls
 
@@ -82,7 +82,7 @@ Based on research, the feature dependency graph and architecture layers suggest 
 
 ### Phase 2: Core Graph Plugin
 **Rationale:** The unified project graph IS the product. This phase delivers the proof of concept: external projects visible in `nx graph`. Depends on Phase 1 (repos must be on disk).
-**Delivers:** Graph Extractor, Graph Merger, `createNodesV2` implementation, project namespacing. After this phase, `nx graph` shows projects from all assembled repos.
+**Delivers:** Graph Extractor, Graph Merger, `createNodesV2` implementation, project namespacing. After this phase, `nx graph` shows projects from all synced repos.
 **Addresses:** Unified project graph, project namespacing, external node deduplication.
 **Avoids:** `createProjectGraphAsync` recursion (cached graph approach), plugin performance (caching from day one), project name collisions (namespace prefixing), external node version conflicts (repo-scoped npm nodes).
 
@@ -137,8 +137,8 @@ Phases with standard patterns (skip research-phase):
 
 - **Cached graph extraction format:** The exact format of `nx graph --file=output.json` output and whether it contains all needed fields (project configs, external nodes, dependency edges) needs validation during Phase 2 implementation.
 - **Nx 22/23 forward compatibility:** The `createNodesV2` to `createNodes` naming migration in Nx 23 needs testing. The dual-export strategy is theoretically sound but untested.
-- **Cross-repo affected analysis with git:** How `nx affected` detects file changes across multiple git working directories (assembled repos have separate `.git` dirs) needs investigation. May require custom `--base`/`--head` handling.
-- **Nx version compatibility across repos:** The adapter layer for different Nx versions in assembled repos is scoped to "Nx 22.x only" for MVP. Exact breaking differences between Nx 20/21/22 graph formats are not fully cataloged.
+- **Cross-repo affected analysis with git:** How `nx affected` detects file changes across multiple git working directories (synced repos have separate `.git` dirs) needs investigation. May require custom `--base`/`--head` handling.
+- **Nx version compatibility across repos:** The adapter layer for different Nx versions in synced repos is scoped to "Nx 22.x only" for MVP. Exact breaking differences between Nx 20/21/22 graph formats are not fully cataloged.
 - **simple-git error handling on Windows:** Edge cases with Git for Windows (credential prompts, SSH agent, proxy settings) may surface during implementation. Not fully documented in simple-git.
 
 ## Sources

@@ -2,7 +2,7 @@
 
 ## Overview
 
-This roadmap delivers a working Nx plugin for synthetic monorepos in three phases. Phase 1 establishes the plugin skeleton and repo assembly pipeline -- cloning and updating external repos from nx.json configuration. Phase 2 delivers the core value: external repo projects visible in `nx graph` and `nx show projects` with proper namespacing and cached graph extraction. Phase 3 adds multi-repo git DX so users can manage all assembled repos from a single command surface.
+This roadmap delivers a working Nx plugin for synthetic monorepos in three phases. Phase 1 establishes the plugin skeleton and repo assembly pipeline -- cloning and updating external repos from nx.json configuration. Phase 2 delivers the core value: external repo projects visible in `nx graph` and `nx show projects` with proper namespacing and cached graph extraction. Phase 3 adds multi-repo git DX so users can manage all synced repos from a single command surface.
 
 ## Phases
 
@@ -39,7 +39,7 @@ Plans:
 **Depends on**: Phase 1
 **Requirements**: GRPH-01, GRPH-02, GRPH-03, GRPH-04
 **Success Criteria** (what must be TRUE):
-  1. Running `nx graph` displays projects from all assembled repos alongside host workspace projects
+  1. Running `nx graph` displays projects from all synced repos alongside host workspace projects
   2. Running `nx show projects` lists external repo projects in its output
   3. External repo projects are prefixed with their repo name (e.g., `repo-b/my-lib`) to prevent name collisions
   4. Graph data is extracted from cached JSON files produced during assembly, not recomputed on every Nx command
@@ -51,12 +51,12 @@ Plans:
 - [ ] 02-03-PLAN.md -- Run executor, createNodesV2 extension for external projects, createDependencies for intra-repo edges
 
 ### Phase 3: Multi-Repo Git DX
-**Goal**: Users can monitor and manage git state across all assembled repos from a single command surface
+**Goal**: Users can monitor and manage git state across all synced repos from a single command surface
 **Depends on**: Phase 1
 **Requirements**: GITX-01, GITX-02, GITX-03
 **Success Criteria** (what must be TRUE):
-  1. User can run a single command to see combined git status of all assembled repos
-  2. User can pull or fetch all assembled repos with one command
+  1. User can run a single command to see combined git status of all synced repos
+  2. User can pull or fetch all synced repos with one command
   3. Git operations display clear per-repo output showing which repo succeeded and which failed
 **Plans**: TBD
 

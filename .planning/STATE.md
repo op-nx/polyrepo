@@ -20,7 +20,7 @@ progress:
 
 See: .planning/PROJECT.md (updated 2026-03-10)
 
-**Core value:** `nx graph` displays projects from all assembled repos with cross-repo dependency edges, and all relevant Nx CLI commands output projects from multiple repos
+**Core value:** `nx graph` displays projects from all synced repos with cross-repo dependency edges, and all relevant Nx CLI commands output projects from multiple repos
 **Current focus:** Phase 2: Unified Project Graph
 
 ## Current Position
@@ -60,7 +60,7 @@ Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
 - [Roadmap]: 3-phase coarse structure derived from 3 requirement categories (ASSM, GRPH, GITX). Cross-repo deps and sync generators deferred to v2.
-- [Roadmap]: Phase 3 (Git DX) depends on Phase 1 only, not Phase 2, since git operations need assembled repos but not the project graph.
+- [Roadmap]: Phase 3 (Git DX) depends on Phase 1 only, not Phase 2, since git operations need synced repos but not the project graph.
 - [Architecture]: Phase 2 graph integration must shell out to `nx show projects --json` / `nx graph --file=output.json` inside each repo workspace -- not manually walk project.json files. Each repo is a full Nx workspace with its own plugins and inferred targets. The "external tool" in the established Nx plugin pattern (gradle/maven/dotnet) is Nx itself.
 - [01-01]: Changed vitest environment from jsdom to node -- plugin is Node.js code, not browser
 - [01-01]: Used .strict() on zod object schemas to reject objects with both url and path fields

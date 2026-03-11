@@ -6,7 +6,7 @@
 
 ## Summary
 
-Phase 2 extends the existing `@op-nx/polyrepo` Nx plugin to make external repo projects visible in the unified Nx project graph. The plugin must extract graph data from each assembled repo by shelling out to `nx graph --print` inside the repo's `.repos/<alias>/` directory, transform and namespace the results, then register projects via `createNodesV2` and dependencies via `createDependencies`. A new `@op-nx/polyrepo:run` executor proxies target execution into child repos using `runCommandsImpl` from `nx/src/executors/run-commands/run-commands.impl`.
+Phase 2 extends the existing `@op-nx/polyrepo` Nx plugin to make external repo projects visible in the unified Nx project graph. The plugin must extract graph data from each synced repo by shelling out to `nx graph --print` inside the repo's `.repos/<alias>/` directory, transform and namespace the results, then register projects via `createNodesV2` and dependencies via `createDependencies`. A new `@op-nx/polyrepo:run` executor proxies target execution into child repos using `runCommandsImpl` from `nx/src/executors/run-commands/run-commands.impl`.
 
 The established pattern from `@nx/gradle`, `@nx/maven`, and `@nx/dotnet` in the nrwl/nx repository has been thoroughly studied. The core technique is: (1) populate a module-level cache in `createNodesV2` by invoking the external tool, (2) share that cache with `createDependencies` via a module-level variable, (3) use `PluginCache` from `nx/src/utils/plugin-cache-utils` for disk persistence, and (4) use `runCommandsImpl` in the executor for transparent output streaming.
 
@@ -56,7 +56,7 @@ The established pattern from `@nx/gradle`, `@nx/maven`, and `@nx/dotnet` in the 
 - **Configurable namespace separator** -- the repo-alias/project-name separator is currently `/`
 - **Add-repo generator** that auto-runs polyrepo-sync
 - **Cross-repo dependency auto-detection** from package.json -- Phase 2 scope covers intra-repo edges only
-- **Nx sync generators** for keeping assembled workspace in sync
+- **Nx sync generators** for keeping synced workspace in sync
 </user_constraints>
 
 <phase_requirements>
@@ -64,8 +64,8 @@ The established pattern from `@nx/gradle`, `@nx/maven`, and `@nx/dotnet` in the 
 
 | ID | Description | Research Support |
 |----|-------------|-----------------|
-| GRPH-01 | Projects from assembled repos appear in `nx graph` visualization | createNodesV2 registers external projects with root at `.repos/<alias>/<project-root>`, targets, tags, metadata. Nx graph visualization reads from the project graph which includes all createNodesV2 results |
-| GRPH-02 | Projects from assembled repos appear in `nx show projects` output | Same as GRPH-01 -- `nx show projects` queries the same project graph that createNodesV2 populates. Namespaced names appear automatically |
+| GRPH-01 | Projects from synced repos appear in `nx graph` visualization | createNodesV2 registers external projects with root at `.repos/<alias>/<project-root>`, targets, tags, metadata. Nx graph visualization reads from the project graph which includes all createNodesV2 results |
+| GRPH-02 | Projects from synced repos appear in `nx show projects` output | Same as GRPH-01 -- `nx show projects` queries the same project graph that createNodesV2 populates. Namespaced names appear automatically |
 | GRPH-03 | External repo projects are namespaced with repo prefix (e.g., `repo-b/my-lib`) to prevent collisions | Projects registered with `name: "<repo-alias>/<original-name>"` in createNodesV2 result. `/` separator confirmed working with Nx command syntax (`nx run repo-b/my-lib:build` -- Nx splits on last `:`) |
 | GRPH-04 | Graph extraction uses cached JSON files (pre-computed during assembly, not on every nx command) | Two-layer caching: outer gate (git HEAD SHA + dirty state + options hash) skips extraction entirely (~15ms check); inner gate (child Nx PluginCache) returns cached data in ~1-2s if outer fires false positive. PluginCache persists to `.nx/workspace-data/` |
 </phase_requirements>

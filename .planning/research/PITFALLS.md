@@ -33,10 +33,10 @@ Phase 1 (core graph plugin) -- namespacing must be built into the graph merging 
 `createNodesV2` is called during every graph computation. If the plugin shells out to child Nx workspaces (running `nx graph --json` in each repo) synchronously, graph computation can take 30-120+ seconds. The Nx daemon has a 10-minute timeout for plugin execution ([GitHub #32788](https://github.com/nrwl/nx/issues/32788)), but even 10 seconds destroys DX since `nx affected`, `nx graph`, and every task run depend on the graph.
 
 **Why it happens:**
-The naive implementation is: for each assembled repo, spawn `nx graph` or `nx show projects --json`, parse the result, merge. Each spawn bootstraps Node.js, loads Nx, reads that repo's `nx.json`, runs its plugins, and computes its graph. This is inherently expensive, multiplied by repo count.
+The naive implementation is: for each synced repo, spawn `nx graph` or `nx show projects --json`, parse the result, merge. Each spawn bootstraps Node.js, loads Nx, reads that repo's `nx.json`, runs its plugins, and computes its graph. This is inherently expensive, multiplied by repo count.
 
 **How to avoid:**
-- Cache assembled repo graphs aggressively. Use file hashes (lockfile + nx.json + project.json files) as cache keys. Only recompute a repo's graph when its files change.
+- Cache synced repo graphs aggressively. Use file hashes (lockfile + nx.json + project.json files) as cache keys. Only recompute a repo's graph when its files change.
 - Consider reading the Nx project graph cache file (`.nx/cache/d/file-map.json` or similar) from each repo rather than spawning a full `nx graph` process.
 - Process repos in parallel, not sequentially.
 - Set `NX_PERF_LOGGING=true` during development to measure plugin time contribution.
@@ -77,13 +77,13 @@ Phase 1 (core graph plugin) -- external node handling is part of graph merging f
 ### Pitfall 4: Nx Version Incompatibility Between Repos
 
 **What goes wrong:**
-The plugin runs inside the host workspace's Nx runtime (v22.x). Assembled repos may run Nx 20, 21, or a future 23. The project graph JSON format, plugin API, and even the project configuration schema can differ across major versions. Attempting to load or parse a repo's graph that was computed with a different Nx version produces cryptic errors or silently wrong data.
+The plugin runs inside the host workspace's Nx runtime (v22.x). Synced repos may run Nx 20, 21, or a future 23. The project graph JSON format, plugin API, and even the project configuration schema can differ across major versions. Attempting to load or parse a repo's graph that was computed with a different Nx version produces cryptic errors or silently wrong data.
 
 **Why it happens:**
 The `createNodesV2` API itself changed between Nx 19 and 22. Project configuration fields, target defaults behavior, and graph cache formats evolve with each major version. The plugin author tests against their own Nx version and doesn't encounter the mismatch.
 
 **How to avoid:**
-- Don't import or require Nx internals from assembled repos. Instead, invoke the repo's own `nx` binary (from its `node_modules/.bin/nx`) to produce a graph JSON, which is a more stable public API surface.
+- Don't import or require Nx internals from synced repos. Instead, invoke the repo's own `nx` binary (from its `node_modules/.bin/nx`) to produce a graph JSON, which is a more stable public API surface.
 - Detect each repo's Nx version early (read `nx` version from `node_modules/nx/package.json`). Define a supported version range (e.g., Nx >=20 <24). Emit a clear error for unsupported versions.
 - For graph JSON format differences, maintain lightweight adapters per major version that normalize the output into a common internal format.
 
@@ -125,7 +125,7 @@ Phase 1 (repo assembly) -- path strategy is a foundational design decision. Chan
 ### Pitfall 6: Stale Repo State Produces Incorrect Graphs
 
 **What goes wrong:**
-Assembled repos are cloned/pulled at some point in time. If the user doesn't re-pull, the local clone diverges from the remote. The project graph shows stale projects, missing new projects, or incorrect dependency edges. Worse, `nx affected` may miss affected projects because it compares against a stale baseline.
+Synced repos are cloned/pulled at some point in time. If the user doesn't re-pull, the local clone diverges from the remote. The project graph shows stale projects, missing new projects, or incorrect dependency edges. Worse, `nx affected` may miss affected projects because it compares against a stale baseline.
 
 **Why it happens:**
 The plugin clones repos during initial setup but has no mechanism to keep them fresh. Users forget to run the sync command, or don't realize their graph is stale.
@@ -134,7 +134,7 @@ The plugin clones repos during initial setup but has no mechanism to keep them f
 - Implement an Nx sync generator that checks repo freshness (compare local HEAD with remote HEAD via `git fetch --dry-run` or `git remote show origin`).
 - Display repo staleness in `nx graph` visualization or CLI output.
 - Support a `--fetch` flag on graph computation that does a quick `git fetch` for all repos before graph merging.
-- Never auto-pull without user consent -- force-pulling can discard local changes in assembled repos.
+- Never auto-pull without user consent -- force-pulling can discard local changes in synced repos.
 
 **Warning signs:**
 - Users say "I added a new project in repo-b but it doesn't show up"
@@ -200,7 +200,7 @@ Phase 2 (dependency detection) -- basic explicit wiring in Phase 1, auto-detecti
 |----------|-------------------|----------------|-----------------|
 | Shell out to `nx graph` per repo instead of reading graph cache | Simple implementation, uses stable CLI API | 5-30 seconds per repo per graph computation, unusable at scale | MVP only, must be replaced before release |
 | Skip external node deduplication | Fewer edge cases to handle | Incorrect dependency edges, broken `affected` command | Never -- at minimum, log warnings on conflicts |
-| Hardcode Nx 22.x graph format | Faster initial development | Plugin breaks when any assembled repo upgrades to Nx 23 | MVP only, with version detection that errors on unsupported versions |
+| Hardcode Nx 22.x graph format | Faster initial development | Plugin breaks when any synced repo upgrades to Nx 23 | MVP only, with version detection that errors on unsupported versions |
 | Clone full repos instead of shallow/sparse | Simpler git operations | Disk space explosion with large repos, slow initial setup | Acceptable for v1 with an option to enable shallow clone later |
 | Synchronous repo processing | Simpler control flow | Graph computation time scales linearly with repo count | Never -- parallel processing is straightforward with `Promise.all` |
 
@@ -220,7 +220,7 @@ Phase 2 (dependency detection) -- basic explicit wiring in Phase 1, auto-detecti
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|----------------|
 | Spawning `nx graph` per repo on every graph computation | 5-30s per repo, every Nx command slow | Cache repo graphs, invalidate on file changes only | >2 repos |
-| Scanning all files in assembled repos for dependency detection | Plugin takes minutes in large repos | Use `package.json` only, not source file scanning | >1000 files per repo |
+| Scanning all files in synced repos for dependency detection | Plugin takes minutes in large repos | Use `package.json` only, not source file scanning | >1000 files per repo |
 | Cloning full git history | Initial setup takes minutes per repo | Default to `--depth=1` shallow clone, with option for full history | Repos with >10k commits |
 | Re-fetching repos on every graph computation | Network I/O on every Nx command | Fetch only on explicit sync command or when cache is stale | Always, even with fast network |
 | Not parallelizing repo processing | Linear scaling: 5 repos = 5x time | `Promise.all` for independent repo operations | >1 repo |
@@ -231,15 +231,15 @@ Phase 2 (dependency detection) -- basic explicit wiring in Phase 1, auto-detecti
 | Mistake | Risk | Prevention |
 |---------|------|------------|
 | Storing git credentials in plugin config | Credential exposure in committed nx.json | Use git credential helpers, SSH keys, or environment variables. Plugin config should only reference repo URLs, not credentials |
-| Cloning arbitrary repos specified in config | Supply chain attack -- malicious repo could contain Nx plugins that execute code during graph computation | Validate repo URLs against an allowlist, warn on first clone of new repos, never auto-install dependencies in assembled repos |
-| Running assembled repo's Nx plugins in the host process | Malicious plugin code execution in the host workspace | Run graph computation for assembled repos in isolated processes (consider `NX_ISOLATE_PLUGINS=true` behavior) |
+| Cloning arbitrary repos specified in config | Supply chain attack -- malicious repo could contain Nx plugins that execute code during graph computation | Validate repo URLs against an allowlist, warn on first clone of new repos, never auto-install dependencies in synced repos |
+| Running synced repo's Nx plugins in the host process | Malicious plugin code execution in the host workspace | Run graph computation for synced repos in isolated processes (consider `NX_ISOLATE_PLUGINS=true` behavior) |
 
 ## UX Pitfalls
 
 | Pitfall | User Impact | Better Approach |
 |---------|-------------|-----------------|
 | No progress feedback during repo clone/fetch | User thinks tool is frozen during multi-minute clone | Show per-repo progress with streaming git output |
-| Cryptic Nx error when assembled repo has broken graph | User sees internal Nx error, doesn't know which repo caused it | Catch errors per-repo, report "Repo X failed graph computation: [reason]" |
+| Cryptic Nx error when synced repo has broken graph | User sees internal Nx error, doesn't know which repo caused it | Catch errors per-repo, report "Repo X failed graph computation: [reason]" |
 | Requiring manual `nx reset` after config changes | Breaks developer flow, erodes trust in the tool | Detect config changes and auto-invalidate graph cache |
 | Silent fallback when a repo URL is unreachable | User doesn't notice a repo is missing from the graph | Error by default, with `--skip-unavailable` flag for CI resilience |
 | Namespace prefixes make project names long and awkward | `my-org-repo-a/shared-utils` is verbose for daily use | Allow short aliases in config: `{ "repo": "...", "prefix": "a" }` |
@@ -250,7 +250,7 @@ Phase 2 (dependency detection) -- basic explicit wiring in Phase 1, auto-detecti
 - [ ] **Repo assembly:** Often missing cleanup of repos removed from config -- verify that removing a repo from config also removes its projects from the graph
 - [ ] **Cross-repo dependencies:** Often missing bidirectional edge support -- verify that circular cross-repo dependencies don't crash the graph
 - [ ] **Windows support:** Often missing long path handling -- verify cloning into a deep workspace directory on Windows works
-- [ ] **Error messages:** Often missing repo context in errors -- verify that every error message identifies which assembled repo caused it
+- [ ] **Error messages:** Often missing repo context in errors -- verify that every error message identifies which synced repo caused it
 - [ ] **Nx affected:** Often missing cross-repo change detection -- verify that a change in repo-b triggers affected projects in repo-a that depend on it
 - [ ] **Plugin options schema:** Often missing JSON schema validation -- verify that invalid config in nx.json produces a helpful error, not a runtime crash
 
@@ -273,7 +273,7 @@ Phase 2 (dependency detection) -- basic explicit wiring in Phase 1, auto-detecti
 | Project name collisions | Phase 1: Core graph plugin | `nx show projects` shows all projects with unique names from all repos |
 | Plugin performance | Phase 1: Core graph plugin | `NX_PERF_LOGGING=true` shows plugin <2s for 5 repos |
 | External node conflicts | Phase 1: Core graph plugin | `nx graph` with two repos using different React versions shows both |
-| Nx version incompatibility | Phase 1: Core graph plugin | Plugin emits clear error when assembled repo uses unsupported Nx version |
+| Nx version incompatibility | Phase 1: Core graph plugin | Plugin emits clear error when synced repo uses unsupported Nx version |
 | Windows path issues | Phase 1: Repo assembly | CI matrix includes Windows, cloning works in a 150+ char workspace path |
 | Stale repo state | Phase 2: Repo assembly DX | Sync generator detects and reports stale repos |
 | Cross-repo false deps | Phase 2: Dependency detection | Manual override + auto-detection with disambiguation warnings |

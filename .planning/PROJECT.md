@@ -6,7 +6,7 @@ An open-source Nx plugin for synthetic monorepos — a development tool for poly
 
 ## Core Value
 
-`nx graph` displays projects from all assembled repos with cross-repo dependency edges, and all relevant Nx CLI commands output projects from multiple repos — making polyrepo feel like monorepo.
+`nx graph` displays projects from all synced repos with cross-repo dependency edges, and all relevant Nx CLI commands output projects from multiple repos — making polyrepo feel like monorepo.
 
 ## Requirements
 
@@ -36,9 +36,9 @@ An open-source Nx plugin for synthetic monorepos — a development tool for poly
 
 - **Nx Polygraph** is the enterprise/paid solution for synthetic monorepos. This project provides the same core concept (assemble multiple repos, unified graph) without the enterprise dependency.
 - **Self-hosted Nx remote cache** is assumed — no Nx Cloud dependency for caching.
-- Each assembled repo is a full Nx workspace with its own `nx.json`. The plugin merges their project graphs rather than treating them as raw source directories.
+- Each synced repo is a full Nx workspace with its own `nx.json`. The plugin merges their project graphs rather than treating them as raw source directories.
 - Projects from external repos are namespaced (prefixed with repo name) to avoid collisions when running Nx commands from an individual repo folder.
-- **Nx sync generators** (`nx sync` command and related hooks) may be a natural mechanism for keeping the assembled workspace in sync (e.g., updating tsconfig paths for cross-repo imports, flagging stale repos). To be evaluated during research.
+- **Nx sync generators** (`nx sync` command and related hooks) may be a natural mechanism for keeping the synced workspace in sync (e.g., updating tsconfig paths for cross-repo imports, flagging stale repos). To be evaluated during research.
 - **Other polyrepo tools** (meta, mu-repo, etc.) should be researched for DX patterns, especially around multi-repo git operations and combined status views.
 
 ## Constraints
