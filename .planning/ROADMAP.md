@@ -68,7 +68,7 @@ Plans:
 - [x] 03-05-PLAN.md -- Gap closure: sync dry-run detached HEAD detection and multi-warning support
 - [x] 03-06-PLAN.md -- Gap closure: remove redundant count from status dirty summary behind/ahead labels
 - [x] 03-07-PLAN.md -- Gap closure: disable external repo git hooks during sync operations
-- [ ] 03-08-PLAN.md -- Gap closure: replace regex isTagRef with git-based tag detection
+- [x] 03-08-PLAN.md -- Gap closure: replace regex isTagRef with git-based tag detection
 - [ ] 03-09-PLAN.md -- Gap closure: conditional dep install only when HEAD changes
 
 ## Progress
@@ -80,4 +80,4 @@ Phases execute in numeric order: 1 -> 2 -> 3
 |-------|----------------|--------|-----------|
 | 1. Plugin Foundation + Repo Assembly | 3/3 | Complete | 2026-03-10 |
 | 2. Unified Project Graph | 3/3 | Complete | 2026-03-11 |
-| 3. Multi-Repo Git DX | 7/9 | In Progress | |
+| 3. Multi-Repo Git DX | 8/9 | In Progress | |
