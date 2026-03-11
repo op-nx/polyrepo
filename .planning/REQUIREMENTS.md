@@ -24,7 +24,7 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Multi-Repo Git DX
 
 - [x] **GITX-01**: User can see combined git status of all synced repos in one command
-- [ ] **GITX-02**: User can pull/fetch all synced repos with one command
+- [x] **GITX-02**: User can pull/fetch all synced repos with one command
 - [x] **GITX-03**: Git operations show clear per-repo output (which repo succeeded/failed)
 
 ## v2 Requirements
@@ -82,7 +82,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | GRPH-03 | Phase 2 | Complete |
 | GRPH-04 | Phase 2 | Complete |
 | GITX-01 | Phase 3 | Complete |
-| GITX-02 | Phase 3 | Pending |
+| GITX-02 | Phase 3 | Complete |
 | GITX-03 | Phase 3 | Complete |
 
 **Coverage:**
