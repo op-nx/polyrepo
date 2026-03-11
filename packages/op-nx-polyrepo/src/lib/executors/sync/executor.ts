@@ -13,7 +13,7 @@ import {
   gitPullFfOnly,
   gitFetchTag,
 } from '../../git/commands';
-import { detectRepoState, getWorkingTreeState } from '../../git/detect';
+import { detectRepoState, getWorkingTreeState, getCurrentBranch, getCurrentRef } from '../../git/detect';
 import { formatAlignedTable, type ColumnDef } from '../../format/table';
 
 export interface SyncExecutorOptions {
@@ -231,7 +231,7 @@ async function executeDryRun(
   for (const entry of entries) {
     const state = detectRepoState(entry.alias, entry, workspaceRoot);
     const action = getDryRunAction(entry, state, strategy);
-    let warning = '';
+    const warnings: string[] = [];
 
     if (state !== 'not-synced') {
       const repoPath = entry.type === 'remote'
@@ -242,7 +242,20 @@ async function executeDryRun(
         + treeState.untracked + treeState.conflicts;
 
       if (total > 0) {
-        warning = '[WARN: dirty, may fail]';
+        warnings.push('[WARN: dirty, may fail]');
+      }
+
+      const branch = await getCurrentBranch(repoPath);
+      const isDetachedHead = branch === null;
+
+      if (isDetachedHead) {
+        const ref = await getCurrentRef(repoPath);
+
+        if (isTagRef(ref)) {
+          warnings.push('[WARN: tag-pinned]');
+        } else {
+          warnings.push('[WARN: detached HEAD]');
+        }
       }
     }
 
@@ -255,7 +268,7 @@ async function executeDryRun(
     rows.push([
       { value: entry.alias },
       { value: action },
-      { value: warning },
+      { value: warnings.join(' ') },
     ]);
   }
 
