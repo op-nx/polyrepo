@@ -39,6 +39,20 @@ function execGitOutput(args: string[], cwd: string): Promise<string> {
   });
 }
 
+function execGitRawOutput(args: string[], cwd: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    execFile('git', args, { cwd, windowsHide: true }, (error, stdout, stderr) => {
+      if (error) {
+        reject(new Error(stderr || error.message));
+
+        return;
+      }
+
+      resolve(stdout);
+    });
+  });
+}
+
 export async function getCurrentBranch(cwd: string): Promise<string | null> {
   const branch = await execGitOutput(
     ['rev-parse', '--abbrev-ref', 'HEAD'],
@@ -68,5 +82,101 @@ export async function getCurrentRef(cwd: string): Promise<string> {
     const sha = await execGitOutput(['rev-parse', '--short', 'HEAD'], cwd);
 
     return sha;
+  }
+}
+
+export interface WorkingTreeState {
+  modified: number;
+  staged: number;
+  deleted: number;
+  untracked: number;
+  conflicts: number;
+}
+
+export interface AheadBehind {
+  ahead: number;
+  behind: number;
+}
+
+const CONFLICT_PATTERNS = new Set([
+  'UU', 'AA', 'DD', 'AU', 'UA', 'DU', 'UD',
+]);
+
+const STAGED_CHARS = new Set(['M', 'A', 'D', 'R', 'C']);
+
+export async function getWorkingTreeState(
+  cwd: string,
+): Promise<WorkingTreeState> {
+  const output = await execGitRawOutput(['status', '--porcelain=v1'], cwd);
+  const state: WorkingTreeState = {
+    modified: 0,
+    staged: 0,
+    deleted: 0,
+    untracked: 0,
+    conflicts: 0,
+  };
+
+  if (!output.trim()) {
+    return state;
+  }
+
+  for (const line of output.split('\n')) {
+    if (!line || line.length < 2) {
+      continue;
+    }
+
+    const x = line[0];
+    const y = line[1];
+    const xy = x + y;
+
+    // Check conflict patterns first
+    if (CONFLICT_PATTERNS.has(xy)) {
+      state.conflicts++;
+      continue;
+    }
+
+    // Check untracked
+    if (x === '?' && y === '?') {
+      state.untracked++;
+      continue;
+    }
+
+    // Check staged (X position)
+    if (STAGED_CHARS.has(x)) {
+      state.staged++;
+    }
+
+    // Check modified in working tree (Y position)
+    if (y === 'M') {
+      state.modified++;
+    }
+
+    // Check deleted -- Y='D' takes priority, else X='D'
+    if (y === 'D') {
+      state.deleted++;
+    } else if (x === 'D') {
+      state.deleted++;
+    }
+  }
+
+  return state;
+}
+
+export async function getAheadBehind(
+  cwd: string,
+): Promise<AheadBehind | null> {
+  try {
+    const output = await execGitOutput(
+      ['rev-list', '--left-right', '--count', 'HEAD...@{u}'],
+      cwd,
+    );
+    const parts = output.split('\t');
+
+    return {
+      ahead: parseInt(parts[0], 10),
+      behind: parseInt(parts[1], 10),
+    };
+  } catch {
+    return null;
   }
 }
