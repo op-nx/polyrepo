@@ -1,7 +1,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
-import { exec } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { logger } from '@nx/devkit';
 import type { ExecutorContext, NxJsonConfiguration } from '@nx/devkit';
 import { validateConfig } from '../../config/validate';
@@ -68,26 +68,48 @@ function getCorepackPm(
 function installDeps(repoPath: string, alias: string): Promise<void> {
   const corepackPm = getCorepackPm(repoPath);
   let command: string;
+  let displayPm: string;
 
   if (corepackPm) {
     command = `corepack ${corepackPm} install`;
-    logger.info(`Installing dependencies for ${alias} (${corepackPm} via corepack)...`);
+    displayPm = `${corepackPm} via corepack`;
   } else {
     const pm = detectPackageManager(repoPath);
     command = `${pm} install`;
-    logger.info(`Installing dependencies for ${alias} (${pm})...`);
+    displayPm = pm;
   }
 
+  logger.info(`Installing dependencies for ${alias} (${displayPm})...`);
+
   return new Promise((resolve, reject) => {
-    exec(command, { cwd: repoPath, windowsHide: true }, (error, _stdout, stderr) => {
-      if (error) {
-        reject(new Error(stderr || error.message));
+    const child = spawn(command, {
+      cwd: repoPath,
+      shell: true,
+      windowsHide: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+
+    child.stdout.on('data', (chunk: Buffer) => {
+      process.stdout.write(chunk);
+    });
+
+    child.stderr.on('data', (chunk: Buffer) => {
+      process.stderr.write(chunk);
+    });
+
+    child.on('close', (code) => {
+      if (code !== 0) {
+        reject(new Error(`${command} exited with code ${code}`));
 
         return;
       }
 
       logger.info(`Done: ${alias} dependencies installed.`);
       resolve();
+    });
+
+    child.on('error', (err) => {
+      reject(err);
     });
   });
 }
@@ -184,9 +206,9 @@ async function syncRepo(
 
     if (entry.ref && await isGitTag(repoPath, entry.ref)) {
       const lockBefore = hashLockfile(repoPath);
-      logger.info(`Fetching tag ${entry.ref} for ${entry.alias}...`);
+      logger.info(`Syncing ${entry.alias} to tag ${entry.ref}...`);
       await gitFetchTag(repoPath, entry.ref, entry.depth, entry.disableHooks);
-      logger.info(`Done: ${entry.alias} at tag ${entry.ref}.`);
+      logger.info(`Done: ${entry.alias} synced to tag ${entry.ref}.`);
 
       if (lockfileChanged(lockBefore, hashLockfile(repoPath))) {
         await tryInstallDeps(repoPath, entry.alias);

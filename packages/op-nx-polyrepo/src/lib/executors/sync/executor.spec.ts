@@ -8,7 +8,7 @@ vi.mock('node:fs', () => ({
 }));
 
 vi.mock('node:child_process', () => ({
-  exec: vi.fn(),
+  spawn: vi.fn(),
 }));
 
 vi.mock('@nx/devkit', () => ({
@@ -51,8 +51,8 @@ vi.mock('../../format/table', () => ({
 }));
 
 import { readFileSync, existsSync } from 'node:fs';
-import { exec } from 'node:child_process';
-import type { ExecException } from 'node:child_process';
+import { spawn } from 'node:child_process';
+import { EventEmitter } from 'node:events';
 import { logger } from '@nx/devkit';
 import { validateConfig } from '../../config/validate';
 import { normalizeRepos } from '../../config/schema';
@@ -71,7 +71,31 @@ import syncExecutor from './executor';
 
 const mockReadFileSync = vi.mocked(readFileSync);
 const mockExistsSync = vi.mocked(existsSync);
-const mockExec = vi.mocked(exec);
+const mockSpawn = vi.mocked(spawn);
+
+function createMockChildProcess(exitCode = 0): ReturnType<typeof spawn> {
+  const child = new EventEmitter() as ReturnType<typeof spawn>;
+  child.stdout = new EventEmitter() as typeof child.stdout;
+  child.stderr = new EventEmitter() as typeof child.stderr;
+  child.stdin = null as unknown as typeof child.stdin;
+  child.pid = 1234;
+  child.killed = false;
+  child.connected = false;
+  child.exitCode = null;
+  child.signalCode = null;
+  child.spawnargs = [];
+  child.spawnfile = '';
+  child.kill = vi.fn().mockReturnValue(true);
+  child.send = vi.fn().mockReturnValue(true);
+  child.disconnect = vi.fn();
+  child.unref = vi.fn().mockReturnThis();
+  child.ref = vi.fn().mockReturnThis();
+  child[Symbol.dispose] = vi.fn();
+  // Emit close on next tick
+  process.nextTick(() => child.emit('close', exitCode));
+
+  return child;
+}
 const mockValidateConfig = vi.mocked(validateConfig);
 const mockNormalizeRepos = vi.mocked(normalizeRepos);
 const mockGitClone = vi.mocked(gitClone);
@@ -139,20 +163,8 @@ describe('syncExecutor', () => {
     });
     // Default: existsSync returns false (no lock files detected -> npm)
     mockExistsSync.mockReturnValue(false);
-    // Default: exec (used for install) succeeds immediately
-    mockExec.mockImplementation(((
-      _command: string,
-      _options: unknown,
-      callback?: (
-        error: ExecException | null,
-        stdout: string,
-        stderr: string,
-      ) => void,
-    ) => {
-      if (callback) {
-        callback(null, '', '');
-      }
-    }) as typeof exec);
+    // Default: spawn (used for install) succeeds immediately
+    mockSpawn.mockImplementation(() => createMockChildProcess(0));
   });
 
   it('clones remote repo when .repos/<alias> does not exist', async () => {
@@ -406,37 +418,12 @@ describe('syncExecutor', () => {
   });
 
   describe('dependency installation', () => {
-    function setupExecMockSuccess(): void {
-      mockExec.mockImplementation(((
-        _command: string,
-        _options: unknown,
-        callback?: (
-          error: ExecException | null,
-          stdout: string,
-          stderr: string,
-        ) => void,
-      ) => {
-        if (callback) {
-          callback(null, '', '');
-        }
-      }) as typeof exec);
+    function setupSpawnMockSuccess(): void {
+      mockSpawn.mockImplementation(() => createMockChildProcess(0));
     }
 
-    function setupExecMockFailure(errorMessage: string): void {
-      mockExec.mockImplementation(((
-        _command: string,
-        _options: unknown,
-        callback?: (
-          error: ExecException | null,
-          stdout: string,
-          stderr: string,
-        ) => void,
-      ) => {
-        if (callback) {
-          const err = new Error(errorMessage) as ExecException;
-          callback(err, '', errorMessage);
-        }
-      }) as typeof exec);
+    function setupSpawnMockFailure(): void {
+      mockSpawn.mockImplementation(() => createMockChildProcess(1));
     }
 
     it('runs npm install after cloning when package-lock.json detected', async () => {
@@ -451,17 +438,17 @@ describe('syncExecutor', () => {
       ]);
       mockDetectRepoState.mockReturnValue('not-synced');
       mockExistsSync.mockReturnValue(false); // no pnpm-lock.yaml, no yarn.lock
-      setupExecMockSuccess();
+      setupSpawnMockSuccess();
 
       await syncExecutor({}, createContext());
 
-      expect(mockExec).toHaveBeenCalledWith(
+      expect(mockSpawn).toHaveBeenCalledWith(
         'npm install',
         expect.objectContaining({
           cwd: expect.stringContaining('.repos'),
+          shell: true,
           windowsHide: true,
         }),
-        expect.any(Function),
       );
     });
 
@@ -484,17 +471,17 @@ describe('syncExecutor', () => {
 
         return false;
       });
-      setupExecMockSuccess();
+      setupSpawnMockSuccess();
 
       await syncExecutor({}, createContext());
 
-      expect(mockExec).toHaveBeenCalledWith(
+      expect(mockSpawn).toHaveBeenCalledWith(
         'pnpm install',
         expect.objectContaining({
           cwd: expect.stringContaining('.repos'),
+          shell: true,
           windowsHide: true,
         }),
-        expect.any(Function),
       );
     });
 
@@ -517,17 +504,17 @@ describe('syncExecutor', () => {
 
         return false;
       });
-      setupExecMockSuccess();
+      setupSpawnMockSuccess();
 
       await syncExecutor({}, createContext());
 
-      expect(mockExec).toHaveBeenCalledWith(
+      expect(mockSpawn).toHaveBeenCalledWith(
         'yarn install',
         expect.objectContaining({
           cwd: expect.stringContaining('.repos'),
+          shell: true,
           windowsHide: true,
         }),
-        expect.any(Function),
       );
     });
 
@@ -543,17 +530,17 @@ describe('syncExecutor', () => {
       ]);
       mockDetectRepoState.mockReturnValue('cloned');
       mockExistsSync.mockReturnValue(false);
-      setupExecMockSuccess();
+      setupSpawnMockSuccess();
 
       await syncExecutor({}, createContext());
 
-      expect(mockExec).toHaveBeenCalledWith(
+      expect(mockSpawn).toHaveBeenCalledWith(
         'npm install',
         expect.objectContaining({
           cwd: expect.stringContaining('.repos'),
+          shell: true,
           windowsHide: true,
         }),
-        expect.any(Function),
       );
     });
 
@@ -563,17 +550,17 @@ describe('syncExecutor', () => {
       ]);
       mockDetectRepoState.mockReturnValue('referenced');
       mockExistsSync.mockReturnValue(false);
-      setupExecMockSuccess();
+      setupSpawnMockSuccess();
 
       await syncExecutor({}, createContext());
 
-      expect(mockExec).toHaveBeenCalledWith(
+      expect(mockSpawn).toHaveBeenCalledWith(
         'npm install',
         expect.objectContaining({
           cwd: 'D:/projects/repo-b',
+          shell: true,
           windowsHide: true,
         }),
-        expect.any(Function),
       );
     });
 
@@ -610,17 +597,17 @@ describe('syncExecutor', () => {
 
         return false;
       });
-      setupExecMockSuccess();
+      setupSpawnMockSuccess();
 
       await syncExecutor({}, createContext());
 
-      expect(mockExec).toHaveBeenCalledWith(
+      expect(mockSpawn).toHaveBeenCalledWith(
         'corepack pnpm install',
         expect.objectContaining({
           cwd: expect.stringContaining('.repos'),
+          shell: true,
           windowsHide: true,
         }),
-        expect.any(Function),
       );
     });
 
@@ -654,17 +641,17 @@ describe('syncExecutor', () => {
 
         return false;
       });
-      setupExecMockSuccess();
+      setupSpawnMockSuccess();
 
       await syncExecutor({}, createContext());
 
-      expect(mockExec).toHaveBeenCalledWith(
+      expect(mockSpawn).toHaveBeenCalledWith(
         'corepack yarn install',
         expect.objectContaining({
           cwd: expect.stringContaining('.repos'),
+          shell: true,
           windowsHide: true,
         }),
-        expect.any(Function),
       );
     });
 
@@ -702,17 +689,17 @@ describe('syncExecutor', () => {
 
         return false;
       });
-      setupExecMockSuccess();
+      setupSpawnMockSuccess();
 
       await syncExecutor({}, createContext());
 
-      expect(mockExec).toHaveBeenCalledWith(
+      expect(mockSpawn).toHaveBeenCalledWith(
         'pnpm install',
         expect.objectContaining({
           cwd: expect.stringContaining('.repos'),
+          shell: true,
           windowsHide: true,
         }),
-        expect.any(Function),
       );
     });
 
@@ -728,7 +715,7 @@ describe('syncExecutor', () => {
       ]);
       mockDetectRepoState.mockReturnValue('not-synced');
       mockExistsSync.mockReturnValue(false);
-      setupExecMockFailure('install failed');
+      setupSpawnMockFailure();
 
       const result = await syncExecutor({}, createContext());
 
@@ -1330,20 +1317,8 @@ describe('syncExecutor', () => {
   });
 
   describe('conditional dependency installation', () => {
-    function setupExecMockSuccess(): void {
-      mockExec.mockImplementation(((
-        _command: string,
-        _options: unknown,
-        callback?: (
-          error: ExecException | null,
-          stdout: string,
-          stderr: string,
-        ) => void,
-      ) => {
-        if (callback) {
-          callback(null, '', '');
-        }
-      }) as typeof exec);
+    function setupSpawnMockSuccess(): void {
+      mockSpawn.mockImplementation(() => createMockChildProcess(0));
     }
 
     function setupUnchangedLockfile(): void {
@@ -1413,11 +1388,11 @@ describe('syncExecutor', () => {
       mockDetectRepoState.mockReturnValue('cloned');
       mockIsGitTag.mockResolvedValue(true);
       setupUnchangedLockfile();
-      setupExecMockSuccess();
+      setupSpawnMockSuccess();
 
       await syncExecutor({}, createContext());
 
-      expect(mockExec).not.toHaveBeenCalled();
+      expect(mockSpawn).not.toHaveBeenCalled();
     });
 
     it('installs after tag fetch when lockfile changed', async () => {
@@ -1434,14 +1409,13 @@ describe('syncExecutor', () => {
       mockDetectRepoState.mockReturnValue('cloned');
       mockIsGitTag.mockResolvedValue(true);
       setupChangedLockfile();
-      setupExecMockSuccess();
+      setupSpawnMockSuccess();
 
       await syncExecutor({}, createContext());
 
-      expect(mockExec).toHaveBeenCalledWith(
+      expect(mockSpawn).toHaveBeenCalledWith(
         expect.stringContaining('install'),
-        expect.objectContaining({ windowsHide: true }),
-        expect.any(Function),
+        expect.objectContaining({ shell: true, windowsHide: true }),
       );
     });
 
@@ -1458,11 +1432,11 @@ describe('syncExecutor', () => {
       ]);
       mockDetectRepoState.mockReturnValue('cloned');
       setupUnchangedLockfile();
-      setupExecMockSuccess();
+      setupSpawnMockSuccess();
 
       await syncExecutor({}, createContext());
 
-      expect(mockExec).not.toHaveBeenCalled();
+      expect(mockSpawn).not.toHaveBeenCalled();
     });
 
     it('installs after pull when lockfile changed', async () => {
@@ -1478,14 +1452,13 @@ describe('syncExecutor', () => {
       ]);
       mockDetectRepoState.mockReturnValue('cloned');
       setupChangedLockfile();
-      setupExecMockSuccess();
+      setupSpawnMockSuccess();
 
       await syncExecutor({}, createContext());
 
-      expect(mockExec).toHaveBeenCalledWith(
+      expect(mockSpawn).toHaveBeenCalledWith(
         expect.stringContaining('install'),
-        expect.objectContaining({ windowsHide: true }),
-        expect.any(Function),
+        expect.objectContaining({ shell: true, windowsHide: true }),
       );
     });
 
@@ -1500,14 +1473,13 @@ describe('syncExecutor', () => {
         },
       ]);
       mockDetectRepoState.mockReturnValue('not-synced');
-      setupExecMockSuccess();
+      setupSpawnMockSuccess();
 
       await syncExecutor({}, createContext());
 
-      expect(mockExec).toHaveBeenCalledWith(
+      expect(mockSpawn).toHaveBeenCalledWith(
         expect.stringContaining('install'),
-        expect.objectContaining({ windowsHide: true }),
-        expect.any(Function),
+        expect.objectContaining({ shell: true, windowsHide: true }),
       );
     });
 
@@ -1524,14 +1496,13 @@ describe('syncExecutor', () => {
       ]);
       mockDetectRepoState.mockReturnValue('cloned');
       // Default existsSync returns false -> no lockfile found
-      setupExecMockSuccess();
+      setupSpawnMockSuccess();
 
       await syncExecutor({}, createContext());
 
-      expect(mockExec).toHaveBeenCalledWith(
+      expect(mockSpawn).toHaveBeenCalledWith(
         expect.stringContaining('install'),
-        expect.objectContaining({ windowsHide: true }),
-        expect.any(Function),
+        expect.objectContaining({ shell: true, windowsHide: true }),
       );
     });
 
@@ -1541,11 +1512,11 @@ describe('syncExecutor', () => {
       ]);
       mockDetectRepoState.mockReturnValue('referenced');
       setupUnchangedLockfile();
-      setupExecMockSuccess();
+      setupSpawnMockSuccess();
 
       await syncExecutor({}, createContext());
 
-      expect(mockExec).not.toHaveBeenCalled();
+      expect(mockSpawn).not.toHaveBeenCalled();
     });
   });
 });
