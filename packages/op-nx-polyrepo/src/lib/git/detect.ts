@@ -93,10 +93,23 @@ export async function isGitTag(
     return false;
   }
 
+  // Check local tags first (fast, no network)
   try {
     await execGitOutput(['show-ref', '--verify', `refs/tags/${ref}`], cwd);
 
     return true;
+  } catch {
+    // Tag not found locally — check remote
+  }
+
+  // Check remote tags (handles not-yet-fetched tags)
+  try {
+    const output = await execGitOutput(
+      ['ls-remote', '--tags', 'origin', `refs/tags/${ref}`],
+      cwd,
+    );
+
+    return output.length > 0;
   } catch {
     return false;
   }

@@ -565,7 +565,39 @@ describe('isGitTag', () => {
     );
   });
 
-  it('returns false when git command fails (tag does not exist)', async () => {
+  it('returns true when tag not found locally but found on remote', async () => {
+    let callCount = 0;
+    mockExecFile.mockImplementation(((
+      _file: string,
+      args: readonly string[],
+      _options: unknown,
+      callback?: (
+        error: ExecFileException | null,
+        stdout: string,
+        stderr: string,
+      ) => void,
+    ) => {
+      if (callback) {
+        callCount++;
+
+        if (callCount === 1) {
+          // Local show-ref fails
+          const err = new Error('fatal: not a valid ref') as ExecFileException;
+          callback(err, '', 'fatal: not a valid ref');
+        } else {
+          // Remote ls-remote succeeds
+          callback(null, 'abc123\trefs/tags/21.0.0\n', '');
+        }
+      }
+    }) as typeof execFile);
+
+    const result = await isGitTag('/workspace/.repos/repo', '21.0.0');
+
+    expect(result).toBe(true);
+    expect(callCount).toBe(2);
+  });
+
+  it('returns false when tag not found locally or on remote', async () => {
     mockExecFile.mockImplementation(((
       _file: string,
       _args: readonly string[],
@@ -579,6 +611,36 @@ describe('isGitTag', () => {
       if (callback) {
         const err = new Error('fatal: not a valid ref') as ExecFileException;
         callback(err, '', 'fatal: not a valid ref');
+      }
+    }) as typeof execFile);
+
+    const result = await isGitTag('/workspace/.repos/repo', 'main');
+
+    expect(result).toBe(false);
+  });
+
+  it('returns false when local check fails and remote returns empty', async () => {
+    let callCount = 0;
+    mockExecFile.mockImplementation(((
+      _file: string,
+      _args: readonly string[],
+      _options: unknown,
+      callback?: (
+        error: ExecFileException | null,
+        stdout: string,
+        stderr: string,
+      ) => void,
+    ) => {
+      if (callback) {
+        callCount++;
+
+        if (callCount === 1) {
+          const err = new Error('fatal: not a valid ref') as ExecFileException;
+          callback(err, '', 'fatal: not a valid ref');
+        } else {
+          // Remote returns empty (ref exists but is not a tag)
+          callback(null, '', '');
+        }
       }
     }) as typeof execFile);
 
