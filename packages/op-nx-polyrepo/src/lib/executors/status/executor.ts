@@ -212,11 +212,11 @@ export default async function statusExecutor(
         const statusParts: string[] = [];
 
         if (aheadBehind.behind > 0) {
-          statusParts.push(`${aheadBehind.behind} behind`);
+          statusParts.push('behind');
         }
 
         if (aheadBehind.ahead > 0) {
-          statusParts.push(`${aheadBehind.ahead} ahead`);
+          statusParts.push('ahead');
         }
 
         if (statusParts.length > 0) {
