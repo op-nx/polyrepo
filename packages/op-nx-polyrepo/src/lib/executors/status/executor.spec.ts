@@ -184,7 +184,7 @@ describe('statusExecutor', () => {
     const values = row.map((c: ColumnDef) => c.value);
     expect(values).toContain('main');
     expect(values).toContain('+0 -0');
-    expect(values).toContain('clean');
+    expect(values).toContain('ok');
     expect(values).toContain('12 projects');
   });
 
@@ -577,6 +577,151 @@ describe('statusExecutor', () => {
 
     const rows = mockFormatAlignedTable.mock.calls[0][0];
     const values = rows[0].map((c: ColumnDef) => c.value);
-    expect(values).toContain('clean');
+    expect(values).toContain('ok');
+  });
+
+  it('summary line includes behind count when repos are behind remote', async () => {
+    setupPluginConfig([
+      {
+        type: 'remote',
+        alias: 'repo-a',
+        url: 'https://github.com/org/repo-a.git',
+        depth: 1,
+      },
+      {
+        type: 'remote',
+        alias: 'repo-b',
+        url: 'https://github.com/org/repo-b.git',
+        depth: 1,
+      },
+    ]);
+    mockDetectRepoState.mockReturnValue('cloned');
+    mockGetCurrentBranch.mockResolvedValue('main');
+    // repo-a: behind=3, repo-b: behind=0
+    mockGetAheadBehind
+      .mockResolvedValueOnce({ ahead: 0, behind: 3 })
+      .mockResolvedValueOnce({ ahead: 0, behind: 0 });
+
+    await statusExecutor({}, createContext());
+
+    const lines = getAllLoggedLines();
+    const summaryLine = lines.find(
+      (line) => line.includes('configured') && line.includes('synced'),
+    );
+    expect(summaryLine).toBeDefined();
+    expect(summaryLine).toContain('1 behind');
+  });
+
+  it('summary line includes ahead count when repos are ahead of remote', async () => {
+    setupPluginConfig([
+      {
+        type: 'remote',
+        alias: 'repo-a',
+        url: 'https://github.com/org/repo-a.git',
+        depth: 1,
+      },
+    ]);
+    mockDetectRepoState.mockReturnValue('cloned');
+    mockGetCurrentBranch.mockResolvedValue('main');
+    mockGetAheadBehind.mockResolvedValue({ ahead: 2, behind: 0 });
+
+    await statusExecutor({}, createContext());
+
+    const lines = getAllLoggedLines();
+    const summaryLine = lines.find(
+      (line) => line.includes('configured') && line.includes('synced'),
+    );
+    expect(summaryLine).toBeDefined();
+    expect(summaryLine).toContain('1 ahead');
+  });
+
+  it('summary line omits behind/ahead when all repos are even', async () => {
+    setupPluginConfig([
+      {
+        type: 'remote',
+        alias: 'repo-a',
+        url: 'https://github.com/org/repo-a.git',
+        depth: 1,
+      },
+    ]);
+    mockDetectRepoState.mockReturnValue('cloned');
+    mockGetCurrentBranch.mockResolvedValue('main');
+    mockGetAheadBehind.mockResolvedValue({ ahead: 0, behind: 0 });
+
+    await statusExecutor({}, createContext());
+
+    const lines = getAllLoggedLines();
+    const summaryLine = lines.find(
+      (line) => line.includes('configured') && line.includes('synced'),
+    );
+    expect(summaryLine).toBeDefined();
+    expect(summaryLine).not.toContain('behind');
+    expect(summaryLine).not.toContain('ahead');
+  });
+
+  it('shows [WARN: tag-pinned] for tag-pinned repo', async () => {
+    setupPluginConfig([
+      {
+        type: 'remote',
+        alias: 'repo-c',
+        url: 'https://github.com/org/repo-c.git',
+        ref: 'v2.1.0',
+        depth: 1,
+      },
+    ]);
+    mockDetectRepoState.mockReturnValue('cloned');
+    mockGetCurrentBranch.mockResolvedValue(null);
+    mockGetCurrentRef.mockResolvedValue('v2.1.0');
+    mockGetWorkingTreeState.mockResolvedValue({
+      modified: 0,
+      staged: 0,
+      deleted: 0,
+      untracked: 0,
+      conflicts: 0,
+    });
+
+    await statusExecutor({}, createContext());
+
+    const rows = mockFormatAlignedTable.mock.calls[0][0];
+    const values = rows[0].map((c: ColumnDef) => c.value);
+    expect(values).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('[WARN: tag-pinned]'),
+      ]),
+    );
+  });
+
+  it('shows both dirty and tag-pinned warnings when tag-pinned repo is dirty', async () => {
+    setupPluginConfig([
+      {
+        type: 'remote',
+        alias: 'repo-c',
+        url: 'https://github.com/org/repo-c.git',
+        ref: 'v2.1.0',
+        depth: 1,
+      },
+    ]);
+    mockDetectRepoState.mockReturnValue('cloned');
+    mockGetCurrentBranch.mockResolvedValue(null);
+    mockGetCurrentRef.mockResolvedValue('v2.1.0');
+    mockGetWorkingTreeState.mockResolvedValue({
+      modified: 2,
+      staged: 0,
+      deleted: 0,
+      untracked: 0,
+      conflicts: 0,
+    });
+
+    await statusExecutor({}, createContext());
+
+    const rows = mockFormatAlignedTable.mock.calls[0][0];
+    const values = rows[0].map((c: ColumnDef) => c.value);
+    // Should have both warnings
+    const warningsCell = values.find(
+      (v: string) => v.includes('[WARN:'),
+    );
+    expect(warningsCell).toBeDefined();
+    expect(warningsCell).toContain('[WARN: dirty, sync may fail]');
+    expect(warningsCell).toContain('[WARN: tag-pinned]');
   });
 });
