@@ -33,14 +33,52 @@ function detectPackageManager(
   return 'npm';
 }
 
-function installDeps(repoPath: string, alias: string): Promise<void> {
-  const pm = detectPackageManager(repoPath);
-  const args = pm === 'yarn' ? ['install'] : ['install'];
+function getCorepackPm(
+  repoPath: string,
+): string | undefined {
+  try {
+    const pkgJsonPath = join(repoPath, 'package.json');
 
-  logger.info(`Installing dependencies for ${alias} (${pm})...`);
+    if (!existsSync(pkgJsonPath)) {
+      return undefined;
+    }
+
+    const pkgJson = JSON.parse(readFileSync(pkgJsonPath, 'utf-8'));
+    const field: unknown = pkgJson.packageManager;
+
+    if (typeof field !== 'string') {
+      return undefined;
+    }
+
+    const pm = field.split('@')[0];
+
+    if (pm === 'pnpm' || pm === 'yarn' || pm === 'npm') {
+      return pm;
+    }
+
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function installDeps(repoPath: string, alias: string): Promise<void> {
+  const corepackPm = getCorepackPm(repoPath);
+  let command: string;
+  let args: string[];
+
+  if (corepackPm) {
+    command = 'corepack';
+    args = [corepackPm, 'install'];
+    logger.info(`Installing dependencies for ${alias} (${corepackPm} via corepack)...`);
+  } else {
+    command = detectPackageManager(repoPath);
+    args = ['install'];
+    logger.info(`Installing dependencies for ${alias} (${command})...`);
+  }
 
   return new Promise((resolve, reject) => {
-    execFile(pm, args, { cwd: repoPath }, (error, _stdout, stderr) => {
+    execFile(command, args, { cwd: repoPath, shell: true, windowsHide: true }, (error, _stdout, stderr) => {
       if (error) {
         reject(new Error(stderr || error.message));
 

@@ -534,6 +534,146 @@ describe('syncExecutor', () => {
       );
     });
 
+    it('uses corepack when package.json has packageManager field', async () => {
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          depth: 1,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('not-synced');
+      mockExistsSync.mockReturnValue(false);
+
+      // Override readFileSync to return packageManager for the repo's package.json
+      mockReadFileSync.mockImplementation((filePath: unknown) => {
+        if (typeof filePath === 'string' && filePath.includes('package.json')) {
+          return JSON.stringify({ packageManager: 'pnpm@10.28.2' });
+        }
+
+        return JSON.stringify({
+          plugins: [
+            { plugin: '@op-nx/polyrepo', options: fakeConfig },
+          ],
+        });
+      });
+      // package.json exists in repo
+      mockExistsSync.mockImplementation((path: unknown) => {
+        if (typeof path === 'string' && path.includes('package.json')) {
+          return true;
+        }
+
+        return false;
+      });
+      setupExecFileMockSuccess();
+
+      await syncExecutor({}, createContext());
+
+      expect(mockExecFile).toHaveBeenCalledWith(
+        'corepack',
+        ['pnpm', 'install'],
+        expect.objectContaining({
+          cwd: expect.stringContaining('.repos'),
+          shell: true,
+          windowsHide: true,
+        }),
+        expect.any(Function),
+      );
+    });
+
+    it('uses corepack for yarn when package.json specifies yarn', async () => {
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          depth: 1,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('not-synced');
+
+      mockReadFileSync.mockImplementation((filePath: unknown) => {
+        if (typeof filePath === 'string' && filePath.includes('package.json')) {
+          return JSON.stringify({ packageManager: 'yarn@4.1.0' });
+        }
+
+        return JSON.stringify({
+          plugins: [
+            { plugin: '@op-nx/polyrepo', options: fakeConfig },
+          ],
+        });
+      });
+      mockExistsSync.mockImplementation((path: unknown) => {
+        if (typeof path === 'string' && path.includes('package.json')) {
+          return true;
+        }
+
+        return false;
+      });
+      setupExecFileMockSuccess();
+
+      await syncExecutor({}, createContext());
+
+      expect(mockExecFile).toHaveBeenCalledWith(
+        'corepack',
+        ['yarn', 'install'],
+        expect.objectContaining({
+          cwd: expect.stringContaining('.repos'),
+          shell: true,
+          windowsHide: true,
+        }),
+        expect.any(Function),
+      );
+    });
+
+    it('falls back to lock file detection when no packageManager field', async () => {
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          depth: 1,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('not-synced');
+
+      mockReadFileSync.mockImplementation((filePath: unknown) => {
+        if (typeof filePath === 'string' && filePath.includes('package.json')) {
+          return JSON.stringify({ name: 'some-repo' });
+        }
+
+        return JSON.stringify({
+          plugins: [
+            { plugin: '@op-nx/polyrepo', options: fakeConfig },
+          ],
+        });
+      });
+      mockExistsSync.mockImplementation((path: unknown) => {
+        if (typeof path === 'string' && path.includes('package.json')) {
+          return true;
+        }
+
+        if (typeof path === 'string' && path.includes('pnpm-lock.yaml')) {
+          return true;
+        }
+
+        return false;
+      });
+      setupExecFileMockSuccess();
+
+      await syncExecutor({}, createContext());
+
+      expect(mockExecFile).toHaveBeenCalledWith(
+        'pnpm',
+        ['install'],
+        expect.objectContaining({
+          cwd: expect.stringContaining('.repos'),
+        }),
+        expect.any(Function),
+      );
+    });
+
     it('install failure logs warning but does not fail the sync', async () => {
       setupPluginConfig([
         {
