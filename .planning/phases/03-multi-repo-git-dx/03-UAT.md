@@ -3,7 +3,7 @@ status: complete
 phase: 03-multi-repo-git-dx
 source: 03-01-SUMMARY.md, 03-02-SUMMARY.md, 03-03-SUMMARY.md
 started: 2026-03-11T12:00:00Z
-updated: 2026-03-11T15:00:00Z
+updated: 2026-03-11T23:00:00Z
 ---
 
 ## Current Test
@@ -48,43 +48,54 @@ expected: Set ref to "20.0.0" and sync. Sync completes without husky hook failur
 result: pass (verified after 03-07 fix)
 note: Hooks silently skipped via core.hooksPath=__op-nx_polyrepo_disable-hooks__. Sync succeeds with [OK].
 
+### 9. Quiet Install / --verbose
+expected: Run `npm exec nx polyrepo-sync`. Install output is suppressed (silent mode). Log shows "(pnpm via corepack, silent mode)..." or similar. Run again with `--verbose` — full PM output streams through.
+result: pass
+note: Per-PM quiet flags (pnpm --reporter=silent, yarn --silent, npm --loglevel=error). --verbose bypasses quiet flags. stdin closed to suppress interactive prompts.
+
+### 10. Install Failure Tracking
+expected: When dependency install fails (e.g. cypress on arm64), results table shows `[WARN: install failed]` instead of `[OK]`. Summary line counts warnings separately: "1 synced with warning".
+result: pass
+note: Verified with cypress postinstall failure on arm64. First run shows warning correctly.
+
+### 11. Install Retry After Failure
+expected: When install fails on first sync, re-running sync for the same ref retries the install instead of silently reporting [OK]. Uses stored lockfile hash — if the hash file is missing or mismatched, install runs.
+result: pass
+note: Stored hash (.op-nx-installed-lock-hash) written after successful install. Missing hash triggers retry. Verified: switch to tag 20.0.0 (install fails), re-run sync (install retried, still shows warning).
+
+### 12. Corepack Download Prompt
+expected: When syncing between refs that use different pnpm versions (e.g. tag 20.3.0 uses pnpm@9.x, master uses pnpm@9.8.0), corepack does not stall waiting for download confirmation. Install proceeds non-interactively.
+result: pass
+note: COREPACK_ENABLE_DOWNLOAD_PROMPT=0 set in spawn env. Previously stalled indefinitely when switching between tags with different packageManager versions.
+
+### 13. Branch Transition (tag-to-branch)
+expected: Set ref to a tag (e.g. "21.0.0"), sync, then change ref to a branch (e.g. "master") and sync again. The sync correctly switches from detached HEAD to the target branch before pulling. No "fatal: not on a branch" error.
+result: pass
+note: gitCheckoutBranch does fetch origin <branch> + checkout with -b fallback. Dry-run shows "would switch to master and pull".
+
+### 14. Sync --dry-run Branch Switch
+expected: When repo is on a different branch/detached HEAD than configured ref, dry-run shows "would switch to <ref> and <strategy>" instead of just "would pull".
+result: pass
+note: Verified with detached HEAD at tag while ref configured as branch.
+
 ## Summary
 
-total: 8
-passed: 8
+total: 14
+passed: 14
 issues: 0
 pending: 0
 skipped: 0
 
 ## Gaps
 
-Resolved gaps (03-06, 03-07):
+Resolved gaps (03-06 through 03-09 and follow-up fixes):
 - Row dirty summary "behind"/"ahead" without count — fixed in 03-06
 - disableHooks config for external repos — fixed in 03-07
+- isTagRef regex replaced with git-based isGitTag — fixed in 03-08
+- Conditional dep install (lockfile hash, not unconditional) — fixed in 03-09
+- Corepack download prompt stall — fixed (COREPACK_ENABLE_DOWNLOAD_PROMPT=0)
+- Install failure not surfaced in results — fixed (installFailed flag, warning counts)
+- Install retry after failure — fixed (stored lockfile hash replaces marker approach)
+- Branch transition from tag/wrong branch — fixed (gitCheckoutBranch)
 
-New gaps discovered during verification (deferred to next phase):
-- truth: "Sync only installs deps when HEAD actually changed"
-  status: open
-  reason: "User reported: sync installs deps after every tag fetch even when repo is already at that tag"
-  severity: minor
-  test: 8
-  root_cause: "syncRepo always calls tryInstallDeps after gitFetchTag (line 170) without checking if HEAD moved"
-  artifacts:
-    - path: "packages/op-nx-polyrepo/src/lib/executors/sync/executor.ts"
-      issue: "tryInstallDeps called unconditionally after every sync strategy"
-  missing:
-    - "Compare HEAD before/after sync, only install when HEAD changed"
-- truth: "isTagRef detects any git tag, not just version-like strings"
-  status: open
-  reason: "User reported: isTagRef uses regex /^v?\\d+\\.\\d+/ which misses tags like 20.x, v20.x, and non-version tags"
-  severity: major
-  test: N/A
-  root_cause: "isTagRef pattern-matches the ref string instead of querying git"
-  artifacts:
-    - path: "packages/op-nx-polyrepo/src/lib/executors/sync/executor.ts"
-      issue: "isTagRef uses regex instead of git tag -l"
-    - path: "packages/op-nx-polyrepo/src/lib/executors/status/executor.ts"
-      issue: "Same isTagRef regex duplicated"
-  missing:
-    - "Replace isTagRef regex with git tag lookup (git tag -l or git show-ref --verify refs/tags/<ref>)"
-    - "Works for any tag name without assumptions about naming conventions"
+No open gaps remaining.
