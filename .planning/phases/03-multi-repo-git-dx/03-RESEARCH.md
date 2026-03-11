@@ -455,6 +455,53 @@ interface DryRunEntry {
 ### Tertiary (LOW confidence)
 - None. All findings verified with official Git documentation.
 
+## Competitive Landscape: Multi-Repo Tools
+
+**Researched:** 2026-03-11 (online research during UAT gap-closure)
+**Context:** Researched how existing polyrepo tools handle ref switching (tag-to-branch, branch-to-tag) to inform our sync executor design.
+
+### Tools Surveyed
+
+| Tool | Type | Manifest-driven | Ref switching behavior |
+|------|------|----------------|----------------------|
+| [Google repo](https://source.android.com/docs/setup/reference/repo) | Android multi-repo | Yes (XML manifest) | Fetch + checkout/rebase. `-d` forces manifest revision. No ref-type-change warning. |
+| [git-submodule](https://git-scm.com/docs/git-submodule) | Git built-in | Yes (.gitmodules + SHA) | Always detached HEAD on pinned SHA. Branch tracking opt-in via `--remote`. |
+| [vcstool](https://github.com/dirk-thomas/vcstool) | ROS workspace | Yes (YAML) | `git fetch` + `git checkout`. Auto-detects ref type via `git ls-remote`. |
+| [tsrc](https://github.com/your-tools/tsrc) | Manifest multi-repo | Yes (YAML) | Separate `branch`, `tag`, `sha1` fields. Branches: merge. Tags/SHAs: `git reset --hard`. |
+| [mrgit (mgit2)](https://github.com/cksource/mrgit) | CKSource multi-repo | Yes (JSON) | Switches to configured branch, then pulls. Skips dirty repos entirely. |
+| [meta](https://github.com/mateodelnorte/meta) | npm multi-repo | No (thin wrapper) | Passthrough to git. No manifest-driven ref management. |
+| [gita](https://github.com/nosarthur/gita) | Multi-repo CLI | No (thin wrapper) | Delegates to git directly. No ref type tracking. |
+| [myrepos (mr)](https://myrepos.branchable.com/) | Multi-repo tool | Yes (.mrconfig) | Fully configurable per-repo commands. No built-in ref switching. |
+| [git-subrepo](https://github.com/ingydotnet/git-subrepo) | Subrepo management | Yes (.gitrepo) | Destructive re-clone (`--force`) to switch refs. No incremental switching. |
+| [Lerna](https://lerna.js.org/) | Monorepo versioning | No | Does not manage repo checkouts. Tags for releases only. |
+
+### Key Patterns Observed
+
+**1. Fetch-then-checkout is universal**
+Every tool that handles ref switching does `git fetch` before any checkout/reset/merge. No tool attempts a pull on potentially stale state.
+
+**2. Config is source of truth — no warnings on ref type change**
+No tool warns about ref type transitions (tag→branch or vice versa). They apply whatever the manifest says. This is an opportunity for @op-nx/polyrepo to provide better UX.
+
+**3. Dirty working tree handling: refuse by default**
+tsrc, mrgit, vcstool, Google repo, and git-submodule all refuse to switch refs when the working tree is dirty. Force flags (`--force`) available as opt-in for destructive override.
+
+**4. tsrc is the closest model to our use case**
+- Explicit ref type distinction in manifest
+- Different sync strategies per ref type (merge for branches, reset for tags)
+- Dirty repo detection before any operation
+- Always fetches first
+
+**5. Git DWIM for local branch creation**
+After fetching, `git checkout <branch>` auto-creates a local tracking branch from `origin/<branch>` if it uniquely matches. tsrc and vcstool both rely on this behavior.
+
+### Implications for @op-nx/polyrepo
+
+- **Sync should detect ref type transitions** and handle them gracefully (checkout target branch before pull)
+- **Fetch before checkout** when switching from tag→branch to ensure remote refs are available
+- **Dirty tree check before ref switch** — already partially done via dry-run warnings; sync should also check before attempting a branch switch
+- **No need to warn about ref type changes** — following established convention, just apply the config
+
 ## Metadata
 
 **Confidence breakdown:**
