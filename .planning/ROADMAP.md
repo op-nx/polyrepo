@@ -64,8 +64,8 @@ Plans:
 - [x] 03-01-PLAN.md -- Git state detection (getWorkingTreeState, getAheadBehind) and column alignment utility
 - [x] 03-02-PLAN.md -- Status executor rewrite with aligned output, auto-fetch, warnings, project counts
 - [x] 03-03-PLAN.md -- Sync executor enhancements: --dry-run option and aligned results summary table
-- [ ] 03-04-PLAN.md -- Gap closure: status summary behind/ahead counts, 'ok' label, tag-pinned warning
-- [ ] 03-05-PLAN.md -- Gap closure: sync dry-run detached HEAD detection and multi-warning support
+- [x] 03-04-PLAN.md -- Gap closure: status summary behind/ahead counts, 'ok' label, tag-pinned warning
+- [x] 03-05-PLAN.md -- Gap closure: sync dry-run detached HEAD detection and multi-warning support
 
 ## Progress
 
@@ -76,4 +76,4 @@ Phases execute in numeric order: 1 -> 2 -> 3
 |-------|----------------|--------|-----------|
 | 1. Plugin Foundation + Repo Assembly | 3/3 | Complete | 2026-03-10 |
 | 2. Unified Project Graph | 3/3 | Complete | 2026-03-11 |
-| 3. Multi-Repo Git DX | 3/5 | Gap closure | - |
+| 3. Multi-Repo Git DX | 5/5 | Complete | 2026-03-11 |
