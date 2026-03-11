@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process';
+import { exec } from 'node:child_process';
 import { join } from 'node:path';
 import type { ExternalGraphJson } from './types';
 
@@ -11,18 +11,19 @@ const LARGE_BUFFER = 1024 * 1024 * 1024;
 /**
  * Extract the full project graph JSON from a child Nx workspace.
  *
- * Shells out to `nx graph --print` inside `repoPath` with the daemon
- * disabled (NX_DAEMON=false) to avoid leftover daemon processes.
+ * Uses `exec` (shell dispatch) because the nx binary in node_modules/.bin
+ * is a .cmd shim on Windows that `execFile` cannot execute directly.
+ * The daemon is disabled (NX_DAEMON=false) to avoid leftover processes.
  */
 export function extractGraphFromRepo(
   repoPath: string,
 ): Promise<ExternalGraphJson> {
   const nxBin = join(repoPath, 'node_modules', '.bin', 'nx');
+  const command = `"${nxBin}" graph --print`;
 
   return new Promise((resolve, reject) => {
-    execFile(
-      nxBin,
-      ['graph', '--print'],
+    exec(
+      command,
       {
         cwd: repoPath,
         maxBuffer: LARGE_BUFFER,

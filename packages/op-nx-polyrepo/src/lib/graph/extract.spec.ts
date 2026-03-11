@@ -1,75 +1,76 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { ExecFileException } from 'node:child_process';
+import type { ExecException } from 'node:child_process';
 
 vi.mock('node:child_process', () => ({
-  execFile: vi.fn(),
+  exec: vi.fn(),
 }));
 
-import { execFile } from 'node:child_process';
+import { exec } from 'node:child_process';
 import { extractGraphFromRepo } from './extract';
 
-const mockExecFile = vi.mocked(execFile);
+const mockExec = vi.mocked(exec);
+
+function setupExecSuccess(stdout: string): void {
+  mockExec.mockImplementation(((
+    _command: string,
+    _options: unknown,
+    callback?: (
+      error: ExecException | null,
+      stdout: string,
+      stderr: string,
+    ) => void,
+  ) => {
+    if (callback) {
+      callback(null, stdout, '');
+    }
+  }) as typeof exec);
+}
+
+function setupExecFailure(errorMessage: string, stderr = ''): void {
+  mockExec.mockImplementation(((
+    _command: string,
+    _options: unknown,
+    callback?: (
+      error: ExecException | null,
+      stdout: string,
+      stderr: string,
+    ) => void,
+  ) => {
+    if (callback) {
+      const err = new Error(errorMessage) as ExecException;
+      callback(err, '', stderr);
+    }
+  }) as typeof exec);
+}
 
 describe('extractGraphFromRepo', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('calls execFile with correct args: node_modules/.bin/nx and graph --print', async () => {
+  it('calls exec with command containing node_modules/.bin/nx and graph --print', async () => {
     const graphJson = {
       graph: { nodes: {}, dependencies: {} },
     };
-
-    mockExecFile.mockImplementation(((
-      _file: string,
-      _args: readonly string[],
-      _options: unknown,
-      callback?: (
-        error: ExecFileException | null,
-        stdout: string,
-        stderr: string,
-      ) => void,
-    ) => {
-      if (callback) {
-        callback(null, JSON.stringify(graphJson), '');
-      }
-    }) as typeof execFile);
+    setupExecSuccess(JSON.stringify(graphJson));
 
     await extractGraphFromRepo('/workspace/.repos/repo-a');
 
-    expect(mockExecFile).toHaveBeenCalledWith(
-      expect.stringMatching(/node_modules[/\\].bin[/\\]nx$/),
-      ['graph', '--print'],
-      expect.objectContaining({
-        cwd: '/workspace/.repos/repo-a',
-      }),
+    expect(mockExec).toHaveBeenCalledWith(
+      expect.stringMatching(/node_modules[/\\].bin[/\\]nx" graph --print$/),
+      expect.any(Object),
       expect.any(Function),
     );
   });
 
   it('sets cwd to repoPath', async () => {
     const graphJson = { graph: { nodes: {}, dependencies: {} } };
-
-    mockExecFile.mockImplementation(((
-      _file: string,
-      _args: readonly string[],
-      _options: unknown,
-      callback?: (
-        error: ExecFileException | null,
-        stdout: string,
-        stderr: string,
-      ) => void,
-    ) => {
-      if (callback) {
-        callback(null, JSON.stringify(graphJson), '');
-      }
-    }) as typeof execFile);
+    setupExecSuccess(JSON.stringify(graphJson));
 
     await extractGraphFromRepo('/some/custom/path');
 
-    expect(mockExecFile).toHaveBeenCalledWith(
+    expect(mockExec).toHaveBeenCalledWith(
       expect.any(String),
-      expect.any(Array),
       expect.objectContaining({ cwd: '/some/custom/path' }),
       expect.any(Function),
     );
@@ -77,27 +78,12 @@ describe('extractGraphFromRepo', () => {
 
   it('sets maxBuffer to LARGE_BUFFER (1GB)', async () => {
     const graphJson = { graph: { nodes: {}, dependencies: {} } };
-
-    mockExecFile.mockImplementation(((
-      _file: string,
-      _args: readonly string[],
-      _options: unknown,
-      callback?: (
-        error: ExecFileException | null,
-        stdout: string,
-        stderr: string,
-      ) => void,
-    ) => {
-      if (callback) {
-        callback(null, JSON.stringify(graphJson), '');
-      }
-    }) as typeof execFile);
+    setupExecSuccess(JSON.stringify(graphJson));
 
     await extractGraphFromRepo('/workspace/.repos/repo-a');
 
-    expect(mockExecFile).toHaveBeenCalledWith(
+    expect(mockExec).toHaveBeenCalledWith(
       expect.any(String),
-      expect.any(Array),
       expect.objectContaining({ maxBuffer: 1024 * 1024 * 1024 }),
       expect.any(Function),
     );
@@ -105,27 +91,12 @@ describe('extractGraphFromRepo', () => {
 
   it('sets env with NX_DAEMON=false', async () => {
     const graphJson = { graph: { nodes: {}, dependencies: {} } };
-
-    mockExecFile.mockImplementation(((
-      _file: string,
-      _args: readonly string[],
-      _options: unknown,
-      callback?: (
-        error: ExecFileException | null,
-        stdout: string,
-        stderr: string,
-      ) => void,
-    ) => {
-      if (callback) {
-        callback(null, JSON.stringify(graphJson), '');
-      }
-    }) as typeof execFile);
+    setupExecSuccess(JSON.stringify(graphJson));
 
     await extractGraphFromRepo('/workspace/.repos/repo-a');
 
-    expect(mockExecFile).toHaveBeenCalledWith(
+    expect(mockExec).toHaveBeenCalledWith(
       expect.any(String),
-      expect.any(Array),
       expect.objectContaining({
         env: expect.objectContaining({ NX_DAEMON: 'false' }),
       }),
@@ -135,27 +106,12 @@ describe('extractGraphFromRepo', () => {
 
   it('sets windowsHide=true', async () => {
     const graphJson = { graph: { nodes: {}, dependencies: {} } };
-
-    mockExecFile.mockImplementation(((
-      _file: string,
-      _args: readonly string[],
-      _options: unknown,
-      callback?: (
-        error: ExecFileException | null,
-        stdout: string,
-        stderr: string,
-      ) => void,
-    ) => {
-      if (callback) {
-        callback(null, JSON.stringify(graphJson), '');
-      }
-    }) as typeof execFile);
+    setupExecSuccess(JSON.stringify(graphJson));
 
     await extractGraphFromRepo('/workspace/.repos/repo-a');
 
-    expect(mockExecFile).toHaveBeenCalledWith(
+    expect(mockExec).toHaveBeenCalledWith(
       expect.any(String),
-      expect.any(Array),
       expect.objectContaining({ windowsHide: true }),
       expect.any(Function),
     );
@@ -174,21 +130,7 @@ describe('extractGraphFromRepo', () => {
         dependencies: { 'my-lib': [] },
       },
     };
-
-    mockExecFile.mockImplementation(((
-      _file: string,
-      _args: readonly string[],
-      _options: unknown,
-      callback?: (
-        error: ExecFileException | null,
-        stdout: string,
-        stderr: string,
-      ) => void,
-    ) => {
-      if (callback) {
-        callback(null, JSON.stringify(graphJson), '');
-      }
-    }) as typeof execFile);
+    setupExecSuccess(JSON.stringify(graphJson));
 
     const result = await extractGraphFromRepo('/workspace/.repos/repo-a');
 
@@ -196,21 +138,7 @@ describe('extractGraphFromRepo', () => {
   });
 
   it('rejects with descriptive error including repoPath and stderr when child process fails', async () => {
-    mockExecFile.mockImplementation(((
-      _file: string,
-      _args: readonly string[],
-      _options: unknown,
-      callback?: (
-        error: ExecFileException | null,
-        stdout: string,
-        stderr: string,
-      ) => void,
-    ) => {
-      if (callback) {
-        const err = new Error('Command failed') as ExecFileException;
-        callback(err, '', 'nx: command not found');
-      }
-    }) as typeof execFile);
+    setupExecFailure('Command failed', 'nx: command not found');
 
     await expect(
       extractGraphFromRepo('/workspace/.repos/repo-a'),
@@ -243,20 +171,7 @@ describe('extractGraphFromRepo', () => {
     // Verify our fixture is > 1.4MB
     expect(largeJson.length).toBeGreaterThan(1_400_000);
 
-    mockExecFile.mockImplementation(((
-      _file: string,
-      _args: readonly string[],
-      _options: unknown,
-      callback?: (
-        error: ExecFileException | null,
-        stdout: string,
-        stderr: string,
-      ) => void,
-    ) => {
-      if (callback) {
-        callback(null, largeJson, '');
-      }
-    }) as typeof execFile);
+    setupExecSuccess(largeJson);
 
     const result = await extractGraphFromRepo('/workspace/.repos/repo-a');
 
