@@ -212,6 +212,7 @@ describe('syncExecutor', () => {
       expect.stringContaining('.repos'),
       'v1.2.3',
       1,
+      true,
     );
     expect(mockGitPull).not.toHaveBeenCalled();
     expect(result).toEqual({ success: true });
@@ -225,7 +226,7 @@ describe('syncExecutor', () => {
 
     const result = await syncExecutor({}, createContext());
 
-    expect(mockGitPull).toHaveBeenCalledWith('D:/projects/repo-b');
+    expect(mockGitPull).toHaveBeenCalledWith('D:/projects/repo-b', undefined);
     expect(result).toEqual({ success: true });
   });
 

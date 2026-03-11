@@ -103,22 +103,22 @@ function isTagRef(ref: string | undefined): boolean {
 
 function getStrategyFn(
   strategy: SyncExecutorOptions['strategy'],
-): (cwd: string) => Promise<void> {
+): (cwd: string, disableHooks?: boolean) => Promise<void> {
   switch (strategy) {
     case 'fetch': {
-      return gitFetch;
+      return (cwd, dh) => gitFetch(cwd, dh);
     }
 
     case 'rebase': {
-      return gitPullRebase;
+      return (cwd, dh) => gitPullRebase(cwd, dh);
     }
 
     case 'ff-only': {
-      return gitPullFfOnly;
+      return (cwd, dh) => gitPullFfOnly(cwd, dh);
     }
 
     default: {
-      return gitPull;
+      return (cwd, dh) => gitPull(cwd, dh);
     }
   }
 }
@@ -155,6 +155,7 @@ async function syncRepo(
       await gitClone(entry.url, repoPath, {
         depth: entry.depth,
         ref: entry.ref,
+        disableHooks: entry.disableHooks,
       });
       logger.info(`Done: ${entry.alias} cloned.`);
       await tryInstallDeps(repoPath, entry.alias);
@@ -164,7 +165,7 @@ async function syncRepo(
 
     if (entry.ref && isTagRef(entry.ref)) {
       logger.info(`Fetching tag ${entry.ref} for ${entry.alias}...`);
-      await gitFetchTag(repoPath, entry.ref, entry.depth);
+      await gitFetchTag(repoPath, entry.ref, entry.depth, entry.disableHooks);
       logger.info(`Done: ${entry.alias} at tag ${entry.ref}.`);
       await tryInstallDeps(repoPath, entry.alias);
 
@@ -173,7 +174,7 @@ async function syncRepo(
 
     const strategyFn = getStrategyFn(strategy);
     logger.info(`Updating ${entry.alias} (${strategy ?? 'pull'})...`);
-    await strategyFn(repoPath);
+    await strategyFn(repoPath, entry.disableHooks);
     logger.info(`Done: ${entry.alias} updated.`);
     await tryInstallDeps(repoPath, entry.alias);
 
@@ -191,7 +192,7 @@ async function syncRepo(
 
   const strategyFn = getStrategyFn(strategy);
   logger.info(`Updating local repo ${entry.alias} (${strategy ?? 'pull'})...`);
-  await strategyFn(entry.path);
+  await strategyFn(entry.path, undefined);
   logger.info(`Done: ${entry.alias} updated.`);
   await tryInstallDeps(entry.path, entry.alias);
 
