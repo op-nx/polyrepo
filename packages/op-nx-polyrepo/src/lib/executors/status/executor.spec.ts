@@ -184,7 +184,7 @@ describe('statusExecutor', () => {
     const values = row.map((c: ColumnDef) => c.value);
     expect(values).toContain('main');
     expect(values).toContain('+0 -0');
-    expect(values).toContain('ok');
+    expect(values).toContain('clean');
     expect(values).toContain('12 projects');
   });
 
@@ -555,7 +555,7 @@ describe('statusExecutor', () => {
     expect(mockGetAheadBehind).not.toHaveBeenCalled();
   });
 
-  it('shows clean when all working tree counts are zero', async () => {
+  it('shows clean when all working tree counts are zero and repo is even', async () => {
     setupPluginConfig([
       {
         type: 'remote',
@@ -572,12 +572,40 @@ describe('statusExecutor', () => {
       untracked: 0,
       conflicts: 0,
     });
+    mockGetAheadBehind.mockResolvedValue({ ahead: 0, behind: 0 });
 
     await statusExecutor({}, createContext());
 
     const rows = mockFormatAlignedTable.mock.calls[0][0];
     const values = rows[0].map((c: ColumnDef) => c.value);
-    expect(values).toContain('ok');
+    expect(values).toContain('clean');
+  });
+
+  it('shows behind/ahead instead of clean when repo is clean but not even', async () => {
+    setupPluginConfig([
+      {
+        type: 'remote',
+        alias: 'repo-a',
+        url: 'https://github.com/org/repo-a.git',
+        depth: 1,
+      },
+    ]);
+    mockDetectRepoState.mockReturnValue('cloned');
+    mockGetWorkingTreeState.mockResolvedValue({
+      modified: 0,
+      staged: 0,
+      deleted: 0,
+      untracked: 0,
+      conflicts: 0,
+    });
+    mockGetAheadBehind.mockResolvedValue({ ahead: 2, behind: 3 });
+
+    await statusExecutor({}, createContext());
+
+    const rows = mockFormatAlignedTable.mock.calls[0][0];
+    const values = rows[0].map((c: ColumnDef) => c.value);
+    expect(values).not.toContain('clean');
+    expect(values).toContain('3 behind, 2 ahead');
   });
 
   it('summary line includes behind count when repos are behind remote', async () => {

@@ -87,7 +87,7 @@ function formatDirtySummary(state: WorkingTreeState): string {
     parts.push(`${state.conflicts}C`);
   }
 
-  return parts.length > 0 ? parts.join(' ') : 'ok';
+  return parts.length > 0 ? parts.join(' ') : 'clean';
 }
 
 interface RepoRowData {
@@ -205,8 +205,24 @@ export default async function statusExecutor(
         aheadBehindDisplay = `+${aheadBehind.ahead} -${aheadBehind.behind}`;
       }
 
-      // Build dirty summary
-      const dirtySummary = formatDirtySummary(workingTree);
+      // Build dirty summary — show ahead/behind instead of "clean" when relevant
+      let dirtySummary = formatDirtySummary(workingTree);
+
+      if (dirtySummary === 'clean' && aheadBehind !== null) {
+        const statusParts: string[] = [];
+
+        if (aheadBehind.behind > 0) {
+          statusParts.push(`${aheadBehind.behind} behind`);
+        }
+
+        if (aheadBehind.ahead > 0) {
+          statusParts.push(`${aheadBehind.ahead} ahead`);
+        }
+
+        if (statusParts.length > 0) {
+          dirtySummary = statusParts.join(', ');
+        }
+      }
 
       // Build project count display
       const projectCountDisplay = projectCount !== null
