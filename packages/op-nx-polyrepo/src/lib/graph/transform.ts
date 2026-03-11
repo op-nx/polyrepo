@@ -9,47 +9,13 @@ function normalizePath(p: string): string {
 }
 
 /**
- * Rewrite `dependsOn` entries: prefix explicit project references with
- * the repo alias while leaving caret syntax (`^build`) and plain
- * self-references (`build`) unchanged.
- */
-function rewriteDependsOn(
-  dependsOn: TargetConfiguration['dependsOn'],
-  repoAlias: string,
-): TargetConfiguration['dependsOn'] {
-  if (!dependsOn || dependsOn.length === 0) {
-    return undefined;
-  }
-
-  return dependsOn.map((entry) => {
-    // String entries: caret syntax (^build) or self-references (build)
-    if (typeof entry === 'string') {
-      return entry;
-    }
-
-    // Object entry with explicit project list
-    if (
-      typeof entry === 'object' &&
-      'projects' in entry &&
-      Array.isArray(entry.projects)
-    ) {
-      return {
-        ...entry,
-        projects: entry.projects.map((p: string) => `${repoAlias}/${p}`),
-      };
-    }
-
-    // Object entry without projects (relative reference) -- pass through
-    return entry;
-  });
-}
-
-/**
  * Rewrite a single target configuration to use the `@op-nx/polyrepo:run`
- * proxy executor. Inputs, outputs, and cache are intentionally omitted:
- * the child repo resolves its own named inputs and manages its own cache.
- * Copying them would fail because named inputs (e.g. "native") are defined
- * in the external repo's nx.json, not the host workspace's.
+ * proxy executor. Inputs, outputs, cache, and dependsOn are intentionally
+ * omitted: the child repo resolves its own named inputs, manages its own
+ * cache, and handles its own task dependency ordering. Copying dependsOn
+ * would cause the host Nx to build a cascading task graph across all
+ * external projects, triggering the native task hasher on projects whose
+ * source files are not meaningful in the host context.
  */
 function rewriteTarget(
   repoAlias: string,
@@ -60,8 +26,8 @@ function rewriteTarget(
   return {
     executor: '@op-nx/polyrepo:run',
     options: { repoAlias, originalProject, targetName },
+    inputs: [],
     cache: false,
-    dependsOn: rewriteDependsOn(targetConfig.dependsOn, repoAlias),
     configurations: targetConfig.configurations,
     parallelism: targetConfig.parallelism,
     metadata: targetConfig.metadata,

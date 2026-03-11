@@ -253,12 +253,12 @@ describe('transformGraphForRepo', () => {
       });
     });
 
-    it('omits inputs from proxy target (child repo resolves its own named inputs)', () => {
+    it('sets inputs to empty array (prevents native hasher from resolving external files)', () => {
       const graph = makeFixtureGraph();
       const result = transformGraphForRepo(repoAlias, graph, workspaceRoot);
       const buildTarget = result.nodes['repo-b/my-lib'].targets['build'];
 
-      expect(buildTarget.inputs).toBeUndefined();
+      expect(buildTarget.inputs).toEqual([]);
     });
 
     it('omits outputs from proxy target (child repo manages its own outputs)', () => {
@@ -324,25 +324,23 @@ describe('transformGraphForRepo', () => {
     });
   });
 
-  describe('dependsOn rewriting', () => {
-    it('caret syntax (^build) passes through unchanged', () => {
+  describe('dependsOn omission', () => {
+    it('omits dependsOn from proxy targets (child repo handles its own task graph)', () => {
       const graph = makeFixtureGraph();
       const result = transformGraphForRepo(repoAlias, graph, workspaceRoot);
-      const buildTarget = result.nodes['repo-b/my-lib'].targets['build'];
 
-      expect(buildTarget.dependsOn).toContain('^build');
+      // my-lib:build originally had dependsOn: ['^build']
+      expect(
+        result.nodes['repo-b/my-lib'].targets['build'].dependsOn,
+      ).toBeUndefined();
+
+      // my-app:build originally had dependsOn: ['^build', 'generate-api']
+      expect(
+        result.nodes['repo-b/my-app'].targets['build'].dependsOn,
+      ).toBeUndefined();
     });
 
-    it('self-references (build) pass through unchanged', () => {
-      const graph = makeFixtureGraph();
-      const result = transformGraphForRepo(repoAlias, graph, workspaceRoot);
-      const appBuild = result.nodes['repo-b/my-app'].targets['build'];
-
-      // 'generate-api' is a self-reference, should pass through
-      expect(appBuild.dependsOn).toContain('generate-api');
-    });
-
-    it('object with projects field gets project names prefixed', () => {
+    it('omits dependsOn even when original has object entries with projects', () => {
       const graph: ExternalGraphJson = {
         graph: {
           nodes: {
@@ -370,50 +368,10 @@ describe('transformGraphForRepo', () => {
       };
 
       const result = transformGraphForRepo(repoAlias, graph, workspaceRoot);
-      const buildTarget = result.nodes['repo-b/lib-a'].targets['build'];
 
-      expect(buildTarget.dependsOn).toEqual([
-        {
-          projects: ['repo-b/lib-b', 'repo-b/lib-c'],
-          target: 'build',
-        },
-      ]);
-    });
-
-    it('object with target but no projects passes through', () => {
-      const graph: ExternalGraphJson = {
-        graph: {
-          nodes: {
-            'lib-a': {
-              name: 'lib-a',
-              type: 'lib',
-              data: {
-                root: 'libs/lib-a',
-                targets: {
-                  build: {
-                    executor: '@nx/js:tsc',
-                    dependsOn: [{ target: 'prebuild' }],
-                  },
-                },
-              },
-            },
-          },
-          dependencies: {},
-        },
-      };
-
-      const result = transformGraphForRepo(repoAlias, graph, workspaceRoot);
-      const buildTarget = result.nodes['repo-b/lib-a'].targets['build'];
-
-      expect(buildTarget.dependsOn).toEqual([{ target: 'prebuild' }]);
-    });
-
-    it('returns undefined dependsOn when original has no dependsOn', () => {
-      const graph = makeFixtureGraph();
-      const result = transformGraphForRepo(repoAlias, graph, workspaceRoot);
-      const serveTarget = result.nodes['repo-b/my-app'].targets['serve'];
-
-      expect(serveTarget.dependsOn).toBeUndefined();
+      expect(
+        result.nodes['repo-b/lib-a'].targets['build'].dependsOn,
+      ).toBeUndefined();
     });
   });
 
