@@ -103,6 +103,87 @@ describe('polyrepoConfigSchema', () => {
     });
   });
 
+  describe('duplicate URL detection', () => {
+    it('rejects config where two repos have the same normalized URL (SSH and HTTPS)', () => {
+      const result = polyrepoConfigSchema.safeParse({
+        repos: {
+          'repo-a': 'git@github.com:org/my-repo.git',
+          'repo-b': 'https://github.com/org/my-repo',
+        },
+      });
+
+      expect(result.success).toBe(false);
+
+      if (!result.success) {
+        const message = result.error.issues[0].message;
+        expect(message).toContain('repo-a');
+        expect(message).toContain('repo-b');
+      }
+    });
+
+    it('rejects config where two repos have same URL but one has .git suffix', () => {
+      const result = polyrepoConfigSchema.safeParse({
+        repos: {
+          'repo-a': 'https://github.com/org/my-repo.git',
+          'repo-b': 'https://github.com/org/my-repo',
+        },
+      });
+
+      expect(result.success).toBe(false);
+
+      if (!result.success) {
+        const message = result.error.issues[0].message;
+        expect(message).toContain('repo-a');
+        expect(message).toContain('repo-b');
+      }
+    });
+
+    it('accepts config where repos have genuinely different URLs', () => {
+      const result = polyrepoConfigSchema.safeParse({
+        repos: {
+          'repo-a': 'https://github.com/org/repo-a.git',
+          'repo-b': 'https://github.com/org/repo-b.git',
+        },
+      });
+
+      expect(result.success).toBe(true);
+    });
+
+    it('detects duplicates across string URL and object URL entries', () => {
+      const result = polyrepoConfigSchema.safeParse({
+        repos: {
+          'repo-a': 'git@github.com:org/my-repo.git',
+          'repo-b': { url: 'https://github.com/org/my-repo' },
+        },
+      });
+
+      expect(result.success).toBe(false);
+
+      if (!result.success) {
+        const message = result.error.issues[0].message;
+        expect(message).toContain('repo-a');
+        expect(message).toContain('repo-b');
+      }
+    });
+
+    it('uses path.resolve for local path duplicate comparison', () => {
+      const result = polyrepoConfigSchema.safeParse({
+        repos: {
+          'repo-a': 'D:/projects/repo',
+          'repo-b': { path: 'D:/projects/repo' },
+        },
+      });
+
+      expect(result.success).toBe(false);
+
+      if (!result.success) {
+        const message = result.error.issues[0].message;
+        expect(message).toContain('repo-a');
+        expect(message).toContain('repo-b');
+      }
+    });
+  });
+
   describe('invalid entries', () => {
     it('rejects empty string', () => {
       const result = polyrepoConfigSchema.safeParse({

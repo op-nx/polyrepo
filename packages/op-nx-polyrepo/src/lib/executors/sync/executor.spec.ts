@@ -4,6 +4,11 @@ import type { ExecutorContext } from '@nx/devkit';
 // Mock dependencies before importing executor
 vi.mock('node:fs', () => ({
   readFileSync: vi.fn(),
+  existsSync: vi.fn(),
+}));
+
+vi.mock('node:child_process', () => ({
+  execFile: vi.fn(),
 }));
 
 vi.mock('@nx/devkit', () => ({
@@ -35,7 +40,9 @@ vi.mock('../../git/detect', () => ({
   detectRepoState: vi.fn(),
 }));
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
+import { execFile } from 'node:child_process';
+import type { ExecFileException } from 'node:child_process';
 import { logger } from '@nx/devkit';
 import { validateConfig } from '../../config/validate';
 import { normalizeRepos } from '../../config/schema';
@@ -52,6 +59,8 @@ import { detectRepoState } from '../../git/detect';
 import syncExecutor from './executor';
 
 const mockReadFileSync = vi.mocked(readFileSync);
+const mockExistsSync = vi.mocked(existsSync);
+const mockExecFile = vi.mocked(execFile);
 const mockValidateConfig = vi.mocked(validateConfig);
 const mockNormalizeRepos = vi.mocked(normalizeRepos);
 const mockGitClone = vi.mocked(gitClone);
@@ -336,6 +345,198 @@ describe('syncExecutor', () => {
     );
 
     expect(summaryCall).toBeDefined();
+  });
+
+  describe('dependency installation', () => {
+    function setupExecFileMockSuccess(): void {
+      mockExecFile.mockImplementation(((
+        _file: string,
+        _args: readonly string[],
+        _options: unknown,
+        callback?: (
+          error: ExecFileException | null,
+          stdout: string,
+          stderr: string,
+        ) => void,
+      ) => {
+        if (callback) {
+          callback(null, '', '');
+        }
+      }) as typeof execFile);
+    }
+
+    function setupExecFileMockFailure(errorMessage: string): void {
+      mockExecFile.mockImplementation(((
+        _file: string,
+        _args: readonly string[],
+        _options: unknown,
+        callback?: (
+          error: ExecFileException | null,
+          stdout: string,
+          stderr: string,
+        ) => void,
+      ) => {
+        if (callback) {
+          const err = new Error(errorMessage) as ExecFileException;
+          callback(err, '', errorMessage);
+        }
+      }) as typeof execFile);
+    }
+
+    it('runs npm install after cloning when package-lock.json detected', async () => {
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          depth: 1,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('not-synced');
+      mockExistsSync.mockReturnValue(false); // no pnpm-lock.yaml, no yarn.lock
+      setupExecFileMockSuccess();
+
+      await syncExecutor({}, createContext());
+
+      expect(mockExecFile).toHaveBeenCalledWith(
+        'npm',
+        ['install'],
+        expect.objectContaining({
+          cwd: expect.stringContaining('.repos'),
+        }),
+        expect.any(Function),
+      );
+    });
+
+    it('runs pnpm install after cloning when pnpm-lock.yaml detected', async () => {
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          depth: 1,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('not-synced');
+      // pnpm-lock.yaml exists
+      mockExistsSync.mockImplementation((path: unknown) => {
+        if (typeof path === 'string' && path.includes('pnpm-lock.yaml')) {
+          return true;
+        }
+
+        return false;
+      });
+      setupExecFileMockSuccess();
+
+      await syncExecutor({}, createContext());
+
+      expect(mockExecFile).toHaveBeenCalledWith(
+        'pnpm',
+        ['install'],
+        expect.objectContaining({
+          cwd: expect.stringContaining('.repos'),
+        }),
+        expect.any(Function),
+      );
+    });
+
+    it('runs yarn after cloning when yarn.lock detected', async () => {
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          depth: 1,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('not-synced');
+      // yarn.lock exists but not pnpm-lock.yaml
+      mockExistsSync.mockImplementation((path: unknown) => {
+        if (typeof path === 'string' && path.includes('yarn.lock')) {
+          return true;
+        }
+
+        return false;
+      });
+      setupExecFileMockSuccess();
+
+      await syncExecutor({}, createContext());
+
+      expect(mockExecFile).toHaveBeenCalledWith(
+        'yarn',
+        ['install'],
+        expect.objectContaining({
+          cwd: expect.stringContaining('.repos'),
+        }),
+        expect.any(Function),
+      );
+    });
+
+    it('runs install after pulling an existing remote repo', async () => {
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          depth: 1,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('cloned');
+      mockExistsSync.mockReturnValue(false);
+      setupExecFileMockSuccess();
+
+      await syncExecutor({}, createContext());
+
+      expect(mockExecFile).toHaveBeenCalledWith(
+        'npm',
+        ['install'],
+        expect.objectContaining({
+          cwd: expect.stringContaining('.repos'),
+        }),
+        expect.any(Function),
+      );
+    });
+
+    it('runs install for local path repos that are updated', async () => {
+      setupPluginConfig([
+        { type: 'local', alias: 'repo-b', path: 'D:/projects/repo-b' },
+      ]);
+      mockDetectRepoState.mockReturnValue('referenced');
+      mockExistsSync.mockReturnValue(false);
+      setupExecFileMockSuccess();
+
+      await syncExecutor({}, createContext());
+
+      expect(mockExecFile).toHaveBeenCalledWith(
+        'npm',
+        ['install'],
+        expect.objectContaining({
+          cwd: 'D:/projects/repo-b',
+        }),
+        expect.any(Function),
+      );
+    });
+
+    it('install failure logs warning but does not fail the sync', async () => {
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          depth: 1,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('not-synced');
+      mockExistsSync.mockReturnValue(false);
+      setupExecFileMockFailure('install failed');
+
+      const result = await syncExecutor({}, createContext());
+
+      expect(mockLoggerWarn).toHaveBeenCalledWith(
+        expect.stringContaining('repo-a'),
+      );
+      expect(result).toEqual({ success: true });
+    });
   });
 
   describe('strategy option', () => {
