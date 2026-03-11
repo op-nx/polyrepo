@@ -66,6 +66,20 @@ export async function gitPullFfOnly(cwd: string, disableHooks?: boolean): Promis
   await execGit(['pull', '--ff-only'], cwd, disableHooks);
 }
 
+export async function gitCheckoutBranch(
+  cwd: string,
+  branch: string,
+  disableHooks?: boolean,
+): Promise<void> {
+  await execGit(['fetch', 'origin', branch], cwd, disableHooks);
+
+  try {
+    await execGit(['checkout', branch], cwd, disableHooks);
+  } catch {
+    await execGit(['checkout', '-b', branch, `origin/${branch}`], cwd, disableHooks);
+  }
+}
+
 export async function gitFetchTag(
   cwd: string,
   tag: string,

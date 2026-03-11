@@ -17,6 +17,7 @@ import {
   gitPullRebase,
   gitPullFfOnly,
   gitFetchTag,
+  gitCheckoutBranch,
 } from './commands';
 
 const mockExecFile = vi.mocked(execFile);
@@ -230,6 +231,94 @@ describe('gitFetchTag', () => {
       1,
       'git',
       ['fetch', '--depth', '5', 'origin', 'tag', 'v2.0.0'],
+      expect.objectContaining({ cwd: 'D:/workspace/.repos/repo' }),
+      expect.any(Function),
+    );
+  });
+});
+
+describe('gitCheckoutBranch', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setupExecFileMock();
+  });
+
+  it('fetches the branch from origin then checks it out', async () => {
+    await gitCheckoutBranch('D:/workspace/.repos/repo', 'main');
+
+    expect(mockExecFile).toHaveBeenCalledTimes(2);
+
+    expect(mockExecFile).toHaveBeenNthCalledWith(
+      1,
+      'git',
+      ['fetch', 'origin', 'main'],
+      expect.objectContaining({ cwd: 'D:/workspace/.repos/repo' }),
+      expect.any(Function),
+    );
+
+    expect(mockExecFile).toHaveBeenNthCalledWith(
+      2,
+      'git',
+      ['checkout', 'main'],
+      expect.objectContaining({ cwd: 'D:/workspace/.repos/repo' }),
+      expect.any(Function),
+    );
+  });
+
+  it('falls back to checkout -b when checkout fails (branch not local)', async () => {
+    let callCount = 0;
+    mockExecFile.mockImplementation(((
+      _file: string,
+      args: readonly string[],
+      _options: unknown,
+      callback?: (
+        error: ExecFileException | null,
+        stdout: string,
+        stderr: string,
+      ) => void,
+    ) => {
+      callCount++;
+
+      if (callback) {
+        // First call: fetch (succeeds)
+        // Second call: checkout (fails — branch not local)
+        // Third call: checkout -b (succeeds)
+        if (callCount === 2 && args.includes('checkout') && !args.includes('-b')) {
+          callback(new Error('pathspec did not match') as ExecFileException, '', 'error: pathspec did not match');
+        } else {
+          callback(null, '', '');
+        }
+      }
+    }) as typeof execFile);
+
+    await gitCheckoutBranch('D:/workspace/.repos/repo', 'develop');
+
+    expect(mockExecFile).toHaveBeenCalledTimes(3);
+
+    expect(mockExecFile).toHaveBeenNthCalledWith(
+      3,
+      'git',
+      ['checkout', '-b', 'develop', 'origin/develop'],
+      expect.objectContaining({ cwd: 'D:/workspace/.repos/repo' }),
+      expect.any(Function),
+    );
+  });
+
+  it('respects disableHooks on all git calls', async () => {
+    await gitCheckoutBranch('D:/workspace/.repos/repo', 'main', true);
+
+    expect(mockExecFile).toHaveBeenNthCalledWith(
+      1,
+      'git',
+      ['-c', 'core.hooksPath=__op-nx_polyrepo_disable-hooks__', 'fetch', 'origin', 'main'],
+      expect.objectContaining({ cwd: 'D:/workspace/.repos/repo' }),
+      expect.any(Function),
+    );
+
+    expect(mockExecFile).toHaveBeenNthCalledWith(
+      2,
+      'git',
+      ['-c', 'core.hooksPath=__op-nx_polyrepo_disable-hooks__', 'checkout', 'main'],
       expect.objectContaining({ cwd: 'D:/workspace/.repos/repo' }),
       expect.any(Function),
     );

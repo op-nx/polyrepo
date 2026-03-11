@@ -34,6 +34,7 @@ vi.mock('../../git/commands', () => ({
   gitPullRebase: vi.fn(),
   gitPullFfOnly: vi.fn(),
   gitFetchTag: vi.fn(),
+  gitCheckoutBranch: vi.fn(),
 }));
 
 vi.mock('../../git/detect', () => ({
@@ -64,6 +65,7 @@ import {
   gitPullRebase,
   gitPullFfOnly,
   gitFetchTag,
+  gitCheckoutBranch,
 } from '../../git/commands';
 import { detectRepoState, getWorkingTreeState, getCurrentBranch, getCurrentRef, isGitTag } from '../../git/detect';
 import { formatAlignedTable } from '../../format/table';
@@ -104,6 +106,7 @@ const mockGitFetch = vi.mocked(gitFetch);
 const mockGitPullRebase = vi.mocked(gitPullRebase);
 const mockGitPullFfOnly = vi.mocked(gitPullFfOnly);
 const mockGitFetchTag = vi.mocked(gitFetchTag);
+const mockGitCheckoutBranch = vi.mocked(gitCheckoutBranch);
 const mockDetectRepoState = vi.mocked(detectRepoState);
 const mockGetWorkingTreeState = vi.mocked(getWorkingTreeState);
 const mockGetCurrentBranch = vi.mocked(getCurrentBranch);
@@ -443,7 +446,7 @@ describe('syncExecutor', () => {
       await syncExecutor({}, createContext());
 
       expect(mockSpawn).toHaveBeenCalledWith(
-        'npm install',
+        'npm install --loglevel=error',
         expect.objectContaining({
           cwd: expect.stringContaining('.repos'),
           shell: true,
@@ -476,7 +479,7 @@ describe('syncExecutor', () => {
       await syncExecutor({}, createContext());
 
       expect(mockSpawn).toHaveBeenCalledWith(
-        'pnpm install',
+        'pnpm install --reporter=silent',
         expect.objectContaining({
           cwd: expect.stringContaining('.repos'),
           shell: true,
@@ -509,7 +512,7 @@ describe('syncExecutor', () => {
       await syncExecutor({}, createContext());
 
       expect(mockSpawn).toHaveBeenCalledWith(
-        'yarn install',
+        'yarn install --silent',
         expect.objectContaining({
           cwd: expect.stringContaining('.repos'),
           shell: true,
@@ -535,7 +538,7 @@ describe('syncExecutor', () => {
       await syncExecutor({}, createContext());
 
       expect(mockSpawn).toHaveBeenCalledWith(
-        'npm install',
+        'npm install --loglevel=error',
         expect.objectContaining({
           cwd: expect.stringContaining('.repos'),
           shell: true,
@@ -555,7 +558,7 @@ describe('syncExecutor', () => {
       await syncExecutor({}, createContext());
 
       expect(mockSpawn).toHaveBeenCalledWith(
-        'npm install',
+        'npm install --loglevel=error',
         expect.objectContaining({
           cwd: 'D:/projects/repo-b',
           shell: true,
@@ -602,7 +605,7 @@ describe('syncExecutor', () => {
       await syncExecutor({}, createContext());
 
       expect(mockSpawn).toHaveBeenCalledWith(
-        'corepack pnpm install',
+        'corepack pnpm install --reporter=silent',
         expect.objectContaining({
           cwd: expect.stringContaining('.repos'),
           shell: true,
@@ -646,7 +649,7 @@ describe('syncExecutor', () => {
       await syncExecutor({}, createContext());
 
       expect(mockSpawn).toHaveBeenCalledWith(
-        'corepack yarn install',
+        'corepack yarn install --silent',
         expect.objectContaining({
           cwd: expect.stringContaining('.repos'),
           shell: true,
@@ -694,11 +697,35 @@ describe('syncExecutor', () => {
       await syncExecutor({}, createContext());
 
       expect(mockSpawn).toHaveBeenCalledWith(
-        'pnpm install',
+        'pnpm install --reporter=silent',
         expect.objectContaining({
           cwd: expect.stringContaining('.repos'),
           shell: true,
           windowsHide: true,
+        }),
+      );
+    });
+
+    it('closes stdin to suppress interactive prompts and pipes stdout/stderr', async () => {
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          depth: 1,
+          disableHooks: true,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('not-synced');
+      mockExistsSync.mockReturnValue(false);
+      setupSpawnMockSuccess();
+
+      await syncExecutor({}, createContext());
+
+      expect(mockSpawn).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          stdio: ['ignore', 'pipe', 'pipe'],
         }),
       );
     });
@@ -847,7 +874,7 @@ describe('syncExecutor', () => {
       expect(mockGitPull).not.toHaveBeenCalled();
     });
 
-    it('shows "would fetch tag" for synced remote repos with tag ref', async () => {
+    it('shows "would sync to tag" for synced remote repos with tag ref', async () => {
       setupPluginConfig([
         {
           type: 'remote',
@@ -864,11 +891,11 @@ describe('syncExecutor', () => {
       await syncExecutor({ dryRun: true }, createContext());
 
       const infoCalls = mockLoggerInfo.mock.calls.map((c) => String(c[0]));
-      const hasWouldFetchTag = infoCalls.some(
-        (msg) => msg.includes('repo-a') && msg.includes('would fetch tag'),
+      const hasWouldSwitchToTag = infoCalls.some(
+        (msg) => msg.includes('repo-a') && msg.includes('would sync to tag'),
       );
 
-      expect(hasWouldFetchTag).toBe(true);
+      expect(hasWouldSwitchToTag).toBe(true);
       expect(mockGitFetchTag).not.toHaveBeenCalled();
     });
 
@@ -1313,6 +1340,149 @@ describe('syncExecutor', () => {
         expect.stringContaining('.repos'),
         false,
       );
+    });
+  });
+
+  describe('branch transition (tag-to-branch, branch-to-branch)', () => {
+    it('checks out target branch when repo is on detached HEAD (tag-to-branch)', async () => {
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          ref: 'master',
+          depth: 1,
+          disableHooks: true,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('cloned');
+      mockIsGitTag.mockResolvedValue(false);
+      mockGetCurrentBranch.mockResolvedValue(null); // detached HEAD
+
+      await syncExecutor({}, createContext());
+
+      expect(mockGitCheckoutBranch).toHaveBeenCalledWith(
+        expect.stringContaining('.repos'),
+        'master',
+        true,
+      );
+      expect(mockGitPull).toHaveBeenCalled();
+    });
+
+    it('checks out target branch when repo is on wrong branch', async () => {
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          ref: 'main',
+          depth: 1,
+          disableHooks: true,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('cloned');
+      mockIsGitTag.mockResolvedValue(false);
+      mockGetCurrentBranch.mockResolvedValue('develop'); // wrong branch
+
+      await syncExecutor({}, createContext());
+
+      expect(mockGitCheckoutBranch).toHaveBeenCalledWith(
+        expect.stringContaining('.repos'),
+        'main',
+        true,
+      );
+      expect(mockGitPull).toHaveBeenCalled();
+    });
+
+    it('skips checkout when already on the correct branch', async () => {
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          ref: 'main',
+          depth: 1,
+          disableHooks: true,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('cloned');
+      mockIsGitTag.mockResolvedValue(false);
+      mockGetCurrentBranch.mockResolvedValue('main'); // already on correct branch
+
+      await syncExecutor({}, createContext());
+
+      expect(mockGitCheckoutBranch).not.toHaveBeenCalled();
+      expect(mockGitPull).toHaveBeenCalled();
+    });
+
+    it('skips checkout when ref is undefined', async () => {
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          depth: 1,
+          disableHooks: true,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('cloned');
+      mockIsGitTag.mockResolvedValue(false);
+
+      await syncExecutor({}, createContext());
+
+      expect(mockGitCheckoutBranch).not.toHaveBeenCalled();
+      expect(mockGitPull).toHaveBeenCalled();
+    });
+
+    it('dry-run shows "would switch to branch and pull" when on detached HEAD', async () => {
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          ref: 'master',
+          depth: 1,
+          disableHooks: true,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('cloned');
+      mockIsGitTag.mockResolvedValue(false);
+      mockGetCurrentBranch.mockResolvedValue(null); // detached HEAD
+
+      await syncExecutor({ dryRun: true }, createContext());
+
+      const infoCalls = mockLoggerInfo.mock.calls.map((c) => String(c[0]));
+      const hasSwitch = infoCalls.some(
+        (msg) => msg.includes('repo-a') && msg.includes('would switch to master and pull'),
+      );
+
+      expect(hasSwitch).toBe(true);
+      expect(mockGitCheckoutBranch).not.toHaveBeenCalled();
+    });
+
+    it('logs switching message before checkout', async () => {
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          ref: 'master',
+          depth: 1,
+          disableHooks: true,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('cloned');
+      mockIsGitTag.mockResolvedValue(false);
+      mockGetCurrentBranch.mockResolvedValue(null);
+
+      await syncExecutor({}, createContext());
+
+      const infoCalls = mockLoggerInfo.mock.calls.map((c) => String(c[0]));
+      const hasSwitchMsg = infoCalls.some(
+        (msg) => msg.includes('Switching repo-a to branch master'),
+      );
+
+      expect(hasSwitchMsg).toBe(true);
     });
   });
 

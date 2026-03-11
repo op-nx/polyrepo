@@ -12,6 +12,11 @@
       "type": "boolean",
       "default": false,
       "description": "Show what sync would do without executing"
+    },
+    "verbose": {
+      "type": "boolean",
+      "default": false,
+      "description": "Show full package manager output during dependency installation"
     }
   },
   "additionalProperties": false

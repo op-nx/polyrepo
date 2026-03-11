@@ -13,6 +13,7 @@ import {
   gitPullRebase,
   gitPullFfOnly,
   gitFetchTag,
+  gitCheckoutBranch,
 } from '../../git/commands';
 import { detectRepoState, getWorkingTreeState, getCurrentBranch, getCurrentRef, isGitTag } from '../../git/detect';
 import { formatAlignedTable, type ColumnDef } from '../../format/table';
@@ -20,6 +21,7 @@ import { formatAlignedTable, type ColumnDef } from '../../format/table';
 export interface SyncExecutorOptions {
   strategy?: 'fetch' | 'pull' | 'rebase' | 'ff-only';
   dryRun?: boolean;
+  verbose?: boolean;
 }
 
 function detectPackageManager(
@@ -65,21 +67,42 @@ function getCorepackPm(
   }
 }
 
-function installDeps(repoPath: string, alias: string): Promise<void> {
+function quietFlag(pm: string): string {
+  switch (pm) {
+    case 'pnpm': {
+      return '--reporter=silent';
+    }
+
+    case 'yarn': {
+      return '--silent';
+    }
+
+    default: {
+      return '--loglevel=error';
+    }
+  }
+}
+
+function installDeps(repoPath: string, alias: string, verbose: boolean): Promise<void> {
   const corepackPm = getCorepackPm(repoPath);
   let command: string;
   let displayPm: string;
 
   if (corepackPm) {
-    command = `corepack ${corepackPm} install`;
     displayPm = `${corepackPm} via corepack`;
+    command = verbose
+      ? `corepack ${corepackPm} install`
+      : `corepack ${corepackPm} install ${quietFlag(corepackPm)}`;
   } else {
     const pm = detectPackageManager(repoPath);
-    command = `${pm} install`;
     displayPm = pm;
+    command = verbose
+      ? `${pm} install`
+      : `${pm} install ${quietFlag(pm)}`;
   }
 
-  logger.info(`Installing dependencies for ${alias} (${displayPm})...`);
+  const mode = verbose ? '' : ', silent mode';
+  logger.info(`Installing dependencies for ${alias} (${displayPm}${mode})...`);
 
   return new Promise((resolve, reject) => {
     const child = spawn(command, {
@@ -139,13 +162,18 @@ function getStrategyFn(
 async function tryInstallDeps(
   repoPath: string,
   alias: string,
-): Promise<void> {
+  verbose: boolean,
+): Promise<boolean> {
   try {
-    await installDeps(repoPath, alias);
+    await installDeps(repoPath, alias, verbose);
+
+    return true;
   } catch (error) {
     logger.warn(
       `Failed to install dependencies for ${alias}: ${error}. Run install manually in .repos/${alias}/`,
     );
+
+    return false;
   }
 }
 
@@ -179,12 +207,14 @@ function lockfileChanged(hashBefore: string | null, hashAfter: string | null): b
 
 interface SyncResult {
   action: string;
+  installFailed?: boolean;
 }
 
 async function syncRepo(
   entry: NormalizedRepoEntry,
   workspaceRoot: string,
   strategy: SyncExecutorOptions['strategy'],
+  verbose: boolean,
 ): Promise<SyncResult> {
   const state = detectRepoState(entry.alias, entry, workspaceRoot);
 
@@ -199,9 +229,9 @@ async function syncRepo(
         disableHooks: entry.disableHooks,
       });
       logger.info(`Done: ${entry.alias} cloned.`);
-      await tryInstallDeps(repoPath, entry.alias);
+      const installed = await tryInstallDeps(repoPath, entry.alias, verbose);
 
-      return { action: 'cloned' };
+      return { action: 'cloned', installFailed: !installed };
     }
 
     if (entry.ref && await isGitTag(repoPath, entry.ref)) {
@@ -211,10 +241,20 @@ async function syncRepo(
       logger.info(`Done: ${entry.alias} synced to tag ${entry.ref}.`);
 
       if (lockfileChanged(lockBefore, hashLockfile(repoPath))) {
-        await tryInstallDeps(repoPath, entry.alias);
+        const installed = await tryInstallDeps(repoPath, entry.alias, verbose);
+
+        return { action: `synced to tag ${entry.ref}`, installFailed: !installed };
       }
 
-      return { action: 'fetched tag' };
+      return { action: `synced to tag ${entry.ref}` };
+    }
+
+    // Ensure repo is on the correct branch before pull/fetch
+    const currentBranch = await getCurrentBranch(repoPath);
+
+    if (entry.ref && currentBranch !== entry.ref) {
+      logger.info(`Switching ${entry.alias} to branch ${entry.ref}...`);
+      await gitCheckoutBranch(repoPath, entry.ref, entry.disableHooks);
     }
 
     const strategyFn = getStrategyFn(strategy);
@@ -224,7 +264,9 @@ async function syncRepo(
     logger.info(`Done: ${entry.alias} updated.`);
 
     if (lockfileChanged(lockBefore, hashLockfile(repoPath))) {
-      await tryInstallDeps(repoPath, entry.alias);
+      const installed = await tryInstallDeps(repoPath, entry.alias, verbose);
+
+      return { action: strategy ?? 'pull', installFailed: !installed };
     }
 
     return { action: strategy ?? 'pull' };
@@ -246,7 +288,9 @@ async function syncRepo(
   logger.info(`Done: ${entry.alias} updated.`);
 
   if (lockfileChanged(lockBefore, hashLockfile(entry.path))) {
-    await tryInstallDeps(entry.path, entry.alias);
+    const installed = await tryInstallDeps(entry.path, entry.alias, verbose);
+
+    return { action: strategy ?? 'pull', installFailed: !installed };
   }
 
   return { action: strategy ?? 'pull' };
@@ -267,7 +311,15 @@ async function getDryRunAction(
   }
 
   if (entry.type === 'remote' && entry.ref && await isGitTag(repoPath, entry.ref)) {
-    return `would fetch tag ${entry.ref}`;
+    return `would sync to tag ${entry.ref}`;
+  }
+
+  if (entry.type === 'remote' && entry.ref) {
+    const currentBranch = await getCurrentBranch(repoPath);
+
+    if (currentBranch !== entry.ref) {
+      return `would switch to ${entry.ref} and ${strategy ?? 'pull'}`;
+    }
   }
 
   return `would ${strategy ?? 'pull'}`;
@@ -363,16 +415,18 @@ export default async function syncExecutor(
   const config = validateConfig(pluginOptions);
   const entries = normalizeRepos(config);
   const strategy = options.strategy;
+  const verbose = options.verbose ?? false;
 
   if (options.dryRun) {
     return executeDryRun(entries, context.root, strategy);
   }
 
   const results = await Promise.allSettled(
-    entries.map((entry) => syncRepo(entry, context.root, strategy)),
+    entries.map((entry) => syncRepo(entry, context.root, strategy, verbose)),
   );
 
   let synced = 0;
+  let warned = 0;
   let failed = 0;
   const tableRows: ColumnDef[][] = [];
 
@@ -380,12 +434,21 @@ export default async function syncExecutor(
     const result = results[i];
 
     if (result.status === 'fulfilled') {
-      synced++;
-      tableRows.push([
-        { value: entries[i].alias },
-        { value: result.value.action },
-        { value: '[OK]' },
-      ]);
+      if (result.value.installFailed) {
+        warned++;
+        tableRows.push([
+          { value: entries[i].alias },
+          { value: result.value.action },
+          { value: '[WARN: install failed]' },
+        ]);
+      } else {
+        synced++;
+        tableRows.push([
+          { value: entries[i].alias },
+          { value: result.value.action },
+          { value: '[OK]' },
+        ]);
+      }
     } else {
       failed++;
       const reason = result.reason instanceof Error
@@ -409,7 +472,21 @@ export default async function syncExecutor(
     logger.info(row);
   }
 
-  logger.info(`Summary: ${synced} synced, ${failed} failed.`);
+  const parts: string[] = [];
+
+  if (synced > 0) {
+    parts.push(`${synced} synced`);
+  }
+
+  if (warned > 0) {
+    parts.push(`${warned} synced with warning`);
+  }
+
+  if (failed > 0) {
+    parts.push(`${failed} failed`);
+  }
+
+  logger.info(`Summary: ${parts.join(', ')}`);
 
   return { success: failed === 0 };
 }
