@@ -85,6 +85,23 @@ export async function getCurrentRef(cwd: string): Promise<string> {
   }
 }
 
+export async function isGitTag(
+  cwd: string,
+  ref: string | undefined,
+): Promise<boolean> {
+  if (!ref) {
+    return false;
+  }
+
+  try {
+    await execGitOutput(['show-ref', '--verify', `refs/tags/${ref}`], cwd);
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export interface WorkingTreeState {
   modified: number;
   staged: number;

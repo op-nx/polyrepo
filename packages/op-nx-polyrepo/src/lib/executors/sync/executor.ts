@@ -13,7 +13,7 @@ import {
   gitPullFfOnly,
   gitFetchTag,
 } from '../../git/commands';
-import { detectRepoState, getWorkingTreeState, getCurrentBranch, getCurrentRef } from '../../git/detect';
+import { detectRepoState, getWorkingTreeState, getCurrentBranch, getCurrentRef, isGitTag } from '../../git/detect';
 import { formatAlignedTable, type ColumnDef } from '../../format/table';
 
 export interface SyncExecutorOptions {
@@ -91,16 +91,6 @@ function installDeps(repoPath: string, alias: string): Promise<void> {
   });
 }
 
-const tagPattern = /^v?\d+\.\d+/;
-
-function isTagRef(ref: string | undefined): boolean {
-  if (!ref) {
-    return false;
-  }
-
-  return tagPattern.test(ref);
-}
-
 function getStrategyFn(
   strategy: SyncExecutorOptions['strategy'],
 ): (cwd: string, disableHooks?: boolean) => Promise<void> {
@@ -163,7 +153,7 @@ async function syncRepo(
       return { action: 'cloned' };
     }
 
-    if (entry.ref && isTagRef(entry.ref)) {
+    if (entry.ref && await isGitTag(repoPath, entry.ref)) {
       logger.info(`Fetching tag ${entry.ref} for ${entry.alias}...`);
       await gitFetchTag(repoPath, entry.ref, entry.depth, entry.disableHooks);
       logger.info(`Done: ${entry.alias} at tag ${entry.ref}.`);
@@ -199,11 +189,12 @@ async function syncRepo(
   return { action: strategy ?? 'pull' };
 }
 
-function getDryRunAction(
+async function getDryRunAction(
   entry: NormalizedRepoEntry,
   state: 'cloned' | 'referenced' | 'not-synced',
   strategy: SyncExecutorOptions['strategy'],
-): string {
+  repoPath: string,
+): Promise<string> {
   if (state === 'not-synced') {
     if (entry.type === 'remote') {
       return 'would clone';
@@ -212,7 +203,7 @@ function getDryRunAction(
     return 'would skip (path not found)';
   }
 
-  if (entry.type === 'remote' && entry.ref && isTagRef(entry.ref)) {
+  if (entry.type === 'remote' && entry.ref && await isGitTag(repoPath, entry.ref)) {
     return `would fetch tag ${entry.ref}`;
   }
 
@@ -231,13 +222,13 @@ async function executeDryRun(
 
   for (const entry of entries) {
     const state = detectRepoState(entry.alias, entry, workspaceRoot);
-    const action = getDryRunAction(entry, state, strategy);
+    const repoPath = entry.type === 'remote'
+      ? join(workspaceRoot, '.repos', entry.alias)
+      : entry.path;
+    const action = await getDryRunAction(entry, state, strategy, repoPath);
     const warnings: string[] = [];
 
     if (state !== 'not-synced') {
-      const repoPath = entry.type === 'remote'
-        ? join(workspaceRoot, '.repos', entry.alias)
-        : entry.path;
       const treeState = await getWorkingTreeState(repoPath);
       const total = treeState.modified + treeState.staged + treeState.deleted
         + treeState.untracked + treeState.conflicts;
@@ -252,7 +243,7 @@ async function executeDryRun(
       if (isDetachedHead) {
         const ref = await getCurrentRef(repoPath);
 
-        if (isTagRef(ref)) {
+        if (await isGitTag(repoPath, ref)) {
           warnings.push('[WARN: tag-pinned]');
         } else {
           warnings.push('[WARN: detached HEAD]');

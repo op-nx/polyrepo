@@ -41,6 +41,7 @@ vi.mock('../../git/detect', () => ({
   getWorkingTreeState: vi.fn(),
   getCurrentBranch: vi.fn(),
   getCurrentRef: vi.fn(),
+  isGitTag: vi.fn(),
 }));
 
 vi.mock('../../format/table', () => ({
@@ -64,7 +65,7 @@ import {
   gitPullFfOnly,
   gitFetchTag,
 } from '../../git/commands';
-import { detectRepoState, getWorkingTreeState, getCurrentBranch, getCurrentRef } from '../../git/detect';
+import { detectRepoState, getWorkingTreeState, getCurrentBranch, getCurrentRef, isGitTag } from '../../git/detect';
 import { formatAlignedTable } from '../../format/table';
 import syncExecutor from './executor';
 
@@ -83,6 +84,7 @@ const mockDetectRepoState = vi.mocked(detectRepoState);
 const mockGetWorkingTreeState = vi.mocked(getWorkingTreeState);
 const mockGetCurrentBranch = vi.mocked(getCurrentBranch);
 const mockGetCurrentRef = vi.mocked(getCurrentRef);
+const mockIsGitTag = vi.mocked(isGitTag);
 const mockFormatAlignedTable = vi.mocked(formatAlignedTable);
 const mockLoggerInfo = vi.mocked(logger.info);
 const mockLoggerWarn = vi.mocked(logger.warn);
@@ -123,6 +125,8 @@ describe('syncExecutor', () => {
     mockGitPullRebase.mockResolvedValue(undefined);
     mockGitPullFfOnly.mockResolvedValue(undefined);
     mockGitFetchTag.mockResolvedValue(undefined);
+    // Default: isGitTag returns false (most tests don't involve tags)
+    mockIsGitTag.mockResolvedValue(false);
     // Default: getCurrentBranch returns a normal branch (not detached)
     mockGetCurrentBranch.mockResolvedValue('main');
     // Default: getWorkingTreeState returns clean state
@@ -205,6 +209,7 @@ describe('syncExecutor', () => {
       },
     ]);
     mockDetectRepoState.mockReturnValue('cloned');
+    mockIsGitTag.mockResolvedValue(true);
 
     const result = await syncExecutor({}, createContext());
 
@@ -867,6 +872,7 @@ describe('syncExecutor', () => {
         },
       ]);
       mockDetectRepoState.mockReturnValue('cloned');
+      mockIsGitTag.mockResolvedValue(true);
 
       await syncExecutor({ dryRun: true }, createContext());
 
@@ -981,6 +987,7 @@ describe('syncExecutor', () => {
       mockDetectRepoState.mockReturnValue('cloned');
       mockGetCurrentBranch.mockResolvedValue(null);
       mockGetCurrentRef.mockResolvedValue('v1.2.3');
+      mockIsGitTag.mockResolvedValue(true);
 
       await syncExecutor({ dryRun: true }, createContext());
 
@@ -1047,6 +1054,7 @@ describe('syncExecutor', () => {
       });
       mockGetCurrentBranch.mockResolvedValue(null);
       mockGetCurrentRef.mockResolvedValue('v1.2.3');
+      mockIsGitTag.mockResolvedValue(true);
 
       await syncExecutor({ dryRun: true }, createContext());
 
@@ -1274,6 +1282,7 @@ describe('syncExecutor', () => {
         },
       ]);
       mockDetectRepoState.mockReturnValue('cloned');
+      mockIsGitTag.mockResolvedValue(true);
 
       await syncExecutor({}, createContext());
 

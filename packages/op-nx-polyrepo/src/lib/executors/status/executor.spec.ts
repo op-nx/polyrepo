@@ -29,6 +29,7 @@ vi.mock('../../git/detect', () => ({
   getCurrentRef: vi.fn(),
   getWorkingTreeState: vi.fn(),
   getAheadBehind: vi.fn(),
+  isGitTag: vi.fn(),
 }));
 
 vi.mock('../../git/commands', () => ({
@@ -50,6 +51,7 @@ import {
   getCurrentRef,
   getWorkingTreeState,
   getAheadBehind,
+  isGitTag,
 } from '../../git/detect';
 import { gitFetch } from '../../git/commands';
 import { formatAlignedTable } from '../../format/table';
@@ -65,6 +67,7 @@ const mockGetCurrentBranch = vi.mocked(getCurrentBranch);
 const mockGetCurrentRef = vi.mocked(getCurrentRef);
 const mockGetWorkingTreeState = vi.mocked(getWorkingTreeState);
 const mockGetAheadBehind = vi.mocked(getAheadBehind);
+const mockIsGitTag = vi.mocked(isGitTag);
 const mockGitFetch = vi.mocked(gitFetch);
 const mockFormatAlignedTable = vi.mocked(formatAlignedTable);
 const mockLoggerInfo = vi.mocked(logger.info);
@@ -109,6 +112,7 @@ function setupDefaultTableMock(): void {
 function setupDefaultSyncedState(): void {
   mockGetCurrentBranch.mockResolvedValue('main');
   mockGetCurrentRef.mockResolvedValue('abc1234');
+  mockIsGitTag.mockResolvedValue(false);
   mockGetWorkingTreeState.mockResolvedValue({
     modified: 0,
     staged: 0,
@@ -245,6 +249,7 @@ describe('statusExecutor', () => {
     mockDetectRepoState.mockReturnValue('cloned');
     mockGetCurrentBranch.mockResolvedValue(null);
     mockGetCurrentRef.mockResolvedValue('v2.1.0');
+    mockIsGitTag.mockResolvedValue(true);
 
     await statusExecutor({}, createContext());
 
@@ -756,6 +761,7 @@ describe('statusExecutor', () => {
     mockDetectRepoState.mockReturnValue('cloned');
     mockGetCurrentBranch.mockResolvedValue(null);
     mockGetCurrentRef.mockResolvedValue('v2.1.0');
+    mockIsGitTag.mockResolvedValue(true);
     mockGetWorkingTreeState.mockResolvedValue({
       modified: 0,
       staged: 0,
@@ -788,6 +794,7 @@ describe('statusExecutor', () => {
     mockDetectRepoState.mockReturnValue('cloned');
     mockGetCurrentBranch.mockResolvedValue(null);
     mockGetCurrentRef.mockResolvedValue('v2.1.0');
+    mockIsGitTag.mockResolvedValue(true);
     mockGetWorkingTreeState.mockResolvedValue({
       modified: 2,
       staged: 0,

@@ -10,6 +10,7 @@ import {
   getCurrentRef,
   getWorkingTreeState,
   getAheadBehind,
+  isGitTag,
 } from '../../git/detect';
 import type { WorkingTreeState, AheadBehind } from '../../git/detect';
 import { gitFetch } from '../../git/commands';
@@ -18,16 +19,6 @@ import type { PolyrepoGraphReport } from '../../graph/types';
 
 // Status executor takes no options
 export type StatusExecutorOptions = Record<string, never>;
-
-const TAG_PATTERN = /^v?\d+\.\d+/;
-
-function isTagRef(ref: string | undefined): boolean {
-  if (!ref) {
-    return false;
-  }
-
-  return TAG_PATTERN.test(ref);
-}
 
 function getRepoPath(
   entry: NormalizedRepoEntry,
@@ -167,7 +158,7 @@ export default async function statusExecutor(
 
       // Determine if tag-pinned
       const isDetachedHead = branch === null;
-      const isTag = isTagRef(ref);
+      const isTag = await isGitTag(repoPath, ref);
       const isTagPinned = isDetachedHead && isTag;
 
       // Only get ahead/behind for branch-tracked repos (not tag-pinned, not detached)
