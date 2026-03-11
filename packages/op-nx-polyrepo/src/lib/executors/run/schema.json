@@ -1,0 +1,22 @@
+{
+  "version": 2,
+  "$schema": "https://json-schema.org/schema",
+  "title": "Run executor",
+  "description": "Proxy executor that delegates target execution to a child repo's Nx workspace",
+  "type": "object",
+  "properties": {
+    "repoAlias": {
+      "type": "string",
+      "description": "Alias of the external repo in polyrepo config"
+    },
+    "originalProject": {
+      "type": "string",
+      "description": "Original project name in the external repo"
+    },
+    "targetName": {
+      "type": "string",
+      "description": "Target to run in the external repo"
+    }
+  },
+  "required": ["repoAlias", "originalProject", "targetName"]
+}
