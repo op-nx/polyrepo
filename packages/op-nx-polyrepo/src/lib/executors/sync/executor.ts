@@ -1,6 +1,6 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { execFile } from 'node:child_process';
+import { exec } from 'node:child_process';
 import { logger } from '@nx/devkit';
 import type { ExecutorContext, NxJsonConfiguration } from '@nx/devkit';
 import { validateConfig } from '../../config/validate';
@@ -65,20 +65,18 @@ function getCorepackPm(
 function installDeps(repoPath: string, alias: string): Promise<void> {
   const corepackPm = getCorepackPm(repoPath);
   let command: string;
-  let args: string[];
 
   if (corepackPm) {
-    command = 'corepack';
-    args = [corepackPm, 'install'];
+    command = `corepack ${corepackPm} install`;
     logger.info(`Installing dependencies for ${alias} (${corepackPm} via corepack)...`);
   } else {
-    command = detectPackageManager(repoPath);
-    args = ['install'];
-    logger.info(`Installing dependencies for ${alias} (${command})...`);
+    const pm = detectPackageManager(repoPath);
+    command = `${pm} install`;
+    logger.info(`Installing dependencies for ${alias} (${pm})...`);
   }
 
   return new Promise((resolve, reject) => {
-    execFile(command, args, { cwd: repoPath, shell: true, windowsHide: true }, (error, _stdout, stderr) => {
+    exec(command, { cwd: repoPath, windowsHide: true }, (error, _stdout, stderr) => {
       if (error) {
         reject(new Error(stderr || error.message));
 

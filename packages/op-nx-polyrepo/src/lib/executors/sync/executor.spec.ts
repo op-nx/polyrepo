@@ -8,7 +8,7 @@ vi.mock('node:fs', () => ({
 }));
 
 vi.mock('node:child_process', () => ({
-  execFile: vi.fn(),
+  exec: vi.fn(),
 }));
 
 vi.mock('@nx/devkit', () => ({
@@ -41,8 +41,8 @@ vi.mock('../../git/detect', () => ({
 }));
 
 import { readFileSync, existsSync } from 'node:fs';
-import { execFile } from 'node:child_process';
-import type { ExecFileException } from 'node:child_process';
+import { exec } from 'node:child_process';
+import type { ExecException } from 'node:child_process';
 import { logger } from '@nx/devkit';
 import { validateConfig } from '../../config/validate';
 import { normalizeRepos } from '../../config/schema';
@@ -60,7 +60,7 @@ import syncExecutor from './executor';
 
 const mockReadFileSync = vi.mocked(readFileSync);
 const mockExistsSync = vi.mocked(existsSync);
-const mockExecFile = vi.mocked(execFile);
+const mockExec = vi.mocked(exec);
 const mockValidateConfig = vi.mocked(validateConfig);
 const mockNormalizeRepos = vi.mocked(normalizeRepos);
 const mockGitClone = vi.mocked(gitClone);
@@ -111,13 +111,12 @@ describe('syncExecutor', () => {
     mockGitFetchTag.mockResolvedValue(undefined);
     // Default: existsSync returns false (no lock files detected -> npm)
     mockExistsSync.mockReturnValue(false);
-    // Default: execFile (used for install) succeeds immediately
-    mockExecFile.mockImplementation(((
-      _file: string,
-      _args: readonly string[],
+    // Default: exec (used for install) succeeds immediately
+    mockExec.mockImplementation(((
+      _command: string,
       _options: unknown,
       callback?: (
-        error: ExecFileException | null,
+        error: ExecException | null,
         stdout: string,
         stderr: string,
       ) => void,
@@ -125,7 +124,7 @@ describe('syncExecutor', () => {
       if (callback) {
         callback(null, '', '');
       }
-    }) as typeof execFile);
+    }) as typeof exec);
   });
 
   it('clones remote repo when .repos/<alias> does not exist', async () => {
@@ -365,13 +364,12 @@ describe('syncExecutor', () => {
   });
 
   describe('dependency installation', () => {
-    function setupExecFileMockSuccess(): void {
-      mockExecFile.mockImplementation(((
-        _file: string,
-        _args: readonly string[],
+    function setupExecMockSuccess(): void {
+      mockExec.mockImplementation(((
+        _command: string,
         _options: unknown,
         callback?: (
-          error: ExecFileException | null,
+          error: ExecException | null,
           stdout: string,
           stderr: string,
         ) => void,
@@ -379,25 +377,24 @@ describe('syncExecutor', () => {
         if (callback) {
           callback(null, '', '');
         }
-      }) as typeof execFile);
+      }) as typeof exec);
     }
 
-    function setupExecFileMockFailure(errorMessage: string): void {
-      mockExecFile.mockImplementation(((
-        _file: string,
-        _args: readonly string[],
+    function setupExecMockFailure(errorMessage: string): void {
+      mockExec.mockImplementation(((
+        _command: string,
         _options: unknown,
         callback?: (
-          error: ExecFileException | null,
+          error: ExecException | null,
           stdout: string,
           stderr: string,
         ) => void,
       ) => {
         if (callback) {
-          const err = new Error(errorMessage) as ExecFileException;
+          const err = new Error(errorMessage) as ExecException;
           callback(err, '', errorMessage);
         }
-      }) as typeof execFile);
+      }) as typeof exec);
     }
 
     it('runs npm install after cloning when package-lock.json detected', async () => {
@@ -411,15 +408,15 @@ describe('syncExecutor', () => {
       ]);
       mockDetectRepoState.mockReturnValue('not-synced');
       mockExistsSync.mockReturnValue(false); // no pnpm-lock.yaml, no yarn.lock
-      setupExecFileMockSuccess();
+      setupExecMockSuccess();
 
       await syncExecutor({}, createContext());
 
-      expect(mockExecFile).toHaveBeenCalledWith(
-        'npm',
-        ['install'],
+      expect(mockExec).toHaveBeenCalledWith(
+        'npm install',
         expect.objectContaining({
           cwd: expect.stringContaining('.repos'),
+          windowsHide: true,
         }),
         expect.any(Function),
       );
@@ -443,15 +440,15 @@ describe('syncExecutor', () => {
 
         return false;
       });
-      setupExecFileMockSuccess();
+      setupExecMockSuccess();
 
       await syncExecutor({}, createContext());
 
-      expect(mockExecFile).toHaveBeenCalledWith(
-        'pnpm',
-        ['install'],
+      expect(mockExec).toHaveBeenCalledWith(
+        'pnpm install',
         expect.objectContaining({
           cwd: expect.stringContaining('.repos'),
+          windowsHide: true,
         }),
         expect.any(Function),
       );
@@ -475,15 +472,15 @@ describe('syncExecutor', () => {
 
         return false;
       });
-      setupExecFileMockSuccess();
+      setupExecMockSuccess();
 
       await syncExecutor({}, createContext());
 
-      expect(mockExecFile).toHaveBeenCalledWith(
-        'yarn',
-        ['install'],
+      expect(mockExec).toHaveBeenCalledWith(
+        'yarn install',
         expect.objectContaining({
           cwd: expect.stringContaining('.repos'),
+          windowsHide: true,
         }),
         expect.any(Function),
       );
@@ -500,15 +497,15 @@ describe('syncExecutor', () => {
       ]);
       mockDetectRepoState.mockReturnValue('cloned');
       mockExistsSync.mockReturnValue(false);
-      setupExecFileMockSuccess();
+      setupExecMockSuccess();
 
       await syncExecutor({}, createContext());
 
-      expect(mockExecFile).toHaveBeenCalledWith(
-        'npm',
-        ['install'],
+      expect(mockExec).toHaveBeenCalledWith(
+        'npm install',
         expect.objectContaining({
           cwd: expect.stringContaining('.repos'),
+          windowsHide: true,
         }),
         expect.any(Function),
       );
@@ -520,15 +517,15 @@ describe('syncExecutor', () => {
       ]);
       mockDetectRepoState.mockReturnValue('referenced');
       mockExistsSync.mockReturnValue(false);
-      setupExecFileMockSuccess();
+      setupExecMockSuccess();
 
       await syncExecutor({}, createContext());
 
-      expect(mockExecFile).toHaveBeenCalledWith(
-        'npm',
-        ['install'],
+      expect(mockExec).toHaveBeenCalledWith(
+        'npm install',
         expect.objectContaining({
           cwd: 'D:/projects/repo-b',
+          windowsHide: true,
         }),
         expect.any(Function),
       );
@@ -566,16 +563,14 @@ describe('syncExecutor', () => {
 
         return false;
       });
-      setupExecFileMockSuccess();
+      setupExecMockSuccess();
 
       await syncExecutor({}, createContext());
 
-      expect(mockExecFile).toHaveBeenCalledWith(
-        'corepack',
-        ['pnpm', 'install'],
+      expect(mockExec).toHaveBeenCalledWith(
+        'corepack pnpm install',
         expect.objectContaining({
           cwd: expect.stringContaining('.repos'),
-          shell: true,
           windowsHide: true,
         }),
         expect.any(Function),
@@ -611,16 +606,14 @@ describe('syncExecutor', () => {
 
         return false;
       });
-      setupExecFileMockSuccess();
+      setupExecMockSuccess();
 
       await syncExecutor({}, createContext());
 
-      expect(mockExecFile).toHaveBeenCalledWith(
-        'corepack',
-        ['yarn', 'install'],
+      expect(mockExec).toHaveBeenCalledWith(
+        'corepack yarn install',
         expect.objectContaining({
           cwd: expect.stringContaining('.repos'),
-          shell: true,
           windowsHide: true,
         }),
         expect.any(Function),
@@ -660,15 +653,15 @@ describe('syncExecutor', () => {
 
         return false;
       });
-      setupExecFileMockSuccess();
+      setupExecMockSuccess();
 
       await syncExecutor({}, createContext());
 
-      expect(mockExecFile).toHaveBeenCalledWith(
-        'pnpm',
-        ['install'],
+      expect(mockExec).toHaveBeenCalledWith(
+        'pnpm install',
         expect.objectContaining({
           cwd: expect.stringContaining('.repos'),
+          windowsHide: true,
         }),
         expect.any(Function),
       );
@@ -685,7 +678,7 @@ describe('syncExecutor', () => {
       ]);
       mockDetectRepoState.mockReturnValue('not-synced');
       mockExistsSync.mockReturnValue(false);
-      setupExecFileMockFailure('install failed');
+      setupExecMockFailure('install failed');
 
       const result = await syncExecutor({}, createContext());
 
