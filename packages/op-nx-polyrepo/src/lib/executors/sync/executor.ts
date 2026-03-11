@@ -13,7 +13,7 @@ import {
   gitPullFfOnly,
   gitFetchTag,
 } from '../../git/commands';
-import { detectRepoState, getWorkingTreeState, getCurrentBranch, getCurrentRef, isGitTag } from '../../git/detect';
+import { detectRepoState, getWorkingTreeState, getCurrentBranch, getCurrentRef, getHeadSha, isGitTag } from '../../git/detect';
 import { formatAlignedTable, type ColumnDef } from '../../format/table';
 
 export interface SyncExecutorOptions {
@@ -154,19 +154,29 @@ async function syncRepo(
     }
 
     if (entry.ref && await isGitTag(repoPath, entry.ref)) {
+      const headBefore = await getHeadSha(repoPath);
       logger.info(`Fetching tag ${entry.ref} for ${entry.alias}...`);
       await gitFetchTag(repoPath, entry.ref, entry.depth, entry.disableHooks);
       logger.info(`Done: ${entry.alias} at tag ${entry.ref}.`);
-      await tryInstallDeps(repoPath, entry.alias);
+      const headAfter = await getHeadSha(repoPath);
+
+      if (headBefore !== headAfter) {
+        await tryInstallDeps(repoPath, entry.alias);
+      }
 
       return { action: 'fetched tag' };
     }
 
     const strategyFn = getStrategyFn(strategy);
+    const headBefore = await getHeadSha(repoPath);
     logger.info(`Updating ${entry.alias} (${strategy ?? 'pull'})...`);
     await strategyFn(repoPath, entry.disableHooks);
     logger.info(`Done: ${entry.alias} updated.`);
-    await tryInstallDeps(repoPath, entry.alias);
+    const headAfter = await getHeadSha(repoPath);
+
+    if (headBefore !== headAfter) {
+      await tryInstallDeps(repoPath, entry.alias);
+    }
 
     return { action: strategy ?? 'pull' };
   }
@@ -181,10 +191,15 @@ async function syncRepo(
   }
 
   const strategyFn = getStrategyFn(strategy);
+  const headBefore = await getHeadSha(entry.path);
   logger.info(`Updating local repo ${entry.alias} (${strategy ?? 'pull'})...`);
   await strategyFn(entry.path, undefined);
   logger.info(`Done: ${entry.alias} updated.`);
-  await tryInstallDeps(entry.path, entry.alias);
+  const headAfter = await getHeadSha(entry.path);
+
+  if (headBefore !== headAfter) {
+    await tryInstallDeps(entry.path, entry.alias);
+  }
 
   return { action: strategy ?? 'pull' };
 }
