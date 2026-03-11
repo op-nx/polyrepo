@@ -7,6 +7,11 @@
       "enum": ["fetch", "pull", "rebase", "ff-only"],
       "default": "pull",
       "description": "Git update strategy for existing repos"
+    },
+    "dryRun": {
+      "type": "boolean",
+      "default": false,
+      "description": "Show what sync would do without executing"
     }
   },
   "additionalProperties": false

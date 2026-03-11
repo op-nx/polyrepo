@@ -13,10 +13,12 @@ import {
   gitPullFfOnly,
   gitFetchTag,
 } from '../../git/commands';
-import { detectRepoState } from '../../git/detect';
+import { detectRepoState, getWorkingTreeState } from '../../git/detect';
+import { formatAlignedTable, type ColumnDef } from '../../format/table';
 
 export interface SyncExecutorOptions {
   strategy?: 'fetch' | 'pull' | 'rebase' | 'ff-only';
+  dryRun?: boolean;
 }
 
 function detectPackageManager(
@@ -134,11 +136,15 @@ async function tryInstallDeps(
   }
 }
 
+interface SyncResult {
+  action: string;
+}
+
 async function syncRepo(
   entry: NormalizedRepoEntry,
   workspaceRoot: string,
   strategy: SyncExecutorOptions['strategy'],
-): Promise<void> {
+): Promise<SyncResult> {
   const state = detectRepoState(entry.alias, entry, workspaceRoot);
 
   if (entry.type === 'remote') {
@@ -153,7 +159,7 @@ async function syncRepo(
       logger.info(`Done: ${entry.alias} cloned.`);
       await tryInstallDeps(repoPath, entry.alias);
 
-      return;
+      return { action: 'cloned' };
     }
 
     if (entry.ref && isTagRef(entry.ref)) {
@@ -162,7 +168,7 @@ async function syncRepo(
       logger.info(`Done: ${entry.alias} at tag ${entry.ref}.`);
       await tryInstallDeps(repoPath, entry.alias);
 
-      return;
+      return { action: 'fetched tag' };
     }
 
     const strategyFn = getStrategyFn(strategy);
@@ -171,7 +177,7 @@ async function syncRepo(
     logger.info(`Done: ${entry.alias} updated.`);
     await tryInstallDeps(repoPath, entry.alias);
 
-    return;
+    return { action: strategy ?? 'pull' };
   }
 
   // Local repo
@@ -180,7 +186,7 @@ async function syncRepo(
       `Local repo "${entry.alias}" path does not exist: ${entry.path}. Skipping.`,
     );
 
-    return;
+    return { action: 'skipped' };
   }
 
   const strategyFn = getStrategyFn(strategy);
@@ -188,6 +194,84 @@ async function syncRepo(
   await strategyFn(entry.path);
   logger.info(`Done: ${entry.alias} updated.`);
   await tryInstallDeps(entry.path, entry.alias);
+
+  return { action: strategy ?? 'pull' };
+}
+
+function getDryRunAction(
+  entry: NormalizedRepoEntry,
+  state: 'cloned' | 'referenced' | 'not-synced',
+  strategy: SyncExecutorOptions['strategy'],
+): string {
+  if (state === 'not-synced') {
+    if (entry.type === 'remote') {
+      return 'would clone';
+    }
+
+    return 'would skip (path not found)';
+  }
+
+  if (entry.type === 'remote' && entry.ref && isTagRef(entry.ref)) {
+    return `would fetch tag ${entry.ref}`;
+  }
+
+  return `would ${strategy ?? 'pull'}`;
+}
+
+async function executeDryRun(
+  entries: NormalizedRepoEntry[],
+  workspaceRoot: string,
+  strategy: SyncExecutorOptions['strategy'],
+): Promise<{ success: boolean }> {
+  let wouldSync = 0;
+  let wouldSkip = 0;
+
+  const rows: ColumnDef[][] = [];
+
+  for (const entry of entries) {
+    const state = detectRepoState(entry.alias, entry, workspaceRoot);
+    const action = getDryRunAction(entry, state, strategy);
+    let warning = '';
+
+    if (state !== 'not-synced') {
+      const repoPath = entry.type === 'remote'
+        ? join(workspaceRoot, '.repos', entry.alias)
+        : entry.path;
+      const treeState = await getWorkingTreeState(repoPath);
+      const total = treeState.modified + treeState.staged + treeState.deleted
+        + treeState.untracked + treeState.conflicts;
+
+      if (total > 0) {
+        warning = '[WARN: dirty, may fail]';
+      }
+    }
+
+    if (action.includes('skip')) {
+      wouldSkip++;
+    } else {
+      wouldSync++;
+    }
+
+    rows.push([
+      { value: entry.alias },
+      { value: action },
+      { value: warning },
+    ]);
+  }
+
+  const formattedRows = formatAlignedTable(rows);
+
+  logger.info('');
+  logger.info('Dry run:');
+
+  for (const row of formattedRows) {
+    logger.info(row);
+  }
+
+  logger.info('');
+  logger.info(`Dry run: ${wouldSync} would sync, ${wouldSkip} would skip`);
+
+  return { success: true };
 }
 
 export default async function syncExecutor(
@@ -212,22 +296,49 @@ export default async function syncExecutor(
   const entries = normalizeRepos(config);
   const strategy = options.strategy;
 
+  if (options.dryRun) {
+    return executeDryRun(entries, context.root, strategy);
+  }
+
   const results = await Promise.allSettled(
     entries.map((entry) => syncRepo(entry, context.root, strategy)),
   );
 
   let synced = 0;
   let failed = 0;
+  const tableRows: ColumnDef[][] = [];
 
   for (let i = 0; i < results.length; i++) {
     const result = results[i];
 
     if (result.status === 'fulfilled') {
       synced++;
+      tableRows.push([
+        { value: entries[i].alias },
+        { value: result.value.action },
+        { value: '[OK]' },
+      ]);
     } else {
       failed++;
+      const reason = result.reason instanceof Error
+        ? result.reason.message
+        : String(result.reason);
       logger.error(`Failed to sync ${entries[i].alias}: ${result.reason}`);
+      tableRows.push([
+        { value: entries[i].alias },
+        { value: strategy ?? 'pull' },
+        { value: `[ERROR] ${reason}` },
+      ]);
     }
+  }
+
+  const formattedRows = formatAlignedTable(tableRows);
+
+  logger.info('');
+  logger.info('Results:');
+
+  for (const row of formattedRows) {
+    logger.info(row);
   }
 
   logger.info(`Summary: ${synced} synced, ${failed} failed.`);
