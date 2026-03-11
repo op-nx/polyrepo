@@ -27,7 +27,7 @@ export function detectRepoState(
 
 function execGitOutput(args: string[], cwd: string): Promise<string> {
   return new Promise((resolve, reject) => {
-    execFile('git', args, { cwd }, (error, stdout, stderr) => {
+    execFile('git', args, { cwd, windowsHide: true }, (error, stdout, stderr) => {
       if (error) {
         reject(new Error(stderr || error.message));
 

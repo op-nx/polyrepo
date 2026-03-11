@@ -9,7 +9,9 @@ interface CloneOptions {
 
 function execGit(args: string[], cwd?: string): Promise<string> {
   return new Promise((resolve, reject) => {
-    const options = cwd ? { cwd: gitPath(cwd) } : {};
+    const options = cwd
+      ? { cwd: gitPath(cwd), windowsHide: true }
+      : { windowsHide: true };
 
     execFile('git', args, options, (error, stdout, stderr) => {
       if (error) {
