@@ -605,7 +605,63 @@ describe('statusExecutor', () => {
     const rows = mockFormatAlignedTable.mock.calls[0][0];
     const values = rows[0].map((c: ColumnDef) => c.value);
     expect(values).not.toContain('clean');
-    expect(values).toContain('3 behind, 2 ahead');
+    expect(values).toContain('behind, ahead');
+    expect(values).not.toContain('3 behind');
+    expect(values).not.toContain('2 ahead');
+  });
+
+  it('shows just "behind" without count when clean and only behind', async () => {
+    setupPluginConfig([
+      {
+        type: 'remote',
+        alias: 'repo-a',
+        url: 'https://github.com/org/repo-a.git',
+        depth: 1,
+      },
+    ]);
+    mockDetectRepoState.mockReturnValue('cloned');
+    mockGetWorkingTreeState.mockResolvedValue({
+      modified: 0,
+      staged: 0,
+      deleted: 0,
+      untracked: 0,
+      conflicts: 0,
+    });
+    mockGetAheadBehind.mockResolvedValue({ ahead: 0, behind: 5 });
+
+    await statusExecutor({}, createContext());
+
+    const rows = mockFormatAlignedTable.mock.calls[0][0];
+    const values = rows[0].map((c: ColumnDef) => c.value);
+    expect(values).toContain('behind');
+    expect(values).not.toContain('5 behind');
+  });
+
+  it('shows just "ahead" without count when clean and only ahead', async () => {
+    setupPluginConfig([
+      {
+        type: 'remote',
+        alias: 'repo-a',
+        url: 'https://github.com/org/repo-a.git',
+        depth: 1,
+      },
+    ]);
+    mockDetectRepoState.mockReturnValue('cloned');
+    mockGetWorkingTreeState.mockResolvedValue({
+      modified: 0,
+      staged: 0,
+      deleted: 0,
+      untracked: 0,
+      conflicts: 0,
+    });
+    mockGetAheadBehind.mockResolvedValue({ ahead: 3, behind: 0 });
+
+    await statusExecutor({}, createContext());
+
+    const rows = mockFormatAlignedTable.mock.calls[0][0];
+    const values = rows[0].map((c: ColumnDef) => c.value);
+    expect(values).toContain('ahead');
+    expect(values).not.toContain('3 ahead');
   });
 
   it('summary line includes behind count when repos are behind remote', async () => {
