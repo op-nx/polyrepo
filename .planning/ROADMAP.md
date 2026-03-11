@@ -14,7 +14,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Plugin Foundation + Repo Assembly** - Plugin skeleton, git clone/pull, nx.json config with validation
 - [x] **Phase 2: Unified Project Graph** - External projects in nx graph with namespacing and cached extraction
-- [x] **Phase 3: Multi-Repo Git DX** - Combined status, bulk operations, per-repo output
+- [ ] **Phase 3: Multi-Repo Git DX** - Combined status, bulk operations, per-repo output
 
 ## Phase Details
 
@@ -58,12 +58,14 @@ Plans:
   1. User can run a single command to see combined git status of all synced repos
   2. User can pull or fetch all synced repos with one command
   3. Git operations display clear per-repo output showing which repo succeeded and which failed
-**Plans**: 3 plans
+**Plans**: 5 plans
 
 Plans:
 - [x] 03-01-PLAN.md -- Git state detection (getWorkingTreeState, getAheadBehind) and column alignment utility
 - [x] 03-02-PLAN.md -- Status executor rewrite with aligned output, auto-fetch, warnings, project counts
 - [x] 03-03-PLAN.md -- Sync executor enhancements: --dry-run option and aligned results summary table
+- [ ] 03-04-PLAN.md -- Gap closure: status summary behind/ahead counts, 'ok' label, tag-pinned warning
+- [ ] 03-05-PLAN.md -- Gap closure: sync dry-run detached HEAD detection and multi-warning support
 
 ## Progress
 
@@ -74,4 +76,4 @@ Phases execute in numeric order: 1 -> 2 -> 3
 |-------|----------------|--------|-----------|
 | 1. Plugin Foundation + Repo Assembly | 3/3 | Complete | 2026-03-10 |
 | 2. Unified Project Graph | 3/3 | Complete | 2026-03-11 |
-| 3. Multi-Repo Git DX | 3/3 | Complete | 2026-03-11 |
+| 3. Multi-Repo Git DX | 3/5 | Gap closure | - |
