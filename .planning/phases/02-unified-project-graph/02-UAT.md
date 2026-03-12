@@ -1,9 +1,9 @@
 ---
-status: complete
+status: diagnosed
 phase: 02-unified-project-graph
 source: [02-01-SUMMARY.md, 02-02-SUMMARY.md, 02-03-SUMMARY.md]
 started: 2026-03-12T00:00:00Z
-updated: 2026-03-12T00:10:00Z
+updated: 2026-03-12T00:15:00Z
 ---
 
 ## Current Test
@@ -54,5 +54,13 @@ skipped: 4
   reason: "User reported: Still only host workspace projects after sync. .repos/nx/ exists with node_modules and graph cache, but nx show projects only returns 3 host projects. polyrepo-status sees 149 projects — graph cache is populated but createNodesV2 is not registering external projects."
   severity: major
   test: 1
-  artifacts: []
-  missing: []
+  root_cause: "Stdout contamination in extractGraphFromRepo. Child nx graph --print inherits NX_VERBOSE_LOGGING from parent daemon env, causing [isolated-plugin] log lines on stdout before JSON payload. JSON.parse fails, error silently caught in index.ts:39-46, createNodesV2 returns only root workspace entry."
+  artifacts:
+    - path: "packages/op-nx-polyrepo/src/lib/graph/extract.ts"
+      issue: "env spread inherits NX_VERBOSE_LOGGING from parent process, contaminating stdout"
+    - path: "packages/op-nx-polyrepo/src/index.ts"
+      issue: "Silent try/catch at lines 39-46 swallows JSON parse error"
+  missing:
+    - "Suppress NX_VERBOSE_LOGGING and NX_PERF_LOGGING in child process env in extract.ts"
+    - "Consider logging the extraction error more visibly in index.ts"
+  debug_session: ".planning/debug/external-projects-not-appearing.md"
