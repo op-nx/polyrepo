@@ -14,14 +14,15 @@ export function formatAlignedTable(rows: ColumnDef[][]): string[] {
   const maxCols = rows.reduce((max, row) => Math.max(max, row.length), 0);
 
   // Compute max width per column index
-  const colWidths: number[] = new Array(maxCols).fill(0);
+  const colWidths: number[] = Array.from<number>({ length: maxCols }).fill(0);
 
   for (const row of rows) {
     for (let i = 0; i < maxCols; i++) {
       const cell = row[i];
       const width = cell ? cell.value.length : 0;
+      const current = colWidths[i] ?? 0;
 
-      if (width > colWidths[i]) {
+      if (width > current) {
         colWidths[i] = width;
       }
     }
@@ -35,7 +36,7 @@ export function formatAlignedTable(rows: ColumnDef[][]): string[] {
       const cell = row[i];
       const value = cell ? cell.value : '';
       const align = cell?.align ?? 'left';
-      const width = colWidths[i];
+      const width = colWidths[i] ?? 0;
 
       if (align === 'right') {
         parts.push(value.padStart(width));

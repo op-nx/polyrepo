@@ -137,7 +137,7 @@ function installDeps(repoPath: string, alias: string, verbose: boolean): Promise
 
     child.on('close', (code) => {
       if (code !== 0) {
-        reject(new Error(`${command} exited with code ${code}`));
+        reject(new Error(`${command} exited with code ${String(code)}`));
 
         return;
       }
@@ -244,7 +244,7 @@ async function tryInstallDeps(
     return true;
   } catch (error) {
     logger.warn(
-      `Failed to install dependencies for ${alias}: ${error}. Run install manually in .repos/${alias}/`,
+      `Failed to install dependencies for ${alias}: ${String(error)}. Run install manually in .repos/${alias}/`,
     );
 
     return false;
@@ -432,7 +432,7 @@ async function executeDryRun(
   }
 
   logger.info('');
-  logger.info(`Dry run: ${wouldSync} would sync, ${wouldSkip} would skip`);
+  logger.info(`Dry run: ${String(wouldSync)} would sync, ${String(wouldSkip)} would skip`);
 
   return { success: true };
 }
@@ -460,33 +460,39 @@ export default async function syncExecutor(
 
   for (let i = 0; i < results.length; i++) {
     const result = results[i];
+    const entry = entries[i];
+
+    if (!result || !entry) {
+      continue;
+    }
 
     if (result.status === 'fulfilled') {
       if (result.value.installFailed) {
         warned++;
         tableRows.push([
-          { value: entries[i].alias },
+          { value: entry.alias },
           { value: result.value.action },
           { value: '[WARN: install failed]' },
         ]);
       } else {
         synced++;
         tableRows.push([
-          { value: entries[i].alias },
+          { value: entry.alias },
           { value: result.value.action },
           { value: '[OK]' },
         ]);
       }
     } else {
       failed++;
-      const reason = result.reason instanceof Error
-        ? result.reason.message
-        : String(result.reason);
-      logger.error(`Failed to sync ${entries[i].alias}: ${result.reason}`);
+      const reason: unknown = result.reason;
+      const reasonMessage = reason instanceof Error
+        ? reason.message
+        : String(reason);
+      logger.error(`Failed to sync ${entry.alias}: ${reasonMessage}`);
       tableRows.push([
-        { value: entries[i].alias },
+        { value: entry.alias },
         { value: strategy ?? 'pull' },
-        { value: `[ERROR] ${reason}` },
+        { value: `[ERROR] ${reasonMessage}` },
       ]);
     }
   }
@@ -503,15 +509,15 @@ export default async function syncExecutor(
   const parts: string[] = [];
 
   if (synced > 0) {
-    parts.push(`${synced} synced`);
+    parts.push(`${String(synced)} synced`);
   }
 
   if (warned > 0) {
-    parts.push(`${warned} synced with warning`);
+    parts.push(`${String(warned)} synced with warning`);
   }
 
   if (failed > 0) {
-    parts.push(`${failed} failed`);
+    parts.push(`${String(failed)} failed`);
   }
 
   logger.info(`Summary: ${parts.join(', ')}`);

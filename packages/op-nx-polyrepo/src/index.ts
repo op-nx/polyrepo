@@ -47,7 +47,7 @@ export const createNodesV2: CreateNodesV2<PolyrepoConfig> = [
       );
     } catch (error) {
       logger.warn(
-        `Failed to extract external project graphs: ${error instanceof Error ? error.message : error}`,
+        `Failed to extract external project graphs: ${error instanceof Error ? error.message : String(error)}`,
       );
       logger.warn(
         'External projects will not be visible. Run "nx polyrepo-sync" and retry.',

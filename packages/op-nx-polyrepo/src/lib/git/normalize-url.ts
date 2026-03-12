@@ -12,16 +12,16 @@ export function normalizeGitUrl(url: string): string {
   normalized = normalized.replace(/\.git$/, '');
 
   // Normalize SSH URLs: git@host:org/repo -> https://host/org/repo
-  const sshMatch = normalized.match(/^git@([^:]+):(.+)$/);
+  const sshMatch = /^git@([^:]+):(.+)$/.exec(normalized);
 
-  if (sshMatch) {
+  if (sshMatch?.[1] && sshMatch[2]) {
     normalized = `https://${sshMatch[1]}/${sshMatch[2]}`;
   }
 
   // Normalize ssh:// URLs: ssh://git@host/path -> https://host/path
-  const sshProtoMatch = normalized.match(/^ssh:\/\/git@([^/]+)\/(.+)$/);
+  const sshProtoMatch = /^ssh:\/\/git@([^/]+)\/(.+)$/.exec(normalized);
 
-  if (sshProtoMatch) {
+  if (sshProtoMatch?.[1] && sshProtoMatch[2]) {
     normalized = `https://${sshProtoMatch[1]}/${sshProtoMatch[2]}`;
   }
 

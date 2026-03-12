@@ -17,20 +17,49 @@ function normalizePath(p: string): string {
  * external projects, triggering the native task hasher on projects whose
  * source files are not meaningful in the host context.
  */
-function rewriteTarget(
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isRecordOfRecords(
+  value: unknown,
+): value is Record<string, Record<string, unknown>> {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return Object.values(value).every(
+    (v) => isRecord(v),
+  );
+}
+
+/**
+ * Create a proxy target configuration from raw (unknown) target data.
+ * Safely extracts configurations, parallelism, and metadata from the
+ * unvalidated target config (typed as z.unknown() in the Zod schema).
+ */
+function createProxyTarget(
   repoAlias: string,
   originalProject: string,
   targetName: string,
-  targetConfig: TargetConfiguration,
+  rawTargetConfig: unknown,
 ): TargetConfiguration {
+  const config = isRecord(rawTargetConfig) ? rawTargetConfig : {};
+
   return {
     executor: '@op-nx/polyrepo:run',
     options: { repoAlias, originalProject, targetName },
     inputs: [],
     cache: false,
-    configurations: targetConfig.configurations,
-    parallelism: targetConfig.parallelism,
-    metadata: targetConfig.metadata,
+    configurations: isRecordOfRecords(config['configurations'])
+      ? config['configurations']
+      : undefined,
+    parallelism: typeof config['parallelism'] === 'boolean'
+      ? config['parallelism']
+      : undefined,
+    metadata: isRecord(config['metadata'])
+      ? config['metadata']
+      : undefined,
   };
 }
 
@@ -75,7 +104,7 @@ export function transformGraphForRepo(
     for (const [targetName, targetConfig] of Object.entries(
       node.data.targets ?? {},
     )) {
-      proxyTargets[targetName] = rewriteTarget(
+      proxyTargets[targetName] = createProxyTarget(
         repoAlias,
         originalName,
         targetName,

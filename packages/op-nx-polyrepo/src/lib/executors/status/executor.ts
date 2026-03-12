@@ -43,7 +43,7 @@ function getProjectCount(
   try {
     const cachePath = join(workspaceRoot, '.repos', CACHE_FILENAME);
     const cache = readJsonFile<GraphCacheFile>(cachePath);
-    const repoReport = cache.report?.repos?.[alias];
+    const repoReport = cache.report.repos[alias];
 
     if (!repoReport) {
       return null;
@@ -59,23 +59,23 @@ function formatDirtySummary(state: WorkingTreeState): string {
   const parts: string[] = [];
 
   if (state.modified > 0) {
-    parts.push(`${state.modified}M`);
+    parts.push(`${String(state.modified)}M`);
   }
 
   if (state.staged > 0) {
-    parts.push(`${state.staged}A`);
+    parts.push(`${String(state.staged)}A`);
   }
 
   if (state.deleted > 0) {
-    parts.push(`${state.deleted}D`);
+    parts.push(`${String(state.deleted)}D`);
   }
 
   if (state.untracked > 0) {
-    parts.push(`${state.untracked}??`);
+    parts.push(`${String(state.untracked)}??`);
   }
 
   if (state.conflicts > 0) {
-    parts.push(`${state.conflicts}C`);
+    parts.push(`${String(state.conflicts)}C`);
   }
 
   return parts.length > 0 ? parts.join(' ') : 'clean';
@@ -122,10 +122,17 @@ export default async function statusExecutor(
 
   for (let i = 0; i < fetchResults.length; i++) {
     const result = fetchResults[i];
+    const syncedEntry = syncedEntries[i];
+
+    if (!result || !syncedEntry) {
+      continue;
+    }
 
     if (result.status === 'rejected') {
+      const reason: unknown = result.reason;
+      const reasonMessage = reason instanceof Error ? reason.message : String(reason);
       logger.warn(
-        `Failed to fetch ${syncedEntries[i].entry.alias}: ${result.reason instanceof Error ? result.reason.message : result.reason}`,
+        `Failed to fetch ${syncedEntry.entry.alias}: ${reasonMessage}`,
       );
     }
   }
@@ -178,7 +185,7 @@ export default async function statusExecutor(
       let aheadBehindDisplay = '';
 
       if (aheadBehind !== null) {
-        aheadBehindDisplay = `+${aheadBehind.ahead} -${aheadBehind.behind}`;
+        aheadBehindDisplay = `+${String(aheadBehind.ahead)} -${String(aheadBehind.behind)}`;
       }
 
       // Build dirty summary — show ahead/behind instead of "clean" when relevant
@@ -202,7 +209,7 @@ export default async function statusExecutor(
 
       // Build project count display
       const projectCountDisplay = projectCount !== null
-        ? `${projectCount} projects`
+        ? `${String(projectCount)} projects`
         : '? projects';
 
       // Build warnings
@@ -294,17 +301,17 @@ export default async function statusExecutor(
   ).length;
 
   const summaryParts = [
-    `${totalConfigured} configured`,
-    `${totalSynced} synced`,
-    `${totalNotSynced} not synced`,
+    `${String(totalConfigured)} configured`,
+    `${String(totalSynced)} synced`,
+    `${String(totalNotSynced)} not synced`,
   ];
 
   if (reposBehind > 0) {
-    summaryParts.push(`${reposBehind} behind`);
+    summaryParts.push(`${String(reposBehind)} behind`);
   }
 
   if (reposAhead > 0) {
-    summaryParts.push(`${reposAhead} ahead`);
+    summaryParts.push(`${String(reposAhead)} ahead`);
   }
 
   logger.info('');

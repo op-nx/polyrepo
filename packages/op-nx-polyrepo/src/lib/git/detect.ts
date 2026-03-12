@@ -154,8 +154,8 @@ export async function getWorkingTreeState(
       continue;
     }
 
-    const x = line[0];
-    const y = line[1];
+    const x = line[0] ?? '';
+    const y = line[1] ?? '';
     const xy = x + y;
 
     // Check conflict patterns first
@@ -200,10 +200,16 @@ export async function getAheadBehind(
       cwd,
     );
     const parts = output.split('\t');
+    const aheadStr = parts[0];
+    const behindStr = parts[1];
+
+    if (aheadStr === undefined || behindStr === undefined) {
+      return null;
+    }
 
     return {
-      ahead: parseInt(parts[0], 10),
-      behind: parseInt(parts[1], 10),
+      ahead: parseInt(aheadStr, 10),
+      behind: parseInt(behindStr, 10),
     };
   } catch {
     return null;
