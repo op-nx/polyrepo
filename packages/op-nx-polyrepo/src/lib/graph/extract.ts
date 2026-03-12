@@ -61,12 +61,12 @@ export function extractGraphFromRepo(
         const jsonPayload = stdout.substring(jsonStart);
 
         try {
-          const parsed = JSON.parse(jsonPayload) as ExternalGraphJson;
+          const parsed: ExternalGraphJson = JSON.parse(jsonPayload);
           resolve(parsed);
         } catch (parseError) {
           reject(
             new Error(
-              `Failed to parse graph JSON from ${repoPath}: ${(parseError as Error).message}`,
+              `Failed to parse graph JSON from ${repoPath}: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
             ),
           );
         }

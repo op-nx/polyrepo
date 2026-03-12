@@ -267,12 +267,12 @@ export default async function statusExecutor(
 
   // Build aligned table rows
   const tableRows: ColumnDef[][] = rowData.map((row) => [
-    { value: row.alias, align: 'left' as const },
-    { value: row.branchDisplay, align: 'left' as const },
-    { value: row.aheadBehind, align: 'left' as const },
-    { value: row.dirtySummary, align: 'left' as const },
-    { value: row.projectCount, align: 'right' as const },
-    { value: row.warnings, align: 'left' as const },
+    { value: row.alias, align: 'left' },
+    { value: row.branchDisplay, align: 'left' },
+    { value: row.aheadBehind, align: 'left' },
+    { value: row.dirtySummary, align: 'left' },
+    { value: row.projectCount, align: 'right' },
+    { value: row.warnings, align: 'left' },
   ]);
 
   const formattedLines = formatAlignedTable(tableRows);
