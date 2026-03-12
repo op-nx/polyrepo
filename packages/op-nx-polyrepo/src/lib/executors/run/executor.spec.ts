@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import type { ExecutorContext } from '@nx/devkit';
 
 vi.mock('nx/src/executors/run-commands/run-commands.impl', () => ({
@@ -10,8 +10,8 @@ import runCommandsImpl from 'nx/src/executors/run-commands/run-commands.impl';
 
 const mockedRunCommandsImpl = vi.mocked(runCommandsImpl);
 
-function createContext(
-  overrides: Partial<ExecutorContext> = {},
+function createTestContext(
+  overrides?: Partial<ExecutorContext>,
 ): ExecutorContext {
   return {
     root: '/workspace',
@@ -24,14 +24,15 @@ function createContext(
   };
 }
 
-const baseContext = createContext();
-
-beforeEach(() => {
+function setup(): { context: ExecutorContext } {
   vi.clearAllMocks();
-});
+
+  return { context: createTestContext() };
+}
 
 describe('runExecutor', () => {
   it('constructs correct nx run command with forward-slashed nxBin', async () => {
+    const { context } = setup();
     mockedRunCommandsImpl.mockResolvedValue({
       success: true,
       terminalOutput: '',
@@ -43,7 +44,7 @@ describe('runExecutor', () => {
         originalProject: 'my-lib',
         targetName: 'build',
       },
-      baseContext,
+      context,
     );
 
     expect(mockedRunCommandsImpl).toHaveBeenCalledTimes(1);
@@ -59,6 +60,7 @@ describe('runExecutor', () => {
   });
 
   it('sets cwd to .repos/<repoAlias> joined with context.root', async () => {
+    const { context } = setup();
     mockedRunCommandsImpl.mockResolvedValue({
       success: true,
       terminalOutput: '',
@@ -70,7 +72,7 @@ describe('runExecutor', () => {
         originalProject: 'my-lib',
         targetName: 'build',
       },
-      baseContext,
+      context,
     );
 
     const callArgs = mockedRunCommandsImpl.mock.calls[0];
@@ -83,6 +85,7 @@ describe('runExecutor', () => {
   });
 
   it('passes __unparsed__ args through to runCommandsImpl', async () => {
+    const { context } = setup();
     mockedRunCommandsImpl.mockResolvedValue({
       success: true,
       terminalOutput: '',
@@ -95,7 +98,7 @@ describe('runExecutor', () => {
         targetName: 'test',
         __unparsed__: ['--watch', '--verbose'],
       },
-      baseContext,
+      context,
     );
 
     const callArgs = mockedRunCommandsImpl.mock.calls[0];
@@ -105,6 +108,7 @@ describe('runExecutor', () => {
   });
 
   it('returns { success: true } when runCommandsImpl succeeds', async () => {
+    const { context } = setup();
     mockedRunCommandsImpl.mockResolvedValue({
       success: true,
       terminalOutput: '',
@@ -116,13 +120,14 @@ describe('runExecutor', () => {
         originalProject: 'my-lib',
         targetName: 'build',
       },
-      baseContext,
+      context,
     );
 
     expect(result).toEqual({ success: true });
   });
 
   it('returns { success: false } when runCommandsImpl fails', async () => {
+    const { context } = setup();
     mockedRunCommandsImpl.mockResolvedValue({
       success: false,
       terminalOutput: '',
@@ -134,13 +139,14 @@ describe('runExecutor', () => {
         originalProject: 'my-lib',
         targetName: 'build',
       },
-      baseContext,
+      context,
     );
 
     expect(result).toEqual({ success: false });
   });
 
   it('returns { success: false } when runCommandsImpl throws', async () => {
+    const { context } = setup();
     mockedRunCommandsImpl.mockRejectedValue(new Error('spawn failed'));
 
     const result = await runExecutor(
@@ -149,19 +155,22 @@ describe('runExecutor', () => {
         originalProject: 'my-lib',
         targetName: 'build',
       },
-      baseContext,
+      context,
     );
 
     expect(result).toEqual({ success: false });
   });
 
   it('uses forward slashes in paths for Windows compat', async () => {
+    setup();
     mockedRunCommandsImpl.mockResolvedValue({
       success: true,
       terminalOutput: '',
     });
 
-    const windowsContext = createContext({ root: 'C:\\Users\\dev\\workspace' });
+    const windowsContext = createTestContext({
+      root: 'C:\\Users\\dev\\workspace',
+    });
 
     await runExecutor(
       {
@@ -180,6 +189,7 @@ describe('runExecutor', () => {
   });
 
   it('passes context through to runCommandsImpl', async () => {
+    const { context } = setup();
     mockedRunCommandsImpl.mockResolvedValue({
       success: true,
       terminalOutput: '',
@@ -191,16 +201,17 @@ describe('runExecutor', () => {
         originalProject: 'my-lib',
         targetName: 'build',
       },
-      baseContext,
+      context,
     );
 
     const callArgs = mockedRunCommandsImpl.mock.calls[0];
-    const context = callArgs[1];
+    const passedContext = callArgs[1];
 
-    expect(context).toBe(baseContext);
+    expect(passedContext).toBe(context);
   });
 
   it('defaults __unparsed__ to empty array when not provided', async () => {
+    const { context } = setup();
     mockedRunCommandsImpl.mockResolvedValue({
       success: true,
       terminalOutput: '',
@@ -212,7 +223,7 @@ describe('runExecutor', () => {
         originalProject: 'my-lib',
         targetName: 'build',
       },
-      baseContext,
+      context,
     );
 
     const callArgs = mockedRunCommandsImpl.mock.calls[0];

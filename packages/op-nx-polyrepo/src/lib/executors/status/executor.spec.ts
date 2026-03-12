@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import type { ExecutorContext } from '@nx/devkit';
 
 // Mock dependencies before importing executor
@@ -73,9 +73,26 @@ const mockFormatAlignedTable = vi.mocked(formatAlignedTable);
 const mockLoggerInfo = vi.mocked(logger.info);
 const mockLoggerWarn = vi.mocked(logger.warn);
 
-function createContext(root = '/workspace'): ExecutorContext {
-  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- partial context, only fields used by executor
-  return { root, cwd: root, isVerbose: false } as ExecutorContext;
+function createTestContext(
+  overrides?: Partial<ExecutorContext>,
+): ExecutorContext {
+  return {
+    root: '/workspace',
+    cwd: '/workspace',
+    isVerbose: false,
+    projectsConfigurations: { version: 2, projects: {} },
+    nxJsonConfiguration: {},
+    projectGraph: { nodes: {}, dependencies: {} },
+    ...overrides,
+  };
+}
+
+interface StubNode {
+  readonly name: string;
+}
+
+function createStubNode(name: string): StubNode {
+  return { name };
 }
 
 const fakeConfig: PolyrepoConfig = {
@@ -130,14 +147,15 @@ function getAllLoggedLines(): string[] {
     .filter((msg): msg is string => typeof msg === 'string');
 }
 
-describe('statusExecutor', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    setupDefaultTableMock();
-    setupDefaultSyncedState();
-  });
+function setup(): void {
+  vi.clearAllMocks();
+  setupDefaultTableMock();
+  setupDefaultSyncedState();
+}
 
+describe('statusExecutor', () => {
   it('shows branch, ahead/behind, clean status, and project count for synced remote repo', async () => {
+    setup();
     setupPluginConfig([
       {
         type: 'remote',
@@ -155,29 +173,27 @@ describe('statusExecutor', () => {
       report: {
         repos: {
           'repo-a': {
-            /* eslint-disable @typescript-eslint/consistent-type-assertions -- stub nodes not inspected by SUT */
             nodes: {
-              p1: {} as never,
-              p2: {} as never,
-              p3: {} as never,
-              p4: {} as never,
-              p5: {} as never,
-              p6: {} as never,
-              p7: {} as never,
-              p8: {} as never,
-              p9: {} as never,
-              p10: {} as never,
-              p11: {} as never,
-              p12: {} as never,
+              p1: createStubNode('p1'),
+              p2: createStubNode('p2'),
+              p3: createStubNode('p3'),
+              p4: createStubNode('p4'),
+              p5: createStubNode('p5'),
+              p6: createStubNode('p6'),
+              p7: createStubNode('p7'),
+              p8: createStubNode('p8'),
+              p9: createStubNode('p9'),
+              p10: createStubNode('p10'),
+              p11: createStubNode('p11'),
+              p12: createStubNode('p12'),
             },
-            /* eslint-enable @typescript-eslint/consistent-type-assertions -- stub nodes not inspected by SUT */
             dependencies: [],
           },
         },
       },
     });
 
-    await statusExecutor({}, createContext());
+    await statusExecutor({}, createTestContext());
 
     // formatAlignedTable should have been called with row data
     expect(mockFormatAlignedTable).toHaveBeenCalledTimes(1);
@@ -193,6 +209,7 @@ describe('statusExecutor', () => {
   });
 
   it('shows file counts with M/A/D/?? labels for dirty repo', async () => {
+    setup();
     setupPluginConfig([
       {
         type: 'remote',
@@ -211,7 +228,7 @@ describe('statusExecutor', () => {
       conflicts: 0,
     });
 
-    await statusExecutor({}, createContext());
+    await statusExecutor({}, createTestContext());
 
     const rows = mockFormatAlignedTable.mock.calls[0][0];
     const dirtyCol = rows[0].map((c: ColumnDef) => c.value);
@@ -219,6 +236,7 @@ describe('statusExecutor', () => {
   });
 
   it('shows [not synced] and ? projects for unsynced repo', async () => {
+    setup();
     setupPluginConfig([
       {
         type: 'remote',
@@ -230,7 +248,7 @@ describe('statusExecutor', () => {
     ]);
     mockDetectRepoState.mockReturnValue('not-synced');
 
-    await statusExecutor({}, createContext());
+    await statusExecutor({}, createTestContext());
 
     const rows = mockFormatAlignedTable.mock.calls[0][0];
     const values = rows[0].map((c: ColumnDef) => c.value);
@@ -239,6 +257,7 @@ describe('statusExecutor', () => {
   });
 
   it('omits ahead/behind for tag-pinned repo', async () => {
+    setup();
     setupPluginConfig([
       {
         type: 'remote',
@@ -254,7 +273,7 @@ describe('statusExecutor', () => {
     mockGetCurrentRef.mockResolvedValue('v2.1.0');
     mockIsGitTag.mockResolvedValue(true);
 
-    await statusExecutor({}, createContext());
+    await statusExecutor({}, createTestContext());
 
     const rows = mockFormatAlignedTable.mock.calls[0][0];
     const values = rows[0].map((c: ColumnDef) => c.value);
@@ -268,6 +287,7 @@ describe('statusExecutor', () => {
   });
 
   it('runs auto-fetch in parallel for all synced repos', async () => {
+    setup();
     setupPluginConfig([
       {
         type: 'remote',
@@ -286,12 +306,13 @@ describe('statusExecutor', () => {
     ]);
     mockDetectRepoState.mockReturnValue('cloned');
 
-    await statusExecutor({}, createContext());
+    await statusExecutor({}, createTestContext());
 
     expect(mockGitFetch).toHaveBeenCalledTimes(2);
   });
 
   it('logs warning but continues when auto-fetch fails for a repo', async () => {
+    setup();
     setupPluginConfig([
       {
         type: 'remote',
@@ -304,7 +325,7 @@ describe('statusExecutor', () => {
     mockDetectRepoState.mockReturnValue('cloned');
     mockGitFetch.mockRejectedValue(new Error('network error'));
 
-    await statusExecutor({}, createContext());
+    await statusExecutor({}, createTestContext());
 
     expect(mockLoggerWarn).toHaveBeenCalledWith(
       expect.stringContaining('repo-a'),
@@ -314,6 +335,7 @@ describe('statusExecutor', () => {
   });
 
   it('shows [WARN: dirty, sync may fail] for dirty repo', async () => {
+    setup();
     setupPluginConfig([
       {
         type: 'remote',
@@ -332,7 +354,7 @@ describe('statusExecutor', () => {
       conflicts: 0,
     });
 
-    await statusExecutor({}, createContext());
+    await statusExecutor({}, createTestContext());
 
     const rows = mockFormatAlignedTable.mock.calls[0][0];
     const warningCol = rows[0].map((c: ColumnDef) => c.value);
@@ -344,6 +366,7 @@ describe('statusExecutor', () => {
   });
 
   it('shows [WARN: detached HEAD] for detached non-tag repo', async () => {
+    setup();
     setupPluginConfig([
       {
         type: 'remote',
@@ -357,7 +380,7 @@ describe('statusExecutor', () => {
     mockGetCurrentBranch.mockResolvedValue(null);
     mockGetCurrentRef.mockResolvedValue('abc1234'); // short SHA, not a tag
 
-    await statusExecutor({}, createContext());
+    await statusExecutor({}, createTestContext());
 
     const rows = mockFormatAlignedTable.mock.calls[0][0];
     const values = rows[0].map((c: ColumnDef) => c.value);
@@ -370,6 +393,7 @@ describe('statusExecutor', () => {
   });
 
   it('shows [WARN: merge conflicts] when conflicts exist', async () => {
+    setup();
     setupPluginConfig([
       {
         type: 'remote',
@@ -388,7 +412,7 @@ describe('statusExecutor', () => {
       conflicts: 2,
     });
 
-    await statusExecutor({}, createContext());
+    await statusExecutor({}, createTestContext());
 
     const rows = mockFormatAlignedTable.mock.calls[0][0];
     const warningValues = rows[0].map((c: ColumnDef) => c.value);
@@ -400,6 +424,7 @@ describe('statusExecutor', () => {
   });
 
   it('shows [WARN: drift] and (expected ref) when branch differs from configured ref', async () => {
+    setup();
     setupPluginConfig([
       {
         type: 'remote',
@@ -413,7 +438,7 @@ describe('statusExecutor', () => {
     mockDetectRepoState.mockReturnValue('cloned');
     mockGetCurrentBranch.mockResolvedValue('feature-x');
 
-    await statusExecutor({}, createContext());
+    await statusExecutor({}, createTestContext());
 
     const rows = mockFormatAlignedTable.mock.calls[0][0];
     const values = rows[0].map((c: ColumnDef) => c.value);
@@ -429,6 +454,7 @@ describe('statusExecutor', () => {
   });
 
   it('shows ? projects when graph cache is missing', async () => {
+    setup();
     setupPluginConfig([
       {
         type: 'remote',
@@ -443,7 +469,7 @@ describe('statusExecutor', () => {
       throw new Error('ENOENT');
     });
 
-    await statusExecutor({}, createContext());
+    await statusExecutor({}, createTestContext());
 
     const rows = mockFormatAlignedTable.mock.calls[0][0];
     const values = rows[0].map((c: ColumnDef) => c.value);
@@ -451,6 +477,7 @@ describe('statusExecutor', () => {
   });
 
   it('shows summary line with configured/synced/not-synced totals', async () => {
+    setup();
     setupPluginConfig([
       {
         type: 'remote',
@@ -479,7 +506,7 @@ describe('statusExecutor', () => {
       .mockReturnValueOnce('cloned')
       .mockReturnValueOnce('not-synced');
 
-    await statusExecutor({}, createContext());
+    await statusExecutor({}, createTestContext());
 
     const lines = getAllLoggedLines();
     const summaryLine = lines.find(
@@ -495,6 +522,7 @@ describe('statusExecutor', () => {
   });
 
   it('always prints legend', async () => {
+    setup();
     setupPluginConfig([
       {
         type: 'remote',
@@ -506,7 +534,7 @@ describe('statusExecutor', () => {
     ]);
     mockDetectRepoState.mockReturnValue('cloned');
 
-    await statusExecutor({}, createContext());
+    await statusExecutor({}, createTestContext());
 
     const lines = getAllLoggedLines();
     expect(lines).toEqual(
@@ -530,6 +558,7 @@ describe('statusExecutor', () => {
   });
 
   it('always returns { success: true }', async () => {
+    setup();
     setupPluginConfig([
       {
         type: 'remote',
@@ -549,12 +578,13 @@ describe('statusExecutor', () => {
       conflicts: 3,
     });
 
-    const result = await statusExecutor({}, createContext());
+    const result = await statusExecutor({}, createTestContext());
 
     expect(result).toEqual({ success: true });
   });
 
   it('does not call getAheadBehind for detached HEAD (non-tag)', async () => {
+    setup();
     setupPluginConfig([
       {
         type: 'remote',
@@ -568,12 +598,13 @@ describe('statusExecutor', () => {
     mockGetCurrentBranch.mockResolvedValue(null);
     mockGetCurrentRef.mockResolvedValue('abc1234');
 
-    await statusExecutor({}, createContext());
+    await statusExecutor({}, createTestContext());
 
     expect(mockGetAheadBehind).not.toHaveBeenCalled();
   });
 
   it('shows clean when all working tree counts are zero and repo is even', async () => {
+    setup();
     setupPluginConfig([
       {
         type: 'remote',
@@ -593,7 +624,7 @@ describe('statusExecutor', () => {
     });
     mockGetAheadBehind.mockResolvedValue({ ahead: 0, behind: 0 });
 
-    await statusExecutor({}, createContext());
+    await statusExecutor({}, createTestContext());
 
     const rows = mockFormatAlignedTable.mock.calls[0][0];
     const values = rows[0].map((c: ColumnDef) => c.value);
@@ -601,6 +632,7 @@ describe('statusExecutor', () => {
   });
 
   it('shows behind/ahead instead of clean when repo is clean but not even', async () => {
+    setup();
     setupPluginConfig([
       {
         type: 'remote',
@@ -620,7 +652,7 @@ describe('statusExecutor', () => {
     });
     mockGetAheadBehind.mockResolvedValue({ ahead: 2, behind: 3 });
 
-    await statusExecutor({}, createContext());
+    await statusExecutor({}, createTestContext());
 
     const rows = mockFormatAlignedTable.mock.calls[0][0];
     const values = rows[0].map((c: ColumnDef) => c.value);
@@ -631,6 +663,7 @@ describe('statusExecutor', () => {
   });
 
   it('shows just "behind" without count when clean and only behind', async () => {
+    setup();
     setupPluginConfig([
       {
         type: 'remote',
@@ -650,7 +683,7 @@ describe('statusExecutor', () => {
     });
     mockGetAheadBehind.mockResolvedValue({ ahead: 0, behind: 5 });
 
-    await statusExecutor({}, createContext());
+    await statusExecutor({}, createTestContext());
 
     const rows = mockFormatAlignedTable.mock.calls[0][0];
     const values = rows[0].map((c: ColumnDef) => c.value);
@@ -659,6 +692,7 @@ describe('statusExecutor', () => {
   });
 
   it('shows just "ahead" without count when clean and only ahead', async () => {
+    setup();
     setupPluginConfig([
       {
         type: 'remote',
@@ -678,7 +712,7 @@ describe('statusExecutor', () => {
     });
     mockGetAheadBehind.mockResolvedValue({ ahead: 3, behind: 0 });
 
-    await statusExecutor({}, createContext());
+    await statusExecutor({}, createTestContext());
 
     const rows = mockFormatAlignedTable.mock.calls[0][0];
     const values = rows[0].map((c: ColumnDef) => c.value);
@@ -687,6 +721,7 @@ describe('statusExecutor', () => {
   });
 
   it('summary line includes behind count when repos are behind remote', async () => {
+    setup();
     setupPluginConfig([
       {
         type: 'remote',
@@ -710,7 +745,7 @@ describe('statusExecutor', () => {
       .mockResolvedValueOnce({ ahead: 0, behind: 3 })
       .mockResolvedValueOnce({ ahead: 0, behind: 0 });
 
-    await statusExecutor({}, createContext());
+    await statusExecutor({}, createTestContext());
 
     const lines = getAllLoggedLines();
     const summaryLine = lines.find(
@@ -721,6 +756,7 @@ describe('statusExecutor', () => {
   });
 
   it('summary line includes ahead count when repos are ahead of remote', async () => {
+    setup();
     setupPluginConfig([
       {
         type: 'remote',
@@ -734,7 +770,7 @@ describe('statusExecutor', () => {
     mockGetCurrentBranch.mockResolvedValue('main');
     mockGetAheadBehind.mockResolvedValue({ ahead: 2, behind: 0 });
 
-    await statusExecutor({}, createContext());
+    await statusExecutor({}, createTestContext());
 
     const lines = getAllLoggedLines();
     const summaryLine = lines.find(
@@ -745,6 +781,7 @@ describe('statusExecutor', () => {
   });
 
   it('summary line omits behind/ahead when all repos are even', async () => {
+    setup();
     setupPluginConfig([
       {
         type: 'remote',
@@ -758,7 +795,7 @@ describe('statusExecutor', () => {
     mockGetCurrentBranch.mockResolvedValue('main');
     mockGetAheadBehind.mockResolvedValue({ ahead: 0, behind: 0 });
 
-    await statusExecutor({}, createContext());
+    await statusExecutor({}, createTestContext());
 
     const lines = getAllLoggedLines();
     const summaryLine = lines.find(
@@ -770,6 +807,7 @@ describe('statusExecutor', () => {
   });
 
   it('shows [WARN: tag-pinned] for tag-pinned repo', async () => {
+    setup();
     setupPluginConfig([
       {
         type: 'remote',
@@ -792,7 +830,7 @@ describe('statusExecutor', () => {
       conflicts: 0,
     });
 
-    await statusExecutor({}, createContext());
+    await statusExecutor({}, createTestContext());
 
     const rows = mockFormatAlignedTable.mock.calls[0][0];
     const values = rows[0].map((c: ColumnDef) => c.value);
@@ -802,6 +840,7 @@ describe('statusExecutor', () => {
   });
 
   it('shows both dirty and tag-pinned warnings when tag-pinned repo is dirty', async () => {
+    setup();
     setupPluginConfig([
       {
         type: 'remote',
@@ -824,7 +863,7 @@ describe('statusExecutor', () => {
       conflicts: 0,
     });
 
-    await statusExecutor({}, createContext());
+    await statusExecutor({}, createTestContext());
 
     const rows = mockFormatAlignedTable.mock.calls[0][0];
     const values = rows[0].map((c: ColumnDef) => c.value);
