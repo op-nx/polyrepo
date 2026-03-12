@@ -74,11 +74,8 @@ const mockLoggerInfo = vi.mocked(logger.info);
 const mockLoggerWarn = vi.mocked(logger.warn);
 
 function createContext(root = '/workspace'): ExecutorContext {
-  return {
-    root,
-    cwd: root,
-    isVerbose: false,
-  } as ExecutorContext;
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+  return { root, cwd: root, isVerbose: false } as ExecutorContext;
 }
 
 const fakeConfig: PolyrepoConfig = {
@@ -158,6 +155,7 @@ describe('statusExecutor', () => {
       report: {
         repos: {
           'repo-a': {
+            /* eslint-disable @typescript-eslint/consistent-type-assertions */
             nodes: {
               p1: {} as never,
               p2: {} as never,
@@ -172,6 +170,7 @@ describe('statusExecutor', () => {
               p11: {} as never,
               p12: {} as never,
             },
+            /* eslint-enable @typescript-eslint/consistent-type-assertions */
             dependencies: [],
           },
         },

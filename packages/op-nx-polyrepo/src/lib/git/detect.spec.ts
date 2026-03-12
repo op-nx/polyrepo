@@ -26,7 +26,17 @@ import {
 const mockExistsSync = vi.mocked(existsSync);
 const mockExecFile = vi.mocked(execFile);
 
+function createExecError(message: string, code?: string): ExecFileException {
+  return Object.assign(new Error(message), {
+    killed: false,
+    code: code ?? null,
+    signal: null,
+    cmd: '',
+  });
+}
+
 function setupExecFileMock(stdout: string, stderr = ''): void {
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
   mockExecFile.mockImplementation(((
     _file: string,
     _args: readonly string[],
@@ -197,6 +207,7 @@ describe('getCurrentRef', () => {
 
   it('returns short SHA when HEAD is not at a tag', async () => {
     let callCount = 0;
+    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
     mockExecFile.mockImplementation(((
       _file: string,
       args: readonly string[],
@@ -212,8 +223,7 @@ describe('getCurrentRef', () => {
 
         if (callCount === 1) {
           // First call: git describe --tags fails
-          const err = new Error('no tag') as ExecFileException;
-          err.code = 'ERR';
+          const err = createExecError('no tag', 'ERR');
           callback(err, '', 'no tag');
         } else {
           // Second call: git rev-parse --short HEAD
@@ -248,6 +258,7 @@ describe('getHeadSha', () => {
   });
 
   it('rejects when git command fails', async () => {
+    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
     mockExecFile.mockImplementation(((
       _file: string,
       _args: readonly string[],
@@ -259,8 +270,7 @@ describe('getHeadSha', () => {
       ) => void,
     ) => {
       if (callback) {
-        const err = new Error('not a git repo') as ExecFileException;
-        callback(err, '', 'not a git repo');
+        callback(createExecError('not a git repo'), '', 'not a git repo');
       }
     }) as typeof execFile);
 
@@ -298,6 +308,7 @@ describe('getDirtyFiles', () => {
   });
 
   it('rejects when git command fails', async () => {
+    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
     mockExecFile.mockImplementation(((
       _file: string,
       _args: readonly string[],
@@ -309,8 +320,7 @@ describe('getDirtyFiles', () => {
       ) => void,
     ) => {
       if (callback) {
-        const err = new Error('git failed') as ExecFileException;
-        callback(err, '', 'git failed');
+        callback(createExecError('git failed'), '', 'git failed');
       }
     }) as typeof execFile);
 
@@ -482,6 +492,7 @@ describe('getAheadBehind', () => {
   });
 
   it('returns null when command fails (detached HEAD)', async () => {
+    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
     mockExecFile.mockImplementation(((
       _file: string,
       _args: readonly string[],
@@ -493,8 +504,11 @@ describe('getAheadBehind', () => {
       ) => void,
     ) => {
       if (callback) {
-        const err = new Error('fatal: no upstream') as ExecFileException;
-        callback(err, '', 'fatal: no upstream');
+        callback(
+          createExecError('fatal: no upstream'),
+          '',
+          'fatal: no upstream',
+        );
       }
     }) as typeof execFile);
 
@@ -504,6 +518,7 @@ describe('getAheadBehind', () => {
   });
 
   it('returns null when command fails (no upstream)', async () => {
+    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
     mockExecFile.mockImplementation(((
       _file: string,
       _args: readonly string[],
@@ -515,10 +530,11 @@ describe('getAheadBehind', () => {
       ) => void,
     ) => {
       if (callback) {
-        const err = new Error(
+        callback(
+          createExecError('fatal: no upstream configured'),
+          '',
           'fatal: no upstream configured',
-        ) as ExecFileException;
-        callback(err, '', 'fatal: no upstream configured');
+        );
       }
     }) as typeof execFile);
 
@@ -576,6 +592,7 @@ describe('isGitTag', () => {
 
   it('returns true when tag not found locally but found on remote', async () => {
     let callCount = 0;
+    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
     mockExecFile.mockImplementation(((
       _file: string,
       args: readonly string[],
@@ -591,8 +608,11 @@ describe('isGitTag', () => {
 
         if (callCount === 1) {
           // Local show-ref fails
-          const err = new Error('fatal: not a valid ref') as ExecFileException;
-          callback(err, '', 'fatal: not a valid ref');
+          callback(
+            createExecError('fatal: not a valid ref'),
+            '',
+            'fatal: not a valid ref',
+          );
         } else {
           // Remote ls-remote succeeds
           callback(null, 'abc123\trefs/tags/21.0.0\n', '');
@@ -607,6 +627,7 @@ describe('isGitTag', () => {
   });
 
   it('returns false when tag not found locally or on remote', async () => {
+    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
     mockExecFile.mockImplementation(((
       _file: string,
       _args: readonly string[],
@@ -618,8 +639,11 @@ describe('isGitTag', () => {
       ) => void,
     ) => {
       if (callback) {
-        const err = new Error('fatal: not a valid ref') as ExecFileException;
-        callback(err, '', 'fatal: not a valid ref');
+        callback(
+          createExecError('fatal: not a valid ref'),
+          '',
+          'fatal: not a valid ref',
+        );
       }
     }) as typeof execFile);
 
@@ -630,6 +654,7 @@ describe('isGitTag', () => {
 
   it('returns false when local check fails and remote returns empty', async () => {
     let callCount = 0;
+    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
     mockExecFile.mockImplementation(((
       _file: string,
       _args: readonly string[],
@@ -644,8 +669,11 @@ describe('isGitTag', () => {
         callCount++;
 
         if (callCount === 1) {
-          const err = new Error('fatal: not a valid ref') as ExecFileException;
-          callback(err, '', 'fatal: not a valid ref');
+          callback(
+            createExecError('fatal: not a valid ref'),
+            '',
+            'fatal: not a valid ref',
+          );
         } else {
           // Remote returns empty (ref exists but is not a tag)
           callback(null, '', '');

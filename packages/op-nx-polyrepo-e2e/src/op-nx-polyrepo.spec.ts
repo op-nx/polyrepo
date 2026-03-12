@@ -102,8 +102,11 @@ function runNx(projectDirectory: string, command: string): string {
       stdio: ['pipe', 'pipe', 'pipe'],
     });
   } catch (err) {
-    const e = err as { stdout?: string; stderr?: string; message?: string };
-    const details = [e.stdout, e.stderr, e.message].filter(Boolean).join('\n');
+    const e = err instanceof Object ? err : {};
+    const stdout = 'stdout' in e ? String(e.stdout) : '';
+    const stderr = 'stderr' in e ? String(e.stderr) : '';
+    const message = err instanceof Error ? err.message : String(err);
+    const details = [stdout, stderr, message].filter(Boolean).join('\n');
     throw new Error(`nx ${command} failed:\n${details}`);
   }
 }
@@ -124,7 +127,7 @@ function registerPlugin(
         typeof p === 'object' &&
         p !== null &&
         'plugin' in p &&
-        (p as { plugin: string }).plugin === '@op-nx/polyrepo'
+        p.plugin === '@op-nx/polyrepo'
       ),
   );
 

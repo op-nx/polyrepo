@@ -72,6 +72,7 @@ describe('createNodesV2', () => {
     const [, callback] = createNodesV2;
 
     await expect(
+      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
       callback(['nx.json'], {} as never, mockContext),
     ).rejects.toThrow();
   });
@@ -229,9 +230,7 @@ describe('createNodesV2', () => {
   });
 
   it('logs warning and registers only root project when populateGraphReport throws', async () => {
-    mockedPopulateGraphReport.mockRejectedValue(
-      new Error('extraction failed'),
-    );
+    mockedPopulateGraphReport.mockRejectedValue(new Error('extraction failed'));
 
     const [, callback] = createNodesV2;
 
@@ -352,9 +351,7 @@ describe('createDependencies', () => {
   });
 
   it('returns empty array when populateGraphReport fails', async () => {
-    mockedPopulateGraphReport.mockRejectedValue(
-      new Error('extraction failed'),
-    );
+    mockedPopulateGraphReport.mockRejectedValue(new Error('extraction failed'));
 
     const depContext: CreateDependenciesContext = {
       projects: {},

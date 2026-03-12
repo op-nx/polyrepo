@@ -164,7 +164,7 @@ describe('cache', () => {
     });
     mocks.getHeadSha.mockResolvedValue('abc123');
     mocks.getDirtyFiles.mockResolvedValue('');
-    mocks.hashArray.mockReturnValue('hash-1' as unknown as string);
+    mocks.hashArray.mockReturnValue('hash-1');
     mocks.extractGraphFromRepo.mockResolvedValue(rawGraph);
     mocks.transformGraphForRepo.mockReturnValue(transformedResult);
     mocks.readJsonFile.mockImplementation(() => {
@@ -203,7 +203,7 @@ describe('cache', () => {
       // First call
       await populateGraphReport(testConfig, '/workspace', 'opts-hash');
       mocks.extractGraphFromRepo.mockClear();
-      mocks.hashArray.mockReturnValue('hash-2' as unknown as string);
+      mocks.hashArray.mockReturnValue('hash-2');
 
       // Second call with different hash: should re-extract
       await populateGraphReport(testConfig, '/workspace', 'opts-hash-2');
@@ -393,7 +393,7 @@ describe('cache', () => {
       mocks.hashArray.mockImplementation((_parts: unknown) => {
         callCount++;
 
-        return `hash-${callCount}` as unknown as string;
+        return `hash-${callCount}`;
       });
 
       const { populateGraphReport } = await loadCacheModule();
@@ -419,7 +419,7 @@ describe('cache', () => {
       mocks.hashArray.mockImplementation((_parts: unknown) => {
         callCount++;
 
-        return `hash-${callCount}` as unknown as string;
+        return `hash-${callCount}`;
       });
 
       const { populateGraphReport } = await loadCacheModule();

@@ -10,11 +10,21 @@ import runCommandsImpl from 'nx/src/executors/run-commands/run-commands.impl';
 
 const mockedRunCommandsImpl = vi.mocked(runCommandsImpl);
 
-const baseContext = {
-  root: '/workspace',
-  cwd: '/workspace',
-  isVerbose: false,
-} as ExecutorContext;
+function createContext(
+  overrides: Partial<ExecutorContext> = {},
+): ExecutorContext {
+  return {
+    root: '/workspace',
+    cwd: '/workspace',
+    isVerbose: false,
+    projectsConfigurations: { version: 2, projects: {} },
+    nxJsonConfiguration: {},
+    projectGraph: { nodes: {}, dependencies: {} },
+    ...overrides,
+  };
+}
+
+const baseContext = createContext();
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -22,7 +32,10 @@ beforeEach(() => {
 
 describe('runExecutor', () => {
   it('constructs correct nx run command with forward-slashed nxBin', async () => {
-    mockedRunCommandsImpl.mockResolvedValue({ success: true, terminalOutput: '' });
+    mockedRunCommandsImpl.mockResolvedValue({
+      success: true,
+      terminalOutput: '',
+    });
 
     await runExecutor(
       {
@@ -46,7 +59,10 @@ describe('runExecutor', () => {
   });
 
   it('sets cwd to .repos/<repoAlias> joined with context.root', async () => {
-    mockedRunCommandsImpl.mockResolvedValue({ success: true, terminalOutput: '' });
+    mockedRunCommandsImpl.mockResolvedValue({
+      success: true,
+      terminalOutput: '',
+    });
 
     await runExecutor(
       {
@@ -61,13 +77,16 @@ describe('runExecutor', () => {
     const options = callArgs[0];
 
     // cwd should use forward slashes and point to .repos/repo-a
-    const cwd = options.cwd as string;
+    const cwd = String(options.cwd);
 
     expect(cwd).toContain('.repos/repo-a');
   });
 
   it('passes __unparsed__ args through to runCommandsImpl', async () => {
-    mockedRunCommandsImpl.mockResolvedValue({ success: true, terminalOutput: '' });
+    mockedRunCommandsImpl.mockResolvedValue({
+      success: true,
+      terminalOutput: '',
+    });
 
     await runExecutor(
       {
@@ -86,7 +105,10 @@ describe('runExecutor', () => {
   });
 
   it('returns { success: true } when runCommandsImpl succeeds', async () => {
-    mockedRunCommandsImpl.mockResolvedValue({ success: true, terminalOutput: '' });
+    mockedRunCommandsImpl.mockResolvedValue({
+      success: true,
+      terminalOutput: '',
+    });
 
     const result = await runExecutor(
       {
@@ -101,7 +123,10 @@ describe('runExecutor', () => {
   });
 
   it('returns { success: false } when runCommandsImpl fails', async () => {
-    mockedRunCommandsImpl.mockResolvedValue({ success: false, terminalOutput: '' });
+    mockedRunCommandsImpl.mockResolvedValue({
+      success: false,
+      terminalOutput: '',
+    });
 
     const result = await runExecutor(
       {
@@ -131,12 +156,12 @@ describe('runExecutor', () => {
   });
 
   it('uses forward slashes in paths for Windows compat', async () => {
-    mockedRunCommandsImpl.mockResolvedValue({ success: true, terminalOutput: '' });
+    mockedRunCommandsImpl.mockResolvedValue({
+      success: true,
+      terminalOutput: '',
+    });
 
-    const windowsContext = {
-      ...baseContext,
-      root: 'C:\\Users\\dev\\workspace',
-    } as ExecutorContext;
+    const windowsContext = createContext({ root: 'C:\\Users\\dev\\workspace' });
 
     await runExecutor(
       {
@@ -151,11 +176,14 @@ describe('runExecutor', () => {
     const options = callArgs[0];
 
     expect(options.command).not.toContain('\\');
-    expect((options.cwd as string)).not.toContain('\\');
+    expect(String(options.cwd)).not.toContain('\\');
   });
 
   it('passes context through to runCommandsImpl', async () => {
-    mockedRunCommandsImpl.mockResolvedValue({ success: true, terminalOutput: '' });
+    mockedRunCommandsImpl.mockResolvedValue({
+      success: true,
+      terminalOutput: '',
+    });
 
     await runExecutor(
       {
@@ -173,7 +201,10 @@ describe('runExecutor', () => {
   });
 
   it('defaults __unparsed__ to empty array when not provided', async () => {
-    mockedRunCommandsImpl.mockResolvedValue({ success: true, terminalOutput: '' });
+    mockedRunCommandsImpl.mockResolvedValue({
+      success: true,
+      terminalOutput: '',
+    });
 
     await runExecutor(
       {

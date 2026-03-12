@@ -22,7 +22,17 @@ import {
 
 const mockExecFile = vi.mocked(execFile);
 
+function createExecError(message: string): ExecFileException {
+  return Object.assign(new Error(message), {
+    killed: false,
+    code: null,
+    signal: null,
+    cmd: '',
+  });
+}
+
 function setupExecFileMock(): void {
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
   mockExecFile.mockImplementation(((
     _file: string,
     _args: readonly string[],
@@ -267,6 +277,7 @@ describe('gitCheckoutBranch', () => {
 
   it('falls back to checkout -b when checkout fails (branch not local)', async () => {
     let callCount = 0;
+    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
     mockExecFile.mockImplementation(((
       _file: string,
       args: readonly string[],
@@ -283,8 +294,16 @@ describe('gitCheckoutBranch', () => {
         // First call: fetch (succeeds)
         // Second call: checkout (fails — branch not local)
         // Third call: checkout -b (succeeds)
-        if (callCount === 2 && args.includes('checkout') && !args.includes('-b')) {
-          callback(new Error('pathspec did not match') as ExecFileException, '', 'error: pathspec did not match');
+        if (
+          callCount === 2 &&
+          args.includes('checkout') &&
+          !args.includes('-b')
+        ) {
+          callback(
+            createExecError('pathspec did not match'),
+            '',
+            'error: pathspec did not match',
+          );
         } else {
           callback(null, '', '');
         }
@@ -310,7 +329,13 @@ describe('gitCheckoutBranch', () => {
     expect(mockExecFile).toHaveBeenNthCalledWith(
       1,
       'git',
-      ['-c', 'core.hooksPath=__op-nx_polyrepo_disable-hooks__', 'fetch', 'origin', 'main'],
+      [
+        '-c',
+        'core.hooksPath=__op-nx_polyrepo_disable-hooks__',
+        'fetch',
+        'origin',
+        'main',
+      ],
       expect.objectContaining({ cwd: 'D:/workspace/.repos/repo' }),
       expect.any(Function),
     );
@@ -318,7 +343,12 @@ describe('gitCheckoutBranch', () => {
     expect(mockExecFile).toHaveBeenNthCalledWith(
       2,
       'git',
-      ['-c', 'core.hooksPath=__op-nx_polyrepo_disable-hooks__', 'checkout', 'main'],
+      [
+        '-c',
+        'core.hooksPath=__op-nx_polyrepo_disable-hooks__',
+        'checkout',
+        'main',
+      ],
       expect.objectContaining({ cwd: 'D:/workspace/.repos/repo' }),
       expect.any(Function),
     );
@@ -433,7 +463,12 @@ describe('disableHooks', () => {
 
     expect(mockExecFile).toHaveBeenCalledWith(
       'git',
-      ['-c', 'core.hooksPath=__op-nx_polyrepo_disable-hooks__', 'pull', '--rebase'],
+      [
+        '-c',
+        'core.hooksPath=__op-nx_polyrepo_disable-hooks__',
+        'pull',
+        '--rebase',
+      ],
       expect.objectContaining({ cwd: 'D:/workspace/.repos/repo' }),
       expect.any(Function),
     );
@@ -444,7 +479,12 @@ describe('disableHooks', () => {
 
     expect(mockExecFile).toHaveBeenCalledWith(
       'git',
-      ['-c', 'core.hooksPath=__op-nx_polyrepo_disable-hooks__', 'pull', '--ff-only'],
+      [
+        '-c',
+        'core.hooksPath=__op-nx_polyrepo_disable-hooks__',
+        'pull',
+        '--ff-only',
+      ],
       expect.objectContaining({ cwd: 'D:/workspace/.repos/repo' }),
       expect.any(Function),
     );
@@ -458,7 +498,16 @@ describe('disableHooks', () => {
     expect(mockExecFile).toHaveBeenNthCalledWith(
       1,
       'git',
-      ['-c', 'core.hooksPath=__op-nx_polyrepo_disable-hooks__', 'fetch', '--depth', '1', 'origin', 'tag', 'v1.0.0'],
+      [
+        '-c',
+        'core.hooksPath=__op-nx_polyrepo_disable-hooks__',
+        'fetch',
+        '--depth',
+        '1',
+        'origin',
+        'tag',
+        'v1.0.0',
+      ],
       expect.objectContaining({ cwd: 'D:/workspace/.repos/repo' }),
       expect.any(Function),
     );
@@ -466,7 +515,12 @@ describe('disableHooks', () => {
     expect(mockExecFile).toHaveBeenNthCalledWith(
       2,
       'git',
-      ['-c', 'core.hooksPath=__op-nx_polyrepo_disable-hooks__', 'checkout', 'v1.0.0'],
+      [
+        '-c',
+        'core.hooksPath=__op-nx_polyrepo_disable-hooks__',
+        'checkout',
+        'v1.0.0',
+      ],
       expect.objectContaining({ cwd: 'D:/workspace/.repos/repo' }),
       expect.any(Function),
     );
