@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: in-progress
-stopped_at: Completed 05-01 ESLint/TSConfig hardening
-last_updated: "2026-03-12T22:09:05Z"
+status: executing
+stopped_at: Completed 05-01-PLAN.md
+last_updated: "2026-03-12T22:33:19.734Z"
 last_activity: "2026-03-12 - Completed plan 05-01: ESLint/TSConfig hardening"
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 23
-  completed_plans: 18
+  completed_plans: 19
   percent: 78
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-03-10)
 ## Current Position
 
 Phase: 5 of 5 (Maximum Type Safety)
-Plan: 2 of 6 in current phase
+Plan: 3 of 6 in current phase
 Status: In progress
-Last activity: 2026-03-12 - Completed plan 05-01: ESLint/TSConfig hardening
+Last activity: 2026-03-12 - Completed plan 05-02: Zod validation at system boundaries
 
-Progress: [███████░░░] 78% (18/23 plans)
+Progress: [████████░░] 83% (19/23 plans)
 
 ## Performance Metrics
 
@@ -47,9 +47,10 @@ Progress: [███████░░░] 78% (18/23 plans)
 | 02-unified-project-graph | 3/3 | ~30 min | ~10 min |
 | 03-multi-repo-git-dx | 9/9 | ~35 min | ~3.9 min |
 | 04-code-cleanup | 1/1 | 2 min | 2 min |
-| 05-avoid-type-casting-and-prefer-satisfies | 1/6 | 12 min | 12 min |
+| 05-avoid-type-casting-and-prefer-satisfies | 2/6 | 15 min | 7.5 min |
 
 *Updated after each plan completion*
+| Phase 05-avoid-type-casting P02 | 3min | 1 tasks | 4 files |
 | Phase 05-avoid-type-casting P01 | 12min | 2 tasks | 5 files |
 | Phase 04-code-cleanup P01 | 2min | 2 tasks | 5 files |
 | Phase 03-multi-repo-git-dx P09 | 3min | 1 tasks | 2 files |
@@ -92,6 +93,9 @@ Recent decisions affecting current work:
 - [Phase 04-01]: resolvePluginConfig returns { config, entries } tuple for flexible destructuring by callers
 - [Phase 05-01]: Removed exactOptionalPropertyTypes -- conflicts with @nx/devkit types (TargetConfiguration, ProjectConfiguration)
 - [Phase 05-01]: allowAsConst not supported with assertionStyle 'never' -- future as const needs use satisfies patterns
+- [Phase 05-02]: Replaced ExternalGraphJson interfaces with Zod schemas, deriving types via z.infer for single source of truth
+- [Phase 05-02]: Used z.unknown() for targets values since TargetConfiguration is too complex to validate at runtime
+- [Phase 05-02]: Used .loose() (passthrough) on outer objects to allow unvalidated extra fields
 
 ### Pending Todos
 
@@ -118,6 +122,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-03-12T22:09:05Z
-Stopped at: Completed 05-01-PLAN.md
-Resume file: .planning/phases/05-avoid-type-casting-and-prefer-satisfies/05-02-PLAN.md
+Last session: 2026-03-12T22:33:00Z
+Stopped at: Completed 05-02-PLAN.md
+Resume file: .planning/phases/05-avoid-type-casting-and-prefer-satisfies/05-03-PLAN.md
