@@ -16,6 +16,10 @@
     "skipLibCheck": true,
     "strict": true,
     "target": "es2022",
-    "customConditions": ["@op-nx/source"]
+    "customConditions": ["@op-nx/source"],
+    "noUncheckedIndexedAccess": true,
+    // exactOptionalPropertyTypes removed: conflicts with @nx/devkit types
+    // (TargetConfiguration, ProjectConfiguration) that assign undefined to optional properties
+    "noPropertyAccessFromIndexSignature": true
   }
 }

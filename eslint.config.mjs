@@ -58,7 +58,7 @@ export default [
       '@typescript-eslint/no-non-null-assertion': 'error',
       '@typescript-eslint/consistent-type-assertions': [
         'error',
-        { assertionStyle: 'never', allowAsConst: true },
+        { assertionStyle: 'never' },
       ],
       '@eslint-community/eslint-comments/require-description': 'error',
       '@typescript-eslint/consistent-type-imports': [
