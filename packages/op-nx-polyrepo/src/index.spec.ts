@@ -92,17 +92,20 @@ describe('createNodesV2', () => {
 
     const createNodesResult = results[0][1];
 
-    expect(createNodesResult.projects).toBeDefined();
-    expect(createNodesResult.projects!['.']).toBeDefined();
+    const projects = createNodesResult.projects;
+    expect(projects).toBeDefined();
 
-    const targets = createNodesResult.projects!['.'].targets;
+    const rootProject = projects?.['.'];
+    expect(rootProject).toBeDefined();
+
+    const targets = rootProject?.targets;
 
     expect(targets).toBeDefined();
-    expect(targets!['polyrepo-sync']).toEqual({
+    expect(targets?.['polyrepo-sync']).toEqual({
       executor: '@op-nx/polyrepo:sync',
       options: {},
     });
-    expect(targets!['polyrepo-status']).toEqual({
+    expect(targets?.['polyrepo-status']).toEqual({
       executor: '@op-nx/polyrepo:status',
       options: {},
     });
@@ -182,36 +185,32 @@ describe('createNodesV2', () => {
     };
 
     const results = await callback(['nx.json'], options, mockContext);
-    const projects = results[0][1].projects!;
+    const projects = results[0][1].projects ?? {};
 
     // Root project still there
     expect(projects['.']).toBeDefined();
-    expect(projects['.'].targets!['polyrepo-sync']).toBeDefined();
+    expect(projects['.'].targets?.['polyrepo-sync']).toBeDefined();
 
     // External projects registered by root path
-    expect(projects['.repos/repo-a/libs/my-lib']).toBeDefined();
-    expect(projects['.repos/repo-a/libs/my-lib'].name).toBe('repo-a/my-lib');
-    expect(projects['.repos/repo-a/libs/my-lib'].projectType).toBe('library');
-    expect(projects['.repos/repo-a/libs/my-lib'].sourceRoot).toBe(
-      '.repos/repo-a/libs/my-lib/src',
-    );
-    expect(projects['.repos/repo-a/libs/my-lib'].tags).toEqual([
+    const myLib = projects['.repos/repo-a/libs/my-lib'];
+    expect(myLib).toBeDefined();
+    expect(myLib.name).toBe('repo-a/my-lib');
+    expect(myLib.projectType).toBe('library');
+    expect(myLib.sourceRoot).toBe('.repos/repo-a/libs/my-lib/src');
+    expect(myLib.tags).toEqual([
       'scope:shared',
       'polyrepo:external',
       'polyrepo:repo-a',
     ]);
-    expect(projects['.repos/repo-a/libs/my-lib'].metadata).toEqual({
+    expect(myLib.metadata).toEqual({
       description: 'My library',
     });
-    expect(
-      projects['.repos/repo-a/libs/my-lib'].targets!['build'],
-    ).toBeDefined();
+    expect(myLib.targets?.['build']).toBeDefined();
 
-    expect(projects['.repos/repo-a/apps/my-app']).toBeDefined();
-    expect(projects['.repos/repo-a/apps/my-app'].name).toBe('repo-a/my-app');
-    expect(projects['.repos/repo-a/apps/my-app'].projectType).toBe(
-      'application',
-    );
+    const myApp = projects['.repos/repo-a/apps/my-app'];
+    expect(myApp).toBeDefined();
+    expect(myApp.name).toBe('repo-a/my-app');
+    expect(myApp.projectType).toBe('application');
   });
 
   it('registers only root project when graph report has empty repos', async () => {
@@ -224,7 +223,7 @@ describe('createNodesV2', () => {
     };
 
     const results = await callback(['nx.json'], options, mockContext);
-    const projects = results[0][1].projects!;
+    const projects = results[0][1].projects ?? {};
 
     expect(Object.keys(projects)).toEqual(['.']);
   });
@@ -241,7 +240,7 @@ describe('createNodesV2', () => {
     };
 
     const results = await callback(['nx.json'], options, mockContext);
-    const projects = results[0][1].projects!;
+    const projects = results[0][1].projects ?? {};
 
     // Only root project registered
     expect(Object.keys(projects)).toEqual(['.']);

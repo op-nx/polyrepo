@@ -37,17 +37,17 @@ import { getHeadSha, getDirtyFiles } from '../git/detect';
 import { normalizeRepos } from '../config/schema';
 import { hashArray, readJsonFile, writeJsonFile } from '@nx/devkit';
 import type { PolyrepoConfig, NormalizedRepoEntry } from '../config/schema';
-import type { ExternalGraphJson, PolyrepoGraphReport } from './types';
+import type { ExternalGraphJson } from './types';
 
-const mockExistsSync = vi.mocked(existsSync);
-const mockExtract = vi.mocked(extractGraphFromRepo);
-const mockTransform = vi.mocked(transformGraphForRepo);
-const mockGetHeadSha = vi.mocked(getHeadSha);
-const mockGetDirtyFiles = vi.mocked(getDirtyFiles);
-const mockNormalizeRepos = vi.mocked(normalizeRepos);
-const mockHashArray = vi.mocked(hashArray);
-const mockReadJsonFile = vi.mocked(readJsonFile);
-const mockWriteJsonFile = vi.mocked(writeJsonFile);
+const _mockExistsSync = vi.mocked(existsSync);
+const _mockExtract = vi.mocked(extractGraphFromRepo);
+const _mockTransform = vi.mocked(transformGraphForRepo);
+const _mockGetHeadSha = vi.mocked(getHeadSha);
+const _mockGetDirtyFiles = vi.mocked(getDirtyFiles);
+const _mockNormalizeRepos = vi.mocked(normalizeRepos);
+const _mockHashArray = vi.mocked(hashArray);
+const _mockReadJsonFile = vi.mocked(readJsonFile);
+const _mockWriteJsonFile = vi.mocked(writeJsonFile);
 
 const testConfig: PolyrepoConfig = {
   repos: {
@@ -387,7 +387,7 @@ describe('cache', () => {
       setupMocksForExtraction(mocks);
 
       let callCount = 0;
-      mocks.hashArray.mockImplementation((parts: unknown) => {
+      mocks.hashArray.mockImplementation((_parts: unknown) => {
         callCount++;
 
         return `hash-${callCount}` as unknown as string;
@@ -413,7 +413,7 @@ describe('cache', () => {
       setupMocksForExtraction(mocks);
 
       let callCount = 0;
-      mocks.hashArray.mockImplementation((parts: unknown) => {
+      mocks.hashArray.mockImplementation((_parts: unknown) => {
         callCount++;
 
         return `hash-${callCount}` as unknown as string;
