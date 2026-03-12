@@ -1,9 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import type { ExecFileException } from 'node:child_process';
 
 // Mock node:child_process before importing commands
 vi.mock('node:child_process', () => {
   const mockExecFile = vi.fn();
+
   return {
     execFile: mockExecFile,
   };
@@ -20,8 +21,6 @@ import {
   gitCheckoutBranch,
 } from './commands';
 
-const mockExecFile = vi.mocked(execFile);
-
 function createExecError(message: string): ExecFileException {
   return Object.assign(new Error(message), {
     killed: false,
@@ -31,9 +30,12 @@ function createExecError(message: string): ExecFileException {
   });
 }
 
-function setupExecFileMock(): void {
-  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- overloaded function mock requires cast
-  mockExecFile.mockImplementation(((
+function setup() {
+  vi.clearAllMocks();
+
+  const mockExecFile = vi.mocked(execFile);
+
+  mockExecFile.mockImplementation((
     _file: string,
     _args: readonly string[],
     _options: unknown,
@@ -46,16 +48,15 @@ function setupExecFileMock(): void {
     if (callback) {
       callback(null, '', '');
     }
-  }) as typeof execFile);
+  });
+
+  return { mockExecFile };
 }
 
 describe('gitClone', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    setupExecFileMock();
-  });
-
   it('constructs correct args for default shallow clone', async () => {
+    const { mockExecFile } = setup();
+
     await gitClone(
       'https://github.com/org/repo.git',
       'D:/workspace/.repos/repo',
@@ -76,6 +77,8 @@ describe('gitClone', () => {
   });
 
   it('constructs correct args for full clone (depth 0)', async () => {
+    const { mockExecFile } = setup();
+
     await gitClone(
       'https://github.com/org/repo.git',
       'D:/workspace/.repos/repo',
@@ -91,6 +94,8 @@ describe('gitClone', () => {
   });
 
   it('constructs correct args when ref is specified', async () => {
+    const { mockExecFile } = setup();
+
     await gitClone(
       'https://github.com/org/repo.git',
       'D:/workspace/.repos/repo',
@@ -114,6 +119,8 @@ describe('gitClone', () => {
   });
 
   it('normalizes backslashes in target directory to forward slashes', async () => {
+    const { mockExecFile } = setup();
+
     await gitClone(
       'https://github.com/org/repo.git',
       'D:\\workspace\\.repos\\repo',
@@ -135,12 +142,9 @@ describe('gitClone', () => {
 });
 
 describe('gitPull', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    setupExecFileMock();
-  });
-
   it('constructs correct args with cwd', async () => {
+    const { mockExecFile } = setup();
+
     await gitPull('D:/workspace/.repos/repo');
 
     expect(mockExecFile).toHaveBeenCalledWith(
@@ -153,12 +157,9 @@ describe('gitPull', () => {
 });
 
 describe('gitFetch', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    setupExecFileMock();
-  });
-
   it('constructs correct args with cwd', async () => {
+    const { mockExecFile } = setup();
+
     await gitFetch('D:/workspace/.repos/repo');
 
     expect(mockExecFile).toHaveBeenCalledWith(
@@ -171,12 +172,9 @@ describe('gitFetch', () => {
 });
 
 describe('gitPullRebase', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    setupExecFileMock();
-  });
-
   it('constructs correct args with cwd', async () => {
+    const { mockExecFile } = setup();
+
     await gitPullRebase('D:/workspace/.repos/repo');
 
     expect(mockExecFile).toHaveBeenCalledWith(
@@ -189,12 +187,9 @@ describe('gitPullRebase', () => {
 });
 
 describe('gitPullFfOnly', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    setupExecFileMock();
-  });
-
   it('constructs correct args with cwd', async () => {
+    const { mockExecFile } = setup();
+
     await gitPullFfOnly('D:/workspace/.repos/repo');
 
     expect(mockExecFile).toHaveBeenCalledWith(
@@ -207,12 +202,9 @@ describe('gitPullFfOnly', () => {
 });
 
 describe('gitFetchTag', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    setupExecFileMock();
-  });
-
   it('constructs fetch and checkout commands for tag', async () => {
+    const { mockExecFile } = setup();
+
     await gitFetchTag('D:/workspace/.repos/repo', 'v1.0.0');
 
     expect(mockExecFile).toHaveBeenCalledTimes(2);
@@ -235,6 +227,8 @@ describe('gitFetchTag', () => {
   });
 
   it('uses custom depth for tag fetch', async () => {
+    const { mockExecFile } = setup();
+
     await gitFetchTag('D:/workspace/.repos/repo', 'v2.0.0', 5);
 
     expect(mockExecFile).toHaveBeenNthCalledWith(
@@ -248,12 +242,9 @@ describe('gitFetchTag', () => {
 });
 
 describe('gitCheckoutBranch', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    setupExecFileMock();
-  });
-
   it('fetches the branch from origin then checks it out', async () => {
+    const { mockExecFile } = setup();
+
     await gitCheckoutBranch('D:/workspace/.repos/repo', 'main');
 
     expect(mockExecFile).toHaveBeenCalledTimes(2);
@@ -276,9 +267,11 @@ describe('gitCheckoutBranch', () => {
   });
 
   it('falls back to checkout -b when checkout fails (branch not local)', async () => {
+    const { mockExecFile } = setup();
+
     let callCount = 0;
-    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- overloaded function mock requires cast
-    mockExecFile.mockImplementation(((
+
+    mockExecFile.mockImplementation((
       _file: string,
       args: readonly string[],
       _options: unknown,
@@ -292,7 +285,7 @@ describe('gitCheckoutBranch', () => {
 
       if (callback) {
         // First call: fetch (succeeds)
-        // Second call: checkout (fails — branch not local)
+        // Second call: checkout (fails -- branch not local)
         // Third call: checkout -b (succeeds)
         if (
           callCount === 2 &&
@@ -308,7 +301,7 @@ describe('gitCheckoutBranch', () => {
           callback(null, '', '');
         }
       }
-    }) as typeof execFile);
+    });
 
     await gitCheckoutBranch('D:/workspace/.repos/repo', 'develop');
 
@@ -324,6 +317,8 @@ describe('gitCheckoutBranch', () => {
   });
 
   it('respects disableHooks on all git calls', async () => {
+    const { mockExecFile } = setup();
+
     await gitCheckoutBranch('D:/workspace/.repos/repo', 'main', true);
 
     expect(mockExecFile).toHaveBeenNthCalledWith(
@@ -356,12 +351,9 @@ describe('gitCheckoutBranch', () => {
 });
 
 describe('disableHooks', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    setupExecFileMock();
-  });
-
   it('gitClone prepends -c core.hooksPath=__op-nx_polyrepo_disable-hooks__ when disableHooks is true', async () => {
+    const { mockExecFile } = setup();
+
     await gitClone(
       'https://github.com/org/repo.git',
       'D:/workspace/.repos/repo',
@@ -385,6 +377,8 @@ describe('disableHooks', () => {
   });
 
   it('gitClone does NOT prepend hooks args when disableHooks is false', async () => {
+    const { mockExecFile } = setup();
+
     await gitClone(
       'https://github.com/org/repo.git',
       'D:/workspace/.repos/repo',
@@ -406,6 +400,8 @@ describe('disableHooks', () => {
   });
 
   it('gitClone does NOT prepend hooks args when disableHooks is undefined', async () => {
+    const { mockExecFile } = setup();
+
     await gitClone(
       'https://github.com/org/repo.git',
       'D:/workspace/.repos/repo',
@@ -426,6 +422,8 @@ describe('disableHooks', () => {
   });
 
   it('gitPull prepends -c core.hooksPath when disableHooks is true', async () => {
+    const { mockExecFile } = setup();
+
     await gitPull('D:/workspace/.repos/repo', true);
 
     expect(mockExecFile).toHaveBeenCalledWith(
@@ -437,6 +435,8 @@ describe('disableHooks', () => {
   });
 
   it('gitPull does NOT prepend hooks args when disableHooks is false', async () => {
+    const { mockExecFile } = setup();
+
     await gitPull('D:/workspace/.repos/repo', false);
 
     expect(mockExecFile).toHaveBeenCalledWith(
@@ -448,6 +448,8 @@ describe('disableHooks', () => {
   });
 
   it('gitFetch prepends -c core.hooksPath when disableHooks is true', async () => {
+    const { mockExecFile } = setup();
+
     await gitFetch('D:/workspace/.repos/repo', true);
 
     expect(mockExecFile).toHaveBeenCalledWith(
@@ -459,6 +461,8 @@ describe('disableHooks', () => {
   });
 
   it('gitPullRebase prepends -c core.hooksPath when disableHooks is true', async () => {
+    const { mockExecFile } = setup();
+
     await gitPullRebase('D:/workspace/.repos/repo', true);
 
     expect(mockExecFile).toHaveBeenCalledWith(
@@ -475,6 +479,8 @@ describe('disableHooks', () => {
   });
 
   it('gitPullFfOnly prepends -c core.hooksPath when disableHooks is true', async () => {
+    const { mockExecFile } = setup();
+
     await gitPullFfOnly('D:/workspace/.repos/repo', true);
 
     expect(mockExecFile).toHaveBeenCalledWith(
@@ -491,6 +497,8 @@ describe('disableHooks', () => {
   });
 
   it('gitFetchTag prepends -c core.hooksPath to both fetch and checkout when disableHooks is true', async () => {
+    const { mockExecFile } = setup();
+
     await gitFetchTag('D:/workspace/.repos/repo', 'v1.0.0', 1, true);
 
     expect(mockExecFile).toHaveBeenCalledTimes(2);
@@ -527,6 +535,8 @@ describe('disableHooks', () => {
   });
 
   it('gitFetchTag does NOT prepend hooks args when disableHooks is not passed', async () => {
+    const { mockExecFile } = setup();
+
     await gitFetchTag('D:/workspace/.repos/repo', 'v1.0.0');
 
     expect(mockExecFile).toHaveBeenNthCalledWith(

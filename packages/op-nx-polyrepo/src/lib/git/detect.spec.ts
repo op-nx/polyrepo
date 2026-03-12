@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import type { ExecFileException } from 'node:child_process';
 
 vi.mock('node:fs', () => ({
@@ -23,9 +23,6 @@ import {
   isGitTag,
 } from './detect';
 
-const mockExistsSync = vi.mocked(existsSync);
-const mockExecFile = vi.mocked(execFile);
-
 function createExecError(message: string, code?: string): ExecFileException {
   return Object.assign(new Error(message), {
     killed: false,
@@ -35,9 +32,13 @@ function createExecError(message: string, code?: string): ExecFileException {
   });
 }
 
-function setupExecFileMock(stdout: string, stderr = ''): void {
-  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- overloaded function mock requires cast
-  mockExecFile.mockImplementation(((
+function setup(stdout: string, stderr = '') {
+  vi.clearAllMocks();
+
+  const mockExistsSync = vi.mocked(existsSync);
+  const mockExecFile = vi.mocked(execFile);
+
+  mockExecFile.mockImplementation((
     _file: string,
     _args: readonly string[],
     _options: unknown,
@@ -50,7 +51,9 @@ function setupExecFileMock(stdout: string, stderr = ''): void {
     if (callback) {
       callback(null, stdout, stderr);
     }
-  }) as typeof execFile);
+  });
+
+  return { mockExistsSync, mockExecFile };
 }
 
 describe('isGitUrl', () => {
@@ -88,11 +91,9 @@ describe('isGitUrl', () => {
 });
 
 describe('detectRepoState', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('returns "cloned" when .repos/<alias>/.git exists for remote repo', () => {
+    const { mockExistsSync } = setup('');
+
     mockExistsSync.mockReturnValue(true);
 
     const result = detectRepoState(
@@ -114,6 +115,8 @@ describe('detectRepoState', () => {
   });
 
   it('returns "not-synced" when .repos/<alias> does not exist for remote repo', () => {
+    const { mockExistsSync } = setup('');
+
     mockExistsSync.mockReturnValue(false);
 
     const result = detectRepoState(
@@ -132,6 +135,8 @@ describe('detectRepoState', () => {
   });
 
   it('returns "referenced" for local path repos that exist', () => {
+    const { mockExistsSync } = setup('');
+
     mockExistsSync.mockReturnValue(true);
 
     const result = detectRepoState(
@@ -148,6 +153,8 @@ describe('detectRepoState', () => {
   });
 
   it('returns "not-synced" for local path repos that do not exist', () => {
+    const { mockExistsSync } = setup('');
+
     mockExistsSync.mockReturnValue(false);
 
     const result = detectRepoState(
@@ -165,12 +172,8 @@ describe('detectRepoState', () => {
 });
 
 describe('getCurrentBranch', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('returns branch name from git rev-parse', async () => {
-    setupExecFileMock('main\n');
+    const { mockExecFile } = setup('main\n');
 
     const result = await getCurrentBranch('/workspace/.repos/repo');
 
@@ -184,7 +187,7 @@ describe('getCurrentBranch', () => {
   });
 
   it('returns null when HEAD is detached', async () => {
-    setupExecFileMock('HEAD\n');
+    setup('HEAD\n');
 
     const result = await getCurrentBranch('/workspace/.repos/repo');
 
@@ -193,12 +196,8 @@ describe('getCurrentBranch', () => {
 });
 
 describe('getCurrentRef', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('returns tag name when HEAD is at a tag', async () => {
-    setupExecFileMock('v1.0.0\n');
+    setup('v1.0.0\n');
 
     const result = await getCurrentRef('/workspace/.repos/repo');
 
@@ -206,11 +205,13 @@ describe('getCurrentRef', () => {
   });
 
   it('returns short SHA when HEAD is not at a tag', async () => {
+    const { mockExecFile } = setup('');
+
     let callCount = 0;
-    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- overloaded function mock requires cast
-    mockExecFile.mockImplementation(((
+
+    mockExecFile.mockImplementation((
       _file: string,
-      args: readonly string[],
+      _args: readonly string[],
       _options: unknown,
       callback?: (
         error: ExecFileException | null,
@@ -230,7 +231,7 @@ describe('getCurrentRef', () => {
           callback(null, 'abc1234\n', '');
         }
       }
-    }) as typeof execFile);
+    });
 
     const result = await getCurrentRef('/workspace/.repos/repo');
 
@@ -239,12 +240,8 @@ describe('getCurrentRef', () => {
 });
 
 describe('getHeadSha', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('returns trimmed SHA string for a repo directory', async () => {
-    setupExecFileMock('abc1234567890def\n');
+    const { mockExecFile } = setup('abc1234567890def\n');
 
     const result = await getHeadSha('/workspace/.repos/repo');
 
@@ -258,8 +255,9 @@ describe('getHeadSha', () => {
   });
 
   it('rejects when git command fails', async () => {
-    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- overloaded function mock requires cast
-    mockExecFile.mockImplementation(((
+    const { mockExecFile } = setup('');
+
+    mockExecFile.mockImplementation((
       _file: string,
       _args: readonly string[],
       _options: unknown,
@@ -272,7 +270,7 @@ describe('getHeadSha', () => {
       if (callback) {
         callback(createExecError('not a git repo'), '', 'not a git repo');
       }
-    }) as typeof execFile);
+    });
 
     await expect(getHeadSha('/workspace/.repos/repo')).rejects.toThrow(
       'not a git repo',
@@ -281,12 +279,8 @@ describe('getHeadSha', () => {
 });
 
 describe('getDirtyFiles', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('returns trimmed output of git diff --name-only HEAD', async () => {
-    setupExecFileMock('src/file1.ts\nsrc/file2.ts\n');
+    const { mockExecFile } = setup('src/file1.ts\nsrc/file2.ts\n');
 
     const result = await getDirtyFiles('/workspace/.repos/repo');
 
@@ -300,7 +294,7 @@ describe('getDirtyFiles', () => {
   });
 
   it('returns empty string when no dirty files', async () => {
-    setupExecFileMock('\n');
+    setup('\n');
 
     const result = await getDirtyFiles('/workspace/.repos/repo');
 
@@ -308,8 +302,9 @@ describe('getDirtyFiles', () => {
   });
 
   it('rejects when git command fails', async () => {
-    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- overloaded function mock requires cast
-    mockExecFile.mockImplementation(((
+    const { mockExecFile } = setup('');
+
+    mockExecFile.mockImplementation((
       _file: string,
       _args: readonly string[],
       _options: unknown,
@@ -322,7 +317,7 @@ describe('getDirtyFiles', () => {
       if (callback) {
         callback(createExecError('git failed'), '', 'git failed');
       }
-    }) as typeof execFile);
+    });
 
     await expect(getDirtyFiles('/workspace/.repos/repo')).rejects.toThrow(
       'git failed',
@@ -331,12 +326,8 @@ describe('getDirtyFiles', () => {
 });
 
 describe('getWorkingTreeState', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('returns all zeros for empty porcelain output', async () => {
-    setupExecFileMock('');
+    setup('');
 
     const result = await getWorkingTreeState('/workspace/.repos/repo');
 
@@ -350,7 +341,7 @@ describe('getWorkingTreeState', () => {
   });
 
   it('counts ?? lines as untracked', async () => {
-    setupExecFileMock('?? newfile.ts\n?? another.ts\n');
+    setup('?? newfile.ts\n?? another.ts\n');
 
     const result = await getWorkingTreeState('/workspace/.repos/repo');
 
@@ -361,7 +352,7 @@ describe('getWorkingTreeState', () => {
 
   it('counts lines where Y=M as modified (working tree changes)', async () => {
     // ' M' = modified in working tree only
-    setupExecFileMock(' M src/file.ts\n M src/other.ts\n');
+    setup(' M src/file.ts\n M src/other.ts\n');
 
     const result = await getWorkingTreeState('/workspace/.repos/repo');
 
@@ -373,7 +364,7 @@ describe('getWorkingTreeState', () => {
     // 'M ' = staged modification
     // 'A ' = staged addition
     // 'D ' = staged deletion
-    setupExecFileMock(
+    setup(
       'M  src/changed.ts\nA  src/added.ts\nD  src/deleted.ts\n',
     );
 
@@ -384,7 +375,7 @@ describe('getWorkingTreeState', () => {
 
   it('counts X=D as deleted when Y is not D', async () => {
     // 'D ' = staged deletion
-    setupExecFileMock('D  src/removed.ts\n');
+    setup('D  src/removed.ts\n');
 
     const result = await getWorkingTreeState('/workspace/.repos/repo');
 
@@ -394,7 +385,7 @@ describe('getWorkingTreeState', () => {
 
   it('counts Y=D as deleted', async () => {
     // ' D' = deleted in working tree
-    setupExecFileMock(' D src/removed.ts\n');
+    setup(' D src/removed.ts\n');
 
     const result = await getWorkingTreeState('/workspace/.repos/repo');
 
@@ -404,7 +395,7 @@ describe('getWorkingTreeState', () => {
 
   it('handles MM (both staged and modified) incrementing both counts', async () => {
     // 'MM' = staged modification + working tree modification
-    setupExecFileMock('MM src/file.ts\n');
+    setup('MM src/file.ts\n');
 
     const result = await getWorkingTreeState('/workspace/.repos/repo');
 
@@ -413,7 +404,7 @@ describe('getWorkingTreeState', () => {
   });
 
   it('counts conflict patterns as conflicts', async () => {
-    setupExecFileMock(
+    setup(
       'UU src/conflict1.ts\nAA src/conflict2.ts\nDD src/conflict3.ts\n',
     );
 
@@ -425,7 +416,7 @@ describe('getWorkingTreeState', () => {
   });
 
   it('counts AU, UA, DU, UD conflict patterns', async () => {
-    setupExecFileMock(
+    setup(
       'AU src/c1.ts\nUA src/c2.ts\nDU src/c3.ts\nUD src/c4.ts\n',
     );
 
@@ -445,7 +436,7 @@ describe('getWorkingTreeState', () => {
         'A  src/added.ts', // staged addition
       ].join('\n') + '\n';
 
-    setupExecFileMock(porcelain);
+    setup(porcelain);
 
     const result = await getWorkingTreeState('/workspace/.repos/repo');
 
@@ -457,7 +448,7 @@ describe('getWorkingTreeState', () => {
   });
 
   it('calls git status with --porcelain=v1', async () => {
-    setupExecFileMock('');
+    const { mockExecFile } = setup('');
 
     await getWorkingTreeState('/workspace/.repos/repo');
 
@@ -471,12 +462,8 @@ describe('getWorkingTreeState', () => {
 });
 
 describe('getAheadBehind', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('parses ahead and behind counts from rev-list output', async () => {
-    setupExecFileMock('2\t3\n');
+    setup('2\t3\n');
 
     const result = await getAheadBehind('/workspace/.repos/repo');
 
@@ -484,7 +471,7 @@ describe('getAheadBehind', () => {
   });
 
   it('returns { ahead: 0, behind: 0 } for "0\\t0" output', async () => {
-    setupExecFileMock('0\t0\n');
+    setup('0\t0\n');
 
     const result = await getAheadBehind('/workspace/.repos/repo');
 
@@ -492,8 +479,9 @@ describe('getAheadBehind', () => {
   });
 
   it('returns null when command fails (detached HEAD)', async () => {
-    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- overloaded function mock requires cast
-    mockExecFile.mockImplementation(((
+    const { mockExecFile } = setup('');
+
+    mockExecFile.mockImplementation((
       _file: string,
       _args: readonly string[],
       _options: unknown,
@@ -510,7 +498,7 @@ describe('getAheadBehind', () => {
           'fatal: no upstream',
         );
       }
-    }) as typeof execFile);
+    });
 
     const result = await getAheadBehind('/workspace/.repos/repo');
 
@@ -518,8 +506,9 @@ describe('getAheadBehind', () => {
   });
 
   it('returns null when command fails (no upstream)', async () => {
-    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- overloaded function mock requires cast
-    mockExecFile.mockImplementation(((
+    const { mockExecFile } = setup('');
+
+    mockExecFile.mockImplementation((
       _file: string,
       _args: readonly string[],
       _options: unknown,
@@ -536,7 +525,7 @@ describe('getAheadBehind', () => {
           'fatal: no upstream configured',
         );
       }
-    }) as typeof execFile);
+    });
 
     const result = await getAheadBehind('/workspace/.repos/repo');
 
@@ -544,7 +533,7 @@ describe('getAheadBehind', () => {
   });
 
   it('calls git rev-list with correct args', async () => {
-    setupExecFileMock('0\t0\n');
+    const { mockExecFile } = setup('0\t0\n');
 
     await getAheadBehind('/workspace/.repos/repo');
 
@@ -558,12 +547,8 @@ describe('getAheadBehind', () => {
 });
 
 describe('isGitTag', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('returns true when git show-ref --verify refs/tags/<ref> succeeds', async () => {
-    setupExecFileMock('abc123 refs/tags/v1.0.0\n');
+    const { mockExecFile } = setup('abc123 refs/tags/v1.0.0\n');
 
     const result = await isGitTag('/workspace/.repos/repo', 'v1.0.0');
 
@@ -577,7 +562,7 @@ describe('isGitTag', () => {
   });
 
   it('returns true for non-version tag name like 20.x', async () => {
-    setupExecFileMock('abc123 refs/tags/20.x\n');
+    const { mockExecFile } = setup('abc123 refs/tags/20.x\n');
 
     const result = await isGitTag('/workspace/.repos/repo', '20.x');
 
@@ -591,11 +576,13 @@ describe('isGitTag', () => {
   });
 
   it('returns true when tag not found locally but found on remote', async () => {
+    const { mockExecFile } = setup('');
+
     let callCount = 0;
-    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- overloaded function mock requires cast
-    mockExecFile.mockImplementation(((
+
+    mockExecFile.mockImplementation((
       _file: string,
-      args: readonly string[],
+      _args: readonly string[],
       _options: unknown,
       callback?: (
         error: ExecFileException | null,
@@ -618,7 +605,7 @@ describe('isGitTag', () => {
           callback(null, 'abc123\trefs/tags/21.0.0\n', '');
         }
       }
-    }) as typeof execFile);
+    });
 
     const result = await isGitTag('/workspace/.repos/repo', '21.0.0');
 
@@ -627,8 +614,9 @@ describe('isGitTag', () => {
   });
 
   it('returns false when tag not found locally or on remote', async () => {
-    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- overloaded function mock requires cast
-    mockExecFile.mockImplementation(((
+    const { mockExecFile } = setup('');
+
+    mockExecFile.mockImplementation((
       _file: string,
       _args: readonly string[],
       _options: unknown,
@@ -645,7 +633,7 @@ describe('isGitTag', () => {
           'fatal: not a valid ref',
         );
       }
-    }) as typeof execFile);
+    });
 
     const result = await isGitTag('/workspace/.repos/repo', 'main');
 
@@ -653,9 +641,11 @@ describe('isGitTag', () => {
   });
 
   it('returns false when local check fails and remote returns empty', async () => {
+    const { mockExecFile } = setup('');
+
     let callCount = 0;
-    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- overloaded function mock requires cast
-    mockExecFile.mockImplementation(((
+
+    mockExecFile.mockImplementation((
       _file: string,
       _args: readonly string[],
       _options: unknown,
@@ -679,7 +669,7 @@ describe('isGitTag', () => {
           callback(null, '', '');
         }
       }
-    }) as typeof execFile);
+    });
 
     const result = await isGitTag('/workspace/.repos/repo', 'main');
 
@@ -687,6 +677,8 @@ describe('isGitTag', () => {
   });
 
   it('returns false for undefined ref without calling git', async () => {
+    const { mockExecFile } = setup('');
+
     const result = await isGitTag('/workspace/.repos/repo', undefined);
 
     expect(result).toBe(false);
