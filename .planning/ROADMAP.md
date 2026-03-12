@@ -15,6 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Plugin Foundation + Repo Assembly** - Plugin skeleton, git clone/pull, nx.json config with validation
 - [x] **Phase 2: Unified Project Graph** - External projects in nx graph with namespacing and cached extraction (completed 2026-03-12)
 - [x] **Phase 3: Multi-Repo Git DX** - Combined status, bulk operations, per-repo output (completed 2026-03-11)
+- [ ] **Phase 4: Code Cleanup** - Extract shared constants and deduplicate config reading (tech debt from v1.0 audit)
 
 ## Phase Details
 
@@ -72,13 +73,26 @@ Plans:
 - [x] 03-08-PLAN.md -- Gap closure: replace regex isTagRef with git-based tag detection
 - [x] 03-09-PLAN.md -- Gap closure: conditional dep install only when HEAD changes
 
+### Phase 4: Code Cleanup
+**Goal**: Extract shared constants and deduplicate config-reading boilerplate identified in v1.0 milestone audit
+**Depends on**: Phase 3
+**Requirements**: None (tech debt, no new requirements)
+**Success Criteria** (what must be TRUE):
+  1. Cache filename constant is exported from cache.ts and imported by status/executor.ts (no duplicated magic string)
+  2. Config reading logic (nx.json parsing + plugin options extraction) is shared between syncExecutor and statusExecutor
+**Plans**: 0 plans
+
+Plans:
+- (run /gsd:plan-phase 4 to break down)
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Plugin Foundation + Repo Assembly | 3/3 | Complete | 2026-03-10 |
 | 2. Unified Project Graph | 4/4 | Complete | 2026-03-12 |
-| 3. Multi-Repo Git DX | 9/9 | Complete   | 2026-03-11 |
+| 3. Multi-Repo Git DX | 9/9 | Complete | 2026-03-11 |
+| 4. Code Cleanup | 0/0 | Not started | - |

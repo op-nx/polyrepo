@@ -53,6 +53,10 @@ Progress: [██████████] 100% (15/15 plans)
 
 ## Accumulated Context
 
+### Roadmap Evolution
+
+- Phase 4 added: Code cleanup (tech debt from v1.0 audit — hardcoded cache filename, duplicated config reading)
+
 ### Decisions
 
 Decisions are logged in PROJECT.md Key Decisions table.
