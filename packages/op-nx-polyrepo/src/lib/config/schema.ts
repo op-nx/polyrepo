@@ -1,8 +1,7 @@
 import { resolve } from 'node:path';
 import { z } from 'zod';
+import { gitUrlPattern } from '../git/detect';
 import { normalizeGitUrl } from '../git/normalize-url';
-
-const gitUrlPattern = /^(git@|https?:\/\/|ssh:\/\/|file:\/\/)/;
 
 const remoteRepoObject = z
   .object({

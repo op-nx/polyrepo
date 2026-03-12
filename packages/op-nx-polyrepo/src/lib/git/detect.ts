@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { execFile } from 'node:child_process';
 import type { NormalizedRepoEntry } from '../config/schema';
 
-const gitUrlPattern = /^(git@|https?:\/\/|ssh:\/\/|file:\/\/)/;
+export const gitUrlPattern = /^(git@|https?:\/\/|ssh:\/\/|file:\/\/)/;
 
 export function isGitUrl(value: string): boolean {
   return gitUrlPattern.test(value);
