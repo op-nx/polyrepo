@@ -89,7 +89,7 @@ describe('extractGraphFromRepo', () => {
     );
   });
 
-  it('sets env with NX_DAEMON=false', async () => {
+  it('sets env with NX_DAEMON, NX_VERBOSE_LOGGING, and NX_PERF_LOGGING all false', async () => {
     const graphJson = { graph: { nodes: {}, dependencies: {} } };
     setupExecSuccess(JSON.stringify(graphJson));
 
@@ -98,10 +98,33 @@ describe('extractGraphFromRepo', () => {
     expect(mockExec).toHaveBeenCalledWith(
       expect.any(String),
       expect.objectContaining({
-        env: expect.objectContaining({ NX_DAEMON: 'false' }),
+        env: expect.objectContaining({
+          NX_DAEMON: 'false',
+          NX_VERBOSE_LOGGING: 'false',
+          NX_PERF_LOGGING: 'false',
+        }),
       }),
       expect.any(Function),
     );
+  });
+
+  it('parses JSON when stdout has leading non-JSON lines', async () => {
+    const graphJson = { graph: { nodes: {}, dependencies: {} } };
+    const contaminatedStdout =
+      '[isolated-plugin] some log line\n' + JSON.stringify(graphJson);
+    setupExecSuccess(contaminatedStdout);
+
+    const result = await extractGraphFromRepo('/workspace/.repos/repo-a');
+
+    expect(result).toEqual(graphJson);
+  });
+
+  it('rejects when stdout contains no valid JSON', async () => {
+    setupExecSuccess('[isolated-plugin] log only\nno json here');
+
+    await expect(
+      extractGraphFromRepo('/workspace/.repos/repo-a'),
+    ).rejects.toThrow('/workspace/.repos/repo-a');
   });
 
   it('sets windowsHide=true', async () => {
