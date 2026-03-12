@@ -92,6 +92,7 @@ describe('detectRepoState', () => {
         alias: 'repo-a',
         url: 'https://github.com/org/repo-a.git',
         depth: 1,
+        disableHooks: true,
       },
       '/workspace',
     );
@@ -112,6 +113,7 @@ describe('detectRepoState', () => {
         alias: 'repo-a',
         url: 'https://github.com/org/repo-a.git',
         depth: 1,
+        disableHooks: true,
       },
       '/workspace',
     );
@@ -361,7 +363,9 @@ describe('getWorkingTreeState', () => {
     // 'M ' = staged modification
     // 'A ' = staged addition
     // 'D ' = staged deletion
-    setupExecFileMock('M  src/changed.ts\nA  src/added.ts\nD  src/deleted.ts\n');
+    setupExecFileMock(
+      'M  src/changed.ts\nA  src/added.ts\nD  src/deleted.ts\n',
+    );
 
     const result = await getWorkingTreeState('/workspace/.repos/repo');
 
@@ -399,7 +403,9 @@ describe('getWorkingTreeState', () => {
   });
 
   it('counts conflict patterns as conflicts', async () => {
-    setupExecFileMock('UU src/conflict1.ts\nAA src/conflict2.ts\nDD src/conflict3.ts\n');
+    setupExecFileMock(
+      'UU src/conflict1.ts\nAA src/conflict2.ts\nDD src/conflict3.ts\n',
+    );
 
     const result = await getWorkingTreeState('/workspace/.repos/repo');
 
@@ -409,7 +415,9 @@ describe('getWorkingTreeState', () => {
   });
 
   it('counts AU, UA, DU, UD conflict patterns', async () => {
-    setupExecFileMock('AU src/c1.ts\nUA src/c2.ts\nDU src/c3.ts\nUD src/c4.ts\n');
+    setupExecFileMock(
+      'AU src/c1.ts\nUA src/c2.ts\nDU src/c3.ts\nUD src/c4.ts\n',
+    );
 
     const result = await getWorkingTreeState('/workspace/.repos/repo');
 
@@ -417,14 +425,15 @@ describe('getWorkingTreeState', () => {
   });
 
   it('handles mixed statuses correctly', async () => {
-    const porcelain = [
-      'M  src/staged.ts',       // staged
-      ' M src/modified.ts',     // modified
-      '?? src/new.ts',          // untracked
-      'UU src/conflict.ts',     // conflict
-      ' D src/deleted.ts',      // deleted in working tree
-      'A  src/added.ts',        // staged addition
-    ].join('\n') + '\n';
+    const porcelain =
+      [
+        'M  src/staged.ts', // staged
+        ' M src/modified.ts', // modified
+        '?? src/new.ts', // untracked
+        'UU src/conflict.ts', // conflict
+        ' D src/deleted.ts', // deleted in working tree
+        'A  src/added.ts', // staged addition
+      ].join('\n') + '\n';
 
     setupExecFileMock(porcelain);
 

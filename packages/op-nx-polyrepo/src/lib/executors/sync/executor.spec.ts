@@ -68,7 +68,13 @@ import {
   gitFetchTag,
   gitCheckoutBranch,
 } from '../../git/commands';
-import { detectRepoState, getWorkingTreeState, getCurrentBranch, getCurrentRef, isGitTag } from '../../git/detect';
+import {
+  detectRepoState,
+  getWorkingTreeState,
+  getCurrentBranch,
+  getCurrentRef,
+  isGitTag,
+} from '../../git/detect';
 import { formatAlignedTable } from '../../format/table';
 import syncExecutor from './executor';
 
@@ -82,13 +88,13 @@ function createMockChildProcess(exitCode = 0): ReturnType<typeof spawn> {
   child.stdout = new EventEmitter() as typeof child.stdout;
   child.stderr = new EventEmitter() as typeof child.stderr;
   child.stdin = null as unknown as typeof child.stdin;
-  child.pid = 1234;
-  child.killed = false;
-  child.connected = false;
-  child.exitCode = null;
-  child.signalCode = null;
-  child.spawnargs = [];
-  child.spawnfile = '';
+  Object.defineProperty(child, 'pid', { value: 1234, writable: true });
+  Object.defineProperty(child, 'killed', { value: false, writable: true });
+  Object.defineProperty(child, 'connected', { value: false, writable: true });
+  Object.defineProperty(child, 'exitCode', { value: null, writable: true });
+  Object.defineProperty(child, 'signalCode', { value: null, writable: true });
+  Object.defineProperty(child, 'spawnargs', { value: [], writable: true });
+  Object.defineProperty(child, 'spawnfile', { value: '', writable: true });
   child.kill = vi.fn().mockReturnValue(true);
   child.send = vi.fn().mockReturnValue(true);
   child.disconnect = vi.fn();
@@ -589,9 +595,7 @@ describe('syncExecutor', () => {
         }
 
         return JSON.stringify({
-          plugins: [
-            { plugin: '@op-nx/polyrepo', options: fakeConfig },
-          ],
+          plugins: [{ plugin: '@op-nx/polyrepo', options: fakeConfig }],
         });
       });
       // package.json exists in repo
@@ -634,9 +638,7 @@ describe('syncExecutor', () => {
         }
 
         return JSON.stringify({
-          plugins: [
-            { plugin: '@op-nx/polyrepo', options: fakeConfig },
-          ],
+          plugins: [{ plugin: '@op-nx/polyrepo', options: fakeConfig }],
         });
       });
       mockExistsSync.mockImplementation((path: unknown) => {
@@ -678,9 +680,7 @@ describe('syncExecutor', () => {
         }
 
         return JSON.stringify({
-          plugins: [
-            { plugin: '@op-nx/polyrepo', options: fakeConfig },
-          ],
+          plugins: [{ plugin: '@op-nx/polyrepo', options: fakeConfig }],
         });
       });
       mockExistsSync.mockImplementation((path: unknown) => {
@@ -927,8 +927,8 @@ describe('syncExecutor', () => {
       await syncExecutor({ dryRun: true }, createContext());
 
       const infoCalls = mockLoggerInfo.mock.calls.map((c) => String(c[0]));
-      const hasDirtyWarning = infoCalls.some(
-        (msg) => msg.includes('[WARN: dirty, may fail]'),
+      const hasDirtyWarning = infoCalls.some((msg) =>
+        msg.includes('[WARN: dirty, may fail]'),
       );
 
       expect(hasDirtyWarning).toBe(true);
@@ -985,8 +985,8 @@ describe('syncExecutor', () => {
       await syncExecutor({ dryRun: true }, createContext());
 
       const infoCalls = mockLoggerInfo.mock.calls.map((c) => String(c[0]));
-      const hasDetachedWarning = infoCalls.some(
-        (msg) => msg.includes('[WARN: detached HEAD]'),
+      const hasDetachedWarning = infoCalls.some((msg) =>
+        msg.includes('[WARN: detached HEAD]'),
       );
 
       expect(hasDetachedWarning).toBe(true);
@@ -1011,8 +1011,8 @@ describe('syncExecutor', () => {
       await syncExecutor({ dryRun: true }, createContext());
 
       const infoCalls = mockLoggerInfo.mock.calls.map((c) => String(c[0]));
-      const hasTagPinnedWarning = infoCalls.some(
-        (msg) => msg.includes('[WARN: tag-pinned]'),
+      const hasTagPinnedWarning = infoCalls.some((msg) =>
+        msg.includes('[WARN: tag-pinned]'),
       );
 
       expect(hasTagPinnedWarning).toBe(true);
@@ -1202,9 +1202,7 @@ describe('syncExecutor', () => {
       const cloningIndex = infoCalls.findIndex((msg) =>
         msg.includes('Cloning'),
       );
-      const doneIndex = infoCalls.findIndex((msg) =>
-        msg.includes('Done:'),
-      );
+      const doneIndex = infoCalls.findIndex((msg) => msg.includes('Done:'));
       const resultsIndex = infoCalls.findIndex((msg) => msg === 'Results:');
 
       expect(cloningIndex).toBeGreaterThanOrEqual(0);
@@ -1321,10 +1319,7 @@ describe('syncExecutor', () => {
 
       await syncExecutor({}, createContext());
 
-      expect(mockGitPull).toHaveBeenCalledWith(
-        'D:/projects/repo-b',
-        undefined,
-      );
+      expect(mockGitPull).toHaveBeenCalledWith('D:/projects/repo-b', undefined);
     });
 
     it('passes disableHooks=false when explicitly set to false', async () => {
@@ -1458,7 +1453,9 @@ describe('syncExecutor', () => {
 
       const infoCalls = mockLoggerInfo.mock.calls.map((c) => String(c[0]));
       const hasSwitch = infoCalls.some(
-        (msg) => msg.includes('repo-a') && msg.includes('would switch to master and pull'),
+        (msg) =>
+          msg.includes('repo-a') &&
+          msg.includes('would switch to master and pull'),
       );
 
       expect(hasSwitch).toBe(true);
@@ -1483,8 +1480,8 @@ describe('syncExecutor', () => {
       await syncExecutor({}, createContext());
 
       const infoCalls = mockLoggerInfo.mock.calls.map((c) => String(c[0]));
-      const hasSwitchMsg = infoCalls.some(
-        (msg) => msg.includes('Switching repo-a to branch master'),
+      const hasSwitchMsg = infoCalls.some((msg) =>
+        msg.includes('Switching repo-a to branch master'),
       );
 
       expect(hasSwitchMsg).toBe(true);
@@ -1764,8 +1761,8 @@ describe('syncExecutor', () => {
 
       await syncExecutor({}, createContext());
 
-      const hashWrites = mockWriteFileSync.mock.calls.filter(
-        (call) => String(call[0]).endsWith('.lock-hash'),
+      const hashWrites = mockWriteFileSync.mock.calls.filter((call) =>
+        String(call[0]).endsWith('.lock-hash'),
       );
 
       expect(hashWrites).toHaveLength(0);

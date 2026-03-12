@@ -3,6 +3,7 @@ import {
   polyrepoConfigSchema,
   normalizeRepos,
   type PolyrepoConfig,
+  type PolyrepoConfigInput,
 } from './schema';
 
 describe('polyrepoConfigSchema', () => {
@@ -299,6 +300,7 @@ describe('normalizeRepos', () => {
           url: 'https://github.com/org/repo-c.git',
           ref: 'develop',
           depth: 3,
+          disableHooks: true,
         },
       },
     };
@@ -336,7 +338,7 @@ describe('normalizeRepos', () => {
   });
 
   it('defaults depth to 1 for remote repos', () => {
-    const config: PolyrepoConfig = {
+    const config: PolyrepoConfigInput = {
       repos: {
         'repo-a': { url: 'https://github.com/org/repo-a.git' },
       },
@@ -370,7 +372,7 @@ describe('normalizeRepos', () => {
   });
 
   it('defaults disableHooks to true for object URL remote entries', () => {
-    const config: PolyrepoConfig = {
+    const config: PolyrepoConfigInput = {
       repos: {
         'repo-a': { url: 'https://github.com/org/repo-a.git' },
       },

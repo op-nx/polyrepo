@@ -147,6 +147,7 @@ describe('statusExecutor', () => {
         alias: 'repo-a',
         url: 'https://github.com/org/repo-a.git',
         depth: 1,
+        disableHooks: true,
       },
     ]);
     mockDetectRepoState.mockReturnValue('cloned');
@@ -199,6 +200,7 @@ describe('statusExecutor', () => {
         alias: 'repo-a',
         url: 'https://github.com/org/repo-a.git',
         depth: 1,
+        disableHooks: true,
       },
     ]);
     mockDetectRepoState.mockReturnValue('cloned');
@@ -224,6 +226,7 @@ describe('statusExecutor', () => {
         alias: 'repo-c',
         url: 'git@github.com:org/repo-c.git',
         depth: 1,
+        disableHooks: true,
       },
     ]);
     mockDetectRepoState.mockReturnValue('not-synced');
@@ -244,6 +247,7 @@ describe('statusExecutor', () => {
         url: 'https://github.com/org/repo-c.git',
         ref: 'v2.1.0',
         depth: 1,
+        disableHooks: true,
       },
     ]);
     mockDetectRepoState.mockReturnValue('cloned');
@@ -271,12 +275,14 @@ describe('statusExecutor', () => {
         alias: 'repo-a',
         url: 'https://github.com/org/repo-a.git',
         depth: 1,
+        disableHooks: true,
       },
       {
         type: 'remote',
         alias: 'repo-b',
         url: 'https://github.com/org/repo-b.git',
         depth: 1,
+        disableHooks: true,
       },
     ]);
     mockDetectRepoState.mockReturnValue('cloned');
@@ -293,6 +299,7 @@ describe('statusExecutor', () => {
         alias: 'repo-a',
         url: 'https://github.com/org/repo-a.git',
         depth: 1,
+        disableHooks: true,
       },
     ]);
     mockDetectRepoState.mockReturnValue('cloned');
@@ -314,6 +321,7 @@ describe('statusExecutor', () => {
         alias: 'repo-a',
         url: 'https://github.com/org/repo-a.git',
         depth: 1,
+        disableHooks: true,
       },
     ]);
     mockDetectRepoState.mockReturnValue('cloned');
@@ -343,6 +351,7 @@ describe('statusExecutor', () => {
         alias: 'repo-d',
         url: 'https://github.com/org/repo-d.git',
         depth: 1,
+        disableHooks: true,
       },
     ]);
     mockDetectRepoState.mockReturnValue('cloned');
@@ -368,6 +377,7 @@ describe('statusExecutor', () => {
         alias: 'repo-a',
         url: 'https://github.com/org/repo-a.git',
         depth: 1,
+        disableHooks: true,
       },
     ]);
     mockDetectRepoState.mockReturnValue('cloned');
@@ -398,6 +408,7 @@ describe('statusExecutor', () => {
         url: 'https://github.com/org/repo-a.git',
         ref: 'develop',
         depth: 1,
+        disableHooks: true,
       },
     ]);
     mockDetectRepoState.mockReturnValue('cloned');
@@ -410,15 +421,11 @@ describe('statusExecutor', () => {
 
     // Branch display should show expected ref
     expect(values).toEqual(
-      expect.arrayContaining([
-        expect.stringContaining('(expected develop)'),
-      ]),
+      expect.arrayContaining([expect.stringContaining('(expected develop)')]),
     );
     // Warning column should contain drift warning
     expect(values).toEqual(
-      expect.arrayContaining([
-        expect.stringContaining('[WARN: drift]'),
-      ]),
+      expect.arrayContaining([expect.stringContaining('[WARN: drift]')]),
     );
   });
 
@@ -429,6 +436,7 @@ describe('statusExecutor', () => {
         alias: 'repo-a',
         url: 'https://github.com/org/repo-a.git',
         depth: 1,
+        disableHooks: true,
       },
     ]);
     mockDetectRepoState.mockReturnValue('cloned');
@@ -450,18 +458,21 @@ describe('statusExecutor', () => {
         alias: 'repo-a',
         url: 'https://github.com/org/repo-a.git',
         depth: 1,
+        disableHooks: true,
       },
       {
         type: 'remote',
         alias: 'repo-b',
         url: 'https://github.com/org/repo-b.git',
         depth: 1,
+        disableHooks: true,
       },
       {
         type: 'remote',
         alias: 'repo-c',
         url: 'git@github.com:org/repo-c.git',
         depth: 1,
+        disableHooks: true,
       },
     ]);
     mockDetectRepoState
@@ -491,6 +502,7 @@ describe('statusExecutor', () => {
         alias: 'repo-a',
         url: 'https://github.com/org/repo-a.git',
         depth: 1,
+        disableHooks: true,
       },
     ]);
     mockDetectRepoState.mockReturnValue('cloned');
@@ -498,24 +510,24 @@ describe('statusExecutor', () => {
     await statusExecutor({}, createContext());
 
     const lines = getAllLoggedLines();
-    expect(lines).toEqual(expect.arrayContaining([
-      expect.stringContaining('Legend:'),
-    ]));
-    expect(lines).toEqual(expect.arrayContaining([
-      expect.stringContaining('M  ='),
-    ]));
-    expect(lines).toEqual(expect.arrayContaining([
-      expect.stringContaining('A  ='),
-    ]));
-    expect(lines).toEqual(expect.arrayContaining([
-      expect.stringContaining('?? ='),
-    ]));
-    expect(lines).toEqual(expect.arrayContaining([
-      expect.stringContaining('+N ='),
-    ]));
-    expect(lines).toEqual(expect.arrayContaining([
-      expect.stringContaining('-N ='),
-    ]));
+    expect(lines).toEqual(
+      expect.arrayContaining([expect.stringContaining('Legend:')]),
+    );
+    expect(lines).toEqual(
+      expect.arrayContaining([expect.stringContaining('M  =')]),
+    );
+    expect(lines).toEqual(
+      expect.arrayContaining([expect.stringContaining('A  =')]),
+    );
+    expect(lines).toEqual(
+      expect.arrayContaining([expect.stringContaining('?? =')]),
+    );
+    expect(lines).toEqual(
+      expect.arrayContaining([expect.stringContaining('+N =')]),
+    );
+    expect(lines).toEqual(
+      expect.arrayContaining([expect.stringContaining('-N =')]),
+    );
   });
 
   it('always returns { success: true }', async () => {
@@ -525,6 +537,7 @@ describe('statusExecutor', () => {
         alias: 'repo-a',
         url: 'https://github.com/org/repo-a.git',
         depth: 1,
+        disableHooks: true,
       },
     ]);
     mockDetectRepoState.mockReturnValue('cloned');
@@ -549,6 +562,7 @@ describe('statusExecutor', () => {
         alias: 'repo-d',
         url: 'https://github.com/org/repo-d.git',
         depth: 1,
+        disableHooks: true,
       },
     ]);
     mockDetectRepoState.mockReturnValue('cloned');
@@ -567,6 +581,7 @@ describe('statusExecutor', () => {
         alias: 'repo-a',
         url: 'https://github.com/org/repo-a.git',
         depth: 1,
+        disableHooks: true,
       },
     ]);
     mockDetectRepoState.mockReturnValue('cloned');
@@ -593,6 +608,7 @@ describe('statusExecutor', () => {
         alias: 'repo-a',
         url: 'https://github.com/org/repo-a.git',
         depth: 1,
+        disableHooks: true,
       },
     ]);
     mockDetectRepoState.mockReturnValue('cloned');
@@ -622,6 +638,7 @@ describe('statusExecutor', () => {
         alias: 'repo-a',
         url: 'https://github.com/org/repo-a.git',
         depth: 1,
+        disableHooks: true,
       },
     ]);
     mockDetectRepoState.mockReturnValue('cloned');
@@ -649,6 +666,7 @@ describe('statusExecutor', () => {
         alias: 'repo-a',
         url: 'https://github.com/org/repo-a.git',
         depth: 1,
+        disableHooks: true,
       },
     ]);
     mockDetectRepoState.mockReturnValue('cloned');
@@ -676,12 +694,14 @@ describe('statusExecutor', () => {
         alias: 'repo-a',
         url: 'https://github.com/org/repo-a.git',
         depth: 1,
+        disableHooks: true,
       },
       {
         type: 'remote',
         alias: 'repo-b',
         url: 'https://github.com/org/repo-b.git',
         depth: 1,
+        disableHooks: true,
       },
     ]);
     mockDetectRepoState.mockReturnValue('cloned');
@@ -708,6 +728,7 @@ describe('statusExecutor', () => {
         alias: 'repo-a',
         url: 'https://github.com/org/repo-a.git',
         depth: 1,
+        disableHooks: true,
       },
     ]);
     mockDetectRepoState.mockReturnValue('cloned');
@@ -731,6 +752,7 @@ describe('statusExecutor', () => {
         alias: 'repo-a',
         url: 'https://github.com/org/repo-a.git',
         depth: 1,
+        disableHooks: true,
       },
     ]);
     mockDetectRepoState.mockReturnValue('cloned');
@@ -756,6 +778,7 @@ describe('statusExecutor', () => {
         url: 'https://github.com/org/repo-c.git',
         ref: 'v2.1.0',
         depth: 1,
+        disableHooks: true,
       },
     ]);
     mockDetectRepoState.mockReturnValue('cloned');
@@ -775,9 +798,7 @@ describe('statusExecutor', () => {
     const rows = mockFormatAlignedTable.mock.calls[0][0];
     const values = rows[0].map((c: ColumnDef) => c.value);
     expect(values).toEqual(
-      expect.arrayContaining([
-        expect.stringContaining('[WARN: tag-pinned]'),
-      ]),
+      expect.arrayContaining([expect.stringContaining('[WARN: tag-pinned]')]),
     );
   });
 
@@ -789,6 +810,7 @@ describe('statusExecutor', () => {
         url: 'https://github.com/org/repo-c.git',
         ref: 'v2.1.0',
         depth: 1,
+        disableHooks: true,
       },
     ]);
     mockDetectRepoState.mockReturnValue('cloned');
@@ -808,9 +830,7 @@ describe('statusExecutor', () => {
     const rows = mockFormatAlignedTable.mock.calls[0][0];
     const values = rows[0].map((c: ColumnDef) => c.value);
     // Should have both warnings
-    const warningsCell = values.find(
-      (v: string) => v.includes('[WARN:'),
-    );
+    const warningsCell = values.find((v: string) => v.includes('[WARN:'));
     expect(warningsCell).toBeDefined();
     expect(warningsCell).toContain('[WARN: dirty, sync may fail]');
     expect(warningsCell).toContain('[WARN: tag-pinned]');

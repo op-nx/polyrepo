@@ -47,6 +47,7 @@ const testEntries: NormalizedRepoEntry[] = [
     url: 'https://github.com/org/repo-a.git',
     ref: undefined,
     depth: 1,
+    disableHooks: true,
   },
   {
     type: 'local',
@@ -120,17 +121,17 @@ describe('cache', () => {
   });
 
   async function loadCacheModule() {
-    const mod = await import('./cache');
+    const mod = await import('./cache.js');
 
     return mod;
   }
 
   async function loadMocks() {
     const fs = await import('node:fs');
-    const extract = await import('./extract');
-    const transform = await import('./transform');
-    const git = await import('../git/detect');
-    const schema = await import('../config/schema');
+    const extract = await import('./extract.js');
+    const transform = await import('./transform.js');
+    const git = await import('../git/detect.js');
+    const schema = await import('../config/schema.js');
     const devkit = await import('@nx/devkit');
 
     return {

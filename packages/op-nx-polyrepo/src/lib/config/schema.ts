@@ -85,16 +85,33 @@ export const polyrepoConfigSchema = z.object({
 });
 
 export type PolyrepoConfig = z.infer<typeof polyrepoConfigSchema>;
+export type PolyrepoConfigInput = z.input<typeof polyrepoConfigSchema>;
 
 export type NormalizedRepoEntry =
-  | { type: 'remote'; alias: string; url: string; ref?: string; depth: number; disableHooks: boolean }
+  | {
+      type: 'remote';
+      alias: string;
+      url: string;
+      ref?: string;
+      depth: number;
+      disableHooks: boolean;
+    }
   | { type: 'local'; alias: string; path: string };
 
-export function normalizeRepos(config: PolyrepoConfig): NormalizedRepoEntry[] {
+export function normalizeRepos(
+  config: PolyrepoConfig | PolyrepoConfigInput,
+): NormalizedRepoEntry[] {
   return Object.entries(config.repos).map(([alias, entry]) => {
     if (typeof entry === 'string') {
       if (gitUrlPattern.test(entry)) {
-        return { type: 'remote', alias, url: entry, ref: undefined, depth: 1, disableHooks: true };
+        return {
+          type: 'remote',
+          alias,
+          url: entry,
+          ref: undefined,
+          depth: 1,
+          disableHooks: true,
+        };
       }
 
       return { type: 'local', alias, path: entry };
