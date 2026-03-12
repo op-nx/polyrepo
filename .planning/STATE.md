@@ -102,6 +102,7 @@ Recent decisions affecting current work:
 | 2 | Rename package to @op-nx/polyrepo | 2026-03-10 | ce1da48 | [2-rename-package-to-op-nx-polyrepo-update-](./quick/2-rename-package-to-op-nx-polyrepo-update-/) |
 | 3 | Add npm scripts for common Nx tasks | 2026-03-10 | d12c037 | [3-add-scripts-for-common-tasks-to-package-](./quick/3-add-scripts-for-common-tasks-to-package-/) |
 | 4 | Run all scripts in package.json and resolve errors | 2026-03-11 | 9311e16 | [4-run-all-scripts-in-package-json-and-reso](./quick/4-run-all-scripts-in-package-json-and-reso/) |
+| 5 | CI check: add --max-warnings=0 to lint pipeline | 2026-03-12 | e905bfd | [5-ci-check-add-max-warnings-0-to-the-lint-](./quick/5-ci-check-add-max-warnings-0-to-the-lint-/) |
 
 ### Blockers/Concerns
 
@@ -111,6 +112,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-03-12T17:04:24Z
-Stopped at: Completed 04-01-PLAN.md
+Last session: 2026-03-12T17:28:07Z
+Stopped at: Completed quick task 5 (lint --max-warnings=0)
 Resume file: None
