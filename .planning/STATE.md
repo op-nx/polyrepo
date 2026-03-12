@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-03-10)
 Phase: 4 of 4 (Code Cleanup)
 Plan: 1 of 1 in current phase
 Status: All plans complete
-Last activity: 2026-03-12 - Completed Phase 4 Plan 1: Deduplicate constants and config reading
+Last activity: 2026-03-12 - Completed quick task 5: CI check, lint zero-warnings, typecheck fixes
 
 Progress: [██████████] 100% (17/17 plans)
 
@@ -102,7 +102,7 @@ Recent decisions affecting current work:
 | 2 | Rename package to @op-nx/polyrepo | 2026-03-10 | ce1da48 | [2-rename-package-to-op-nx-polyrepo-update-](./quick/2-rename-package-to-op-nx-polyrepo-update-/) |
 | 3 | Add npm scripts for common Nx tasks | 2026-03-10 | d12c037 | [3-add-scripts-for-common-tasks-to-package-](./quick/3-add-scripts-for-common-tasks-to-package-/) |
 | 4 | Run all scripts in package.json and resolve errors | 2026-03-11 | 9311e16 | [4-run-all-scripts-in-package-json-and-reso](./quick/4-run-all-scripts-in-package-json-and-reso/) |
-| 5 | CI check: add --max-warnings=0 to lint pipeline | 2026-03-12 | e905bfd | [5-ci-check-add-max-warnings-0-to-the-lint-](./quick/5-ci-check-add-max-warnings-0-to-the-lint-/) |
+| 5 | CI check: add --max-warnings=0 to lint, fix all typecheck errors, scope scripts to host projects | 2026-03-12 | 3a3db26 | [5-ci-check-add-max-warnings-0-to-the-lint-](./quick/5-ci-check-add-max-warnings-0-to-the-lint-/) |
 
 ### Blockers/Concerns
 
