@@ -11,7 +11,7 @@ import { extractGraphFromRepo } from './extract';
 const mockExec = vi.mocked(exec);
 
 function setupExecSuccess(stdout: string): void {
-  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- overloaded function mock requires cast
   mockExec.mockImplementation(((
     _command: string,
     _options: unknown,
@@ -28,7 +28,7 @@ function setupExecSuccess(stdout: string): void {
 }
 
 function setupExecFailure(errorMessage: string, stderr = ''): void {
-  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- overloaded function mock requires cast
   mockExec.mockImplementation(((
     _command: string,
     _options: unknown,

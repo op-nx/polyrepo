@@ -83,7 +83,7 @@ const mockExistsSync = vi.mocked(existsSync);
 const mockWriteFileSync = vi.mocked(writeFileSync);
 const mockSpawn = vi.mocked(spawn);
 
-/* eslint-disable @typescript-eslint/consistent-type-assertions */
+/* eslint-disable @typescript-eslint/consistent-type-assertions -- EventEmitter-based mock requires casts for ChildProcess shape */
 function createMockChildProcess(exitCode = 0): ReturnType<typeof spawn> {
   const child = new EventEmitter() as ReturnType<typeof spawn>;
   child.stdout = new EventEmitter() as typeof child.stdout;
@@ -107,7 +107,7 @@ function createMockChildProcess(exitCode = 0): ReturnType<typeof spawn> {
 
   return child;
 }
-/* eslint-enable @typescript-eslint/consistent-type-assertions */
+/* eslint-enable @typescript-eslint/consistent-type-assertions -- EventEmitter-based mock requires casts for ChildProcess shape */
 const mockValidateConfig = vi.mocked(validateConfig);
 const mockNormalizeRepos = vi.mocked(normalizeRepos);
 const mockGitClone = vi.mocked(gitClone);
@@ -127,7 +127,7 @@ const mockLoggerInfo = vi.mocked(logger.info);
 const mockLoggerWarn = vi.mocked(logger.warn);
 
 function createContext(root = '/workspace'): ExecutorContext {
-  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- partial context, only fields used by executor
   return { root, cwd: root, isVerbose: false } as ExecutorContext;
 }
 

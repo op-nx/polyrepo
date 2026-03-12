@@ -32,7 +32,7 @@ function createExecError(message: string): ExecFileException {
 }
 
 function setupExecFileMock(): void {
-  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- overloaded function mock requires cast
   mockExecFile.mockImplementation(((
     _file: string,
     _args: readonly string[],
@@ -277,7 +277,7 @@ describe('gitCheckoutBranch', () => {
 
   it('falls back to checkout -b when checkout fails (branch not local)', async () => {
     let callCount = 0;
-    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- overloaded function mock requires cast
     mockExecFile.mockImplementation(((
       _file: string,
       args: readonly string[],

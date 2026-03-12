@@ -17,6 +17,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@eslint-community/eslint-plugin-eslint-comments": "^4.7.1",
     "@eslint/js": "^9.8.0",
     "@nx/devkit": "^22.5.4",
     "@nx/esbuild": "^22.5.4",

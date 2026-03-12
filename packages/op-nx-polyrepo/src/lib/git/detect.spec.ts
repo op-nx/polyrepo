@@ -36,7 +36,7 @@ function createExecError(message: string, code?: string): ExecFileException {
 }
 
 function setupExecFileMock(stdout: string, stderr = ''): void {
-  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- overloaded function mock requires cast
   mockExecFile.mockImplementation(((
     _file: string,
     _args: readonly string[],
@@ -207,7 +207,7 @@ describe('getCurrentRef', () => {
 
   it('returns short SHA when HEAD is not at a tag', async () => {
     let callCount = 0;
-    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- overloaded function mock requires cast
     mockExecFile.mockImplementation(((
       _file: string,
       args: readonly string[],
@@ -258,7 +258,7 @@ describe('getHeadSha', () => {
   });
 
   it('rejects when git command fails', async () => {
-    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- overloaded function mock requires cast
     mockExecFile.mockImplementation(((
       _file: string,
       _args: readonly string[],
@@ -308,7 +308,7 @@ describe('getDirtyFiles', () => {
   });
 
   it('rejects when git command fails', async () => {
-    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- overloaded function mock requires cast
     mockExecFile.mockImplementation(((
       _file: string,
       _args: readonly string[],
@@ -492,7 +492,7 @@ describe('getAheadBehind', () => {
   });
 
   it('returns null when command fails (detached HEAD)', async () => {
-    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- overloaded function mock requires cast
     mockExecFile.mockImplementation(((
       _file: string,
       _args: readonly string[],
@@ -518,7 +518,7 @@ describe('getAheadBehind', () => {
   });
 
   it('returns null when command fails (no upstream)', async () => {
-    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- overloaded function mock requires cast
     mockExecFile.mockImplementation(((
       _file: string,
       _args: readonly string[],
@@ -592,7 +592,7 @@ describe('isGitTag', () => {
 
   it('returns true when tag not found locally but found on remote', async () => {
     let callCount = 0;
-    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- overloaded function mock requires cast
     mockExecFile.mockImplementation(((
       _file: string,
       args: readonly string[],
@@ -627,7 +627,7 @@ describe('isGitTag', () => {
   });
 
   it('returns false when tag not found locally or on remote', async () => {
-    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- overloaded function mock requires cast
     mockExecFile.mockImplementation(((
       _file: string,
       _args: readonly string[],
@@ -654,7 +654,7 @@ describe('isGitTag', () => {
 
   it('returns false when local check fails and remote returns empty', async () => {
     let callCount = 0;
-    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- overloaded function mock requires cast
     mockExecFile.mockImplementation(((
       _file: string,
       _args: readonly string[],

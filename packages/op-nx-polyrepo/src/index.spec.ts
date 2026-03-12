@@ -72,7 +72,7 @@ describe('createNodesV2', () => {
     const [, callback] = createNodesV2;
 
     await expect(
-      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- stub object for test data not inspected by SUT
       callback(['nx.json'], {} as never, mockContext),
     ).rejects.toThrow();
   });

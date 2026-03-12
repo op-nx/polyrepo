@@ -74,7 +74,7 @@ const mockLoggerInfo = vi.mocked(logger.info);
 const mockLoggerWarn = vi.mocked(logger.warn);
 
 function createContext(root = '/workspace'): ExecutorContext {
-  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- partial context, only fields used by executor
   return { root, cwd: root, isVerbose: false } as ExecutorContext;
 }
 
@@ -155,7 +155,7 @@ describe('statusExecutor', () => {
       report: {
         repos: {
           'repo-a': {
-            /* eslint-disable @typescript-eslint/consistent-type-assertions */
+            /* eslint-disable @typescript-eslint/consistent-type-assertions -- stub nodes not inspected by SUT */
             nodes: {
               p1: {} as never,
               p2: {} as never,
@@ -170,7 +170,7 @@ describe('statusExecutor', () => {
               p11: {} as never,
               p12: {} as never,
             },
-            /* eslint-enable @typescript-eslint/consistent-type-assertions */
+            /* eslint-enable @typescript-eslint/consistent-type-assertions -- stub nodes not inspected by SUT */
             dependencies: [],
           },
         },

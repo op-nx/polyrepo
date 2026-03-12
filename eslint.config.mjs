@@ -1,9 +1,11 @@
 import nx from '@nx/eslint-plugin';
+import eslintComments from '@eslint-community/eslint-plugin-eslint-comments/configs';
 
 export default [
   ...nx.configs['flat/base'],
   ...nx.configs['flat/typescript'],
   ...nx.configs['flat/javascript'],
+  eslintComments.recommended,
   {
     ignores: ['**/dist', '**/out-tsc', '.repos/**'],
   },
@@ -46,6 +48,7 @@ export default [
         'error',
         { assertionStyle: 'never' },
       ],
+      '@eslint-community/eslint-comments/require-description': 'error',
     },
   },
 ];
