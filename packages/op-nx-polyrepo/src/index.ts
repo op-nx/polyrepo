@@ -2,6 +2,7 @@ import type {
   CreateNodesV2,
   CreateNodesResult,
   CreateDependencies,
+  ProjectType,
   RawProjectGraphDependency,
   ProjectConfiguration,
 } from '@nx/devkit';
@@ -15,6 +16,14 @@ import {
   warnIfReposNotGitignored,
   warnUnsyncedRepos,
 } from './lib/config/validate';
+
+function toProjectType(value: string | undefined): ProjectType | undefined {
+  if (value === 'application' || value === 'library') {
+    return value;
+  }
+
+  return undefined;
+}
 
 export const createNodesV2: CreateNodesV2<PolyrepoConfig> = [
   'nx.json',
@@ -68,10 +77,7 @@ export const createNodesV2: CreateNodesV2<PolyrepoConfig> = [
           for (const [, node] of Object.entries(repoReport.nodes)) {
             projects[node.root] = {
               name: node.name,
-              projectType: node.projectType as
-                | 'application'
-                | 'library'
-                | undefined,
+              projectType: toProjectType(node.projectType),
               sourceRoot: node.sourceRoot,
               targets: node.targets,
               tags: node.tags,
