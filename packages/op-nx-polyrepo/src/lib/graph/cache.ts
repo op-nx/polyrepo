@@ -15,7 +15,7 @@ import type { PolyrepoGraphReport } from './types';
 let graphReport: PolyrepoGraphReport | undefined;
 let currentHash: string | undefined;
 
-const CACHE_FILENAME = '.polyrepo-graph-cache.json';
+export const CACHE_FILENAME = '.polyrepo-graph-cache.json';
 
 interface CacheFile {
   hash: string;
