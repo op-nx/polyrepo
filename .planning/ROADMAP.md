@@ -109,11 +109,12 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
   4. Zero `as` type assertions, zero `any`, zero eslint-disable comments
   5. All test files use SIFER pattern (zero beforeEach/afterEach hooks)
   6. Project-local skills teach AI agents the approved patterns
-**Plans:** 5 plans
+**Plans:** 6 plans
 
 Plans:
 - [ ] 05-01-PLAN.md -- ESLint strict-type-checked preset + TSConfig hardening + @vitest/eslint-plugin install
-- [ ] 05-02-PLAN.md -- Zod schemas at JSON.parse boundaries + fix all production code strict violations
-- [ ] 05-03-PLAN.md -- Test refactoring: git/, graph/, config/, format/, index -- cast elimination + SIFERs
-- [ ] 05-04-PLAN.md -- Test refactoring: executor tests -- ChildProcess mock factory, ExecutorContext factory, SIFERs
-- [ ] 05-05-PLAN.md -- Final enforcement verification + project-local type safety skills
+- [ ] 05-02-PLAN.md -- Zod schemas at all 3 JSON.parse system boundaries
+- [ ] 05-03-PLAN.md -- Fix all production code lint and typecheck violations from strict rules
+- [ ] 05-04-PLAN.md -- Test refactoring: git/, graph/, config/, format/, index -- cast elimination + SIFERs
+- [ ] 05-05-PLAN.md -- Test refactoring: executor tests -- ChildProcess mock factory, ExecutorContext factory, SIFERs
+- [ ] 05-06-PLAN.md -- Final enforcement verification + project-local type safety skills
