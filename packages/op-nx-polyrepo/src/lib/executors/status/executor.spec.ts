@@ -143,7 +143,7 @@ function setupDefaultSyncedState(): void {
 
 function getAllLoggedLines(): string[] {
   return mockLoggerInfo.mock.calls
-    .map((call) => call[0])
+    .map((call: unknown[]) => call[0])
     .filter((msg): msg is string => typeof msg === 'string');
 }
 

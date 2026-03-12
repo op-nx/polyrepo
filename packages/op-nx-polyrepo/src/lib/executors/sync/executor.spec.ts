@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { createHash } from 'node:crypto';
+import { describe, it, expect, vi } from 'vitest';
 import type { ExecutorContext } from '@nx/devkit';
 
 // Mock dependencies before importing executor
@@ -54,8 +55,8 @@ vi.mock('../../format/table', () => ({
 
 import { readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
-import { EventEmitter } from 'node:events';
 import { logger } from '@nx/devkit';
+import { createMockChildProcess } from '../../testing/mock-child-process';
 import { validateConfig } from '../../config/validate';
 import { normalizeRepos } from '../../config/schema';
 import type { NormalizedRepoEntry, PolyrepoConfig } from '../../config/schema';
@@ -82,32 +83,6 @@ const mockReadFileSync = vi.mocked(readFileSync);
 const mockExistsSync = vi.mocked(existsSync);
 const mockWriteFileSync = vi.mocked(writeFileSync);
 const mockSpawn = vi.mocked(spawn);
-
-/* eslint-disable @typescript-eslint/consistent-type-assertions -- EventEmitter-based mock requires casts for ChildProcess shape */
-function createMockChildProcess(exitCode = 0): ReturnType<typeof spawn> {
-  const child = new EventEmitter() as ReturnType<typeof spawn>;
-  child.stdout = new EventEmitter() as typeof child.stdout;
-  child.stderr = new EventEmitter() as typeof child.stderr;
-  child.stdin = null as unknown as typeof child.stdin;
-  Object.defineProperty(child, 'pid', { value: 1234, writable: true });
-  Object.defineProperty(child, 'killed', { value: false, writable: true });
-  Object.defineProperty(child, 'connected', { value: false, writable: true });
-  Object.defineProperty(child, 'exitCode', { value: null, writable: true });
-  Object.defineProperty(child, 'signalCode', { value: null, writable: true });
-  Object.defineProperty(child, 'spawnargs', { value: [], writable: true });
-  Object.defineProperty(child, 'spawnfile', { value: '', writable: true });
-  child.kill = vi.fn().mockReturnValue(true);
-  child.send = vi.fn().mockReturnValue(true);
-  child.disconnect = vi.fn();
-  child.unref = vi.fn().mockReturnThis();
-  child.ref = vi.fn().mockReturnThis();
-  child[Symbol.dispose] = vi.fn();
-  // Emit close on next tick
-  process.nextTick(() => child.emit('close', exitCode));
-
-  return child;
-}
-/* eslint-enable @typescript-eslint/consistent-type-assertions -- EventEmitter-based mock requires casts for ChildProcess shape */
 const mockValidateConfig = vi.mocked(validateConfig);
 const mockNormalizeRepos = vi.mocked(normalizeRepos);
 const mockGitClone = vi.mocked(gitClone);
@@ -126,9 +101,18 @@ const mockFormatAlignedTable = vi.mocked(formatAlignedTable);
 const mockLoggerInfo = vi.mocked(logger.info);
 const mockLoggerWarn = vi.mocked(logger.warn);
 
-function createContext(root = '/workspace'): ExecutorContext {
-  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- partial context, only fields used by executor
-  return { root, cwd: root, isVerbose: false } as ExecutorContext;
+function createTestContext(
+  overrides?: Partial<ExecutorContext>,
+): ExecutorContext {
+  return {
+    root: '/workspace',
+    cwd: '/workspace',
+    isVerbose: false,
+    projectsConfigurations: { version: 2, projects: {} },
+    nxJsonConfiguration: {},
+    projectGraph: { nodes: {}, dependencies: {} },
+    ...overrides,
+  };
 }
 
 const fakeConfig: PolyrepoConfig = {
@@ -150,34 +134,35 @@ function setupPluginConfig(entries: NormalizedRepoEntry[]): void {
   mockNormalizeRepos.mockReturnValue(entries);
 }
 
-describe('syncExecutor', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockGitClone.mockResolvedValue(undefined);
-    mockGitPull.mockResolvedValue(undefined);
-    mockGitFetch.mockResolvedValue(undefined);
-    mockGitPullRebase.mockResolvedValue(undefined);
-    mockGitPullFfOnly.mockResolvedValue(undefined);
-    mockGitFetchTag.mockResolvedValue(undefined);
-    // Default: isGitTag returns false (most tests don't involve tags)
-    mockIsGitTag.mockResolvedValue(false);
-    // Default: getCurrentBranch returns a normal branch (not detached)
-    mockGetCurrentBranch.mockResolvedValue('main');
-    // Default: getWorkingTreeState returns clean state
-    mockGetWorkingTreeState.mockResolvedValue({
-      modified: 0,
-      staged: 0,
-      deleted: 0,
-      untracked: 0,
-      conflicts: 0,
-    });
-    // Default: existsSync returns false (no lock files detected -> npm)
-    mockExistsSync.mockReturnValue(false);
-    // Default: spawn (used for install) succeeds immediately
-    mockSpawn.mockImplementation(() => createMockChildProcess(0));
+function setup(): void {
+  vi.clearAllMocks();
+  mockGitClone.mockResolvedValue(undefined);
+  mockGitPull.mockResolvedValue(undefined);
+  mockGitFetch.mockResolvedValue(undefined);
+  mockGitPullRebase.mockResolvedValue(undefined);
+  mockGitPullFfOnly.mockResolvedValue(undefined);
+  mockGitFetchTag.mockResolvedValue(undefined);
+  // Default: isGitTag returns false (most tests don't involve tags)
+  mockIsGitTag.mockResolvedValue(false);
+  // Default: getCurrentBranch returns a normal branch (not detached)
+  mockGetCurrentBranch.mockResolvedValue('main');
+  // Default: getWorkingTreeState returns clean state
+  mockGetWorkingTreeState.mockResolvedValue({
+    modified: 0,
+    staged: 0,
+    deleted: 0,
+    untracked: 0,
+    conflicts: 0,
   });
+  // Default: existsSync returns false (no lock files detected -> npm)
+  mockExistsSync.mockReturnValue(false);
+  // Default: spawn (used for install) succeeds immediately
+  mockSpawn.mockImplementation(() => createMockChildProcess(0));
+}
 
+describe('syncExecutor', () => {
   it('clones remote repo when .repos/<alias> does not exist', async () => {
+    setup();
     setupPluginConfig([
       {
         type: 'remote',
@@ -189,7 +174,7 @@ describe('syncExecutor', () => {
     ]);
     mockDetectRepoState.mockReturnValue('not-synced');
 
-    const result = await syncExecutor({}, createContext());
+    const result = await syncExecutor({}, createTestContext());
 
     expect(mockGitClone).toHaveBeenCalledWith(
       'https://github.com/org/repo-a.git',
@@ -200,6 +185,7 @@ describe('syncExecutor', () => {
   });
 
   it('pulls remote repo when .repos/<alias> already exists and ref is a branch', async () => {
+    setup();
     setupPluginConfig([
       {
         type: 'remote',
@@ -212,7 +198,7 @@ describe('syncExecutor', () => {
     ]);
     mockDetectRepoState.mockReturnValue('cloned');
 
-    const result = await syncExecutor({}, createContext());
+    const result = await syncExecutor({}, createTestContext());
 
     expect(mockGitPull).toHaveBeenCalled();
     expect(mockGitClone).not.toHaveBeenCalled();
@@ -220,6 +206,7 @@ describe('syncExecutor', () => {
   });
 
   it('re-fetches tag when .repos/<alias> already exists and ref looks like a tag', async () => {
+    setup();
     setupPluginConfig([
       {
         type: 'remote',
@@ -233,7 +220,7 @@ describe('syncExecutor', () => {
     mockDetectRepoState.mockReturnValue('cloned');
     mockIsGitTag.mockResolvedValue(true);
 
-    const result = await syncExecutor({}, createContext());
+    const result = await syncExecutor({}, createTestContext());
 
     expect(mockGitFetchTag).toHaveBeenCalledWith(
       expect.stringContaining('.repos'),
@@ -246,24 +233,26 @@ describe('syncExecutor', () => {
   });
 
   it('pulls local path repo when it is a git repo', async () => {
+    setup();
     setupPluginConfig([
       { type: 'local', alias: 'repo-b', path: 'D:/projects/repo-b' },
     ]);
     mockDetectRepoState.mockReturnValue('referenced');
 
-    const result = await syncExecutor({}, createContext());
+    const result = await syncExecutor({}, createTestContext());
 
     expect(mockGitPull).toHaveBeenCalledWith('D:/projects/repo-b', undefined);
     expect(result).toEqual({ success: true });
   });
 
   it('skips local path repo pull when path does not exist (warns)', async () => {
+    setup();
     setupPluginConfig([
       { type: 'local', alias: 'repo-b', path: 'D:/projects/repo-b' },
     ]);
     mockDetectRepoState.mockReturnValue('not-synced');
 
-    const result = await syncExecutor({}, createContext());
+    const result = await syncExecutor({}, createTestContext());
 
     expect(mockGitPull).not.toHaveBeenCalled();
     expect(mockLoggerWarn).toHaveBeenCalledWith(
@@ -273,6 +262,7 @@ describe('syncExecutor', () => {
   });
 
   it('uses configured depth for clone (depth:0 = full)', async () => {
+    setup();
     setupPluginConfig([
       {
         type: 'remote',
@@ -284,7 +274,7 @@ describe('syncExecutor', () => {
     ]);
     mockDetectRepoState.mockReturnValue('not-synced');
 
-    await syncExecutor({}, createContext());
+    await syncExecutor({}, createTestContext());
 
     expect(mockGitClone).toHaveBeenCalledWith(
       'https://github.com/org/repo-a.git',
@@ -294,6 +284,7 @@ describe('syncExecutor', () => {
   });
 
   it('uses configured ref as --branch during clone', async () => {
+    setup();
     setupPluginConfig([
       {
         type: 'remote',
@@ -306,7 +297,7 @@ describe('syncExecutor', () => {
     ]);
     mockDetectRepoState.mockReturnValue('not-synced');
 
-    await syncExecutor({}, createContext());
+    await syncExecutor({}, createTestContext());
 
     expect(mockGitClone).toHaveBeenCalledWith(
       'https://github.com/org/repo-a.git',
@@ -316,6 +307,7 @@ describe('syncExecutor', () => {
   });
 
   it('processes all repos in parallel (Promise.allSettled)', async () => {
+    setup();
     setupPluginConfig([
       {
         type: 'remote',
@@ -335,7 +327,7 @@ describe('syncExecutor', () => {
     ]);
     mockDetectRepoState.mockReturnValue('not-synced');
 
-    const result = await syncExecutor({}, createContext());
+    const result = await syncExecutor({}, createTestContext());
 
     // All three repos processed
     expect(mockGitClone).toHaveBeenCalledTimes(2);
@@ -344,6 +336,7 @@ describe('syncExecutor', () => {
   });
 
   it('returns { success: true } when all repos succeed', async () => {
+    setup();
     setupPluginConfig([
       {
         type: 'remote',
@@ -355,12 +348,13 @@ describe('syncExecutor', () => {
     ]);
     mockDetectRepoState.mockReturnValue('not-synced');
 
-    const result = await syncExecutor({}, createContext());
+    const result = await syncExecutor({}, createTestContext());
 
     expect(result).toEqual({ success: true });
   });
 
   it('returns { success: false } when any repo fails', async () => {
+    setup();
     setupPluginConfig([
       {
         type: 'remote',
@@ -382,12 +376,13 @@ describe('syncExecutor', () => {
       .mockResolvedValueOnce(undefined)
       .mockRejectedValueOnce(new Error('clone failed'));
 
-    const result = await syncExecutor({}, createContext());
+    const result = await syncExecutor({}, createTestContext());
 
     expect(result).toEqual({ success: false });
   });
 
   it('logs per-repo results (cloning/pulling/done/failed)', async () => {
+    setup();
     setupPluginConfig([
       {
         type: 'remote',
@@ -399,7 +394,7 @@ describe('syncExecutor', () => {
     ]);
     mockDetectRepoState.mockReturnValue('not-synced');
 
-    await syncExecutor({}, createContext());
+    await syncExecutor({}, createTestContext());
 
     expect(mockLoggerInfo).toHaveBeenCalledWith(
       expect.stringContaining('repo-a'),
@@ -407,6 +402,7 @@ describe('syncExecutor', () => {
   });
 
   it('logs summary at end (N synced, M failed)', async () => {
+    setup();
     setupPluginConfig([
       {
         type: 'remote',
@@ -418,7 +414,7 @@ describe('syncExecutor', () => {
     ]);
     mockDetectRepoState.mockReturnValue('not-synced');
 
-    await syncExecutor({}, createContext());
+    await syncExecutor({}, createTestContext());
 
     const summaryCall = mockLoggerInfo.mock.calls.find(
       (call) => typeof call[0] === 'string' && call[0].includes('synced'),
@@ -437,6 +433,7 @@ describe('syncExecutor', () => {
     }
 
     it('runs npm install after cloning when package-lock.json detected', async () => {
+      setup();
       setupPluginConfig([
         {
           type: 'remote',
@@ -450,7 +447,7 @@ describe('syncExecutor', () => {
       mockExistsSync.mockReturnValue(false); // no pnpm-lock.yaml, no yarn.lock
       setupSpawnMockSuccess();
 
-      await syncExecutor({}, createContext());
+      await syncExecutor({}, createTestContext());
 
       expect(mockSpawn).toHaveBeenCalledWith(
         'npm install --loglevel=error',
@@ -463,6 +460,7 @@ describe('syncExecutor', () => {
     });
 
     it('runs pnpm install after cloning when pnpm-lock.yaml detected', async () => {
+      setup();
       setupPluginConfig([
         {
           type: 'remote',
@@ -483,7 +481,7 @@ describe('syncExecutor', () => {
       });
       setupSpawnMockSuccess();
 
-      await syncExecutor({}, createContext());
+      await syncExecutor({}, createTestContext());
 
       expect(mockSpawn).toHaveBeenCalledWith(
         'pnpm install --reporter=silent',
@@ -496,6 +494,7 @@ describe('syncExecutor', () => {
     });
 
     it('runs yarn after cloning when yarn.lock detected', async () => {
+      setup();
       setupPluginConfig([
         {
           type: 'remote',
@@ -516,7 +515,7 @@ describe('syncExecutor', () => {
       });
       setupSpawnMockSuccess();
 
-      await syncExecutor({}, createContext());
+      await syncExecutor({}, createTestContext());
 
       expect(mockSpawn).toHaveBeenCalledWith(
         'yarn install --silent',
@@ -529,6 +528,7 @@ describe('syncExecutor', () => {
     });
 
     it('runs install after pulling an existing remote repo', async () => {
+      setup();
       setupPluginConfig([
         {
           type: 'remote',
@@ -542,7 +542,7 @@ describe('syncExecutor', () => {
       mockExistsSync.mockReturnValue(false);
       setupSpawnMockSuccess();
 
-      await syncExecutor({}, createContext());
+      await syncExecutor({}, createTestContext());
 
       expect(mockSpawn).toHaveBeenCalledWith(
         'npm install --loglevel=error',
@@ -555,6 +555,7 @@ describe('syncExecutor', () => {
     });
 
     it('runs install for local path repos that are updated', async () => {
+      setup();
       setupPluginConfig([
         { type: 'local', alias: 'repo-b', path: 'D:/projects/repo-b' },
       ]);
@@ -562,7 +563,7 @@ describe('syncExecutor', () => {
       mockExistsSync.mockReturnValue(false);
       setupSpawnMockSuccess();
 
-      await syncExecutor({}, createContext());
+      await syncExecutor({}, createTestContext());
 
       expect(mockSpawn).toHaveBeenCalledWith(
         'npm install --loglevel=error',
@@ -575,6 +576,7 @@ describe('syncExecutor', () => {
     });
 
     it('uses corepack when package.json has packageManager field', async () => {
+      setup();
       setupPluginConfig([
         {
           type: 'remote',
@@ -607,7 +609,7 @@ describe('syncExecutor', () => {
       });
       setupSpawnMockSuccess();
 
-      await syncExecutor({}, createContext());
+      await syncExecutor({}, createTestContext());
 
       expect(mockSpawn).toHaveBeenCalledWith(
         'corepack pnpm install --reporter=silent',
@@ -620,6 +622,7 @@ describe('syncExecutor', () => {
     });
 
     it('uses corepack for yarn when package.json specifies yarn', async () => {
+      setup();
       setupPluginConfig([
         {
           type: 'remote',
@@ -649,7 +652,7 @@ describe('syncExecutor', () => {
       });
       setupSpawnMockSuccess();
 
-      await syncExecutor({}, createContext());
+      await syncExecutor({}, createTestContext());
 
       expect(mockSpawn).toHaveBeenCalledWith(
         'corepack yarn install --silent',
@@ -662,6 +665,7 @@ describe('syncExecutor', () => {
     });
 
     it('falls back to lock file detection when no packageManager field', async () => {
+      setup();
       setupPluginConfig([
         {
           type: 'remote',
@@ -695,7 +699,7 @@ describe('syncExecutor', () => {
       });
       setupSpawnMockSuccess();
 
-      await syncExecutor({}, createContext());
+      await syncExecutor({}, createTestContext());
 
       expect(mockSpawn).toHaveBeenCalledWith(
         'pnpm install --reporter=silent',
@@ -708,6 +712,7 @@ describe('syncExecutor', () => {
     });
 
     it('closes stdin to suppress interactive prompts and pipes stdout/stderr', async () => {
+      setup();
       setupPluginConfig([
         {
           type: 'remote',
@@ -721,7 +726,7 @@ describe('syncExecutor', () => {
       mockExistsSync.mockReturnValue(false);
       setupSpawnMockSuccess();
 
-      await syncExecutor({}, createContext());
+      await syncExecutor({}, createTestContext());
 
       expect(mockSpawn).toHaveBeenCalledWith(
         expect.any(String),
@@ -735,6 +740,7 @@ describe('syncExecutor', () => {
     });
 
     it('install failure logs warning but does not fail the sync', async () => {
+      setup();
       setupPluginConfig([
         {
           type: 'remote',
@@ -748,7 +754,7 @@ describe('syncExecutor', () => {
       mockExistsSync.mockReturnValue(false);
       setupSpawnMockFailure();
 
-      const result = await syncExecutor({}, createContext());
+      const result = await syncExecutor({}, createTestContext());
 
       expect(mockLoggerWarn).toHaveBeenCalledWith(
         expect.stringContaining('repo-a'),
@@ -759,6 +765,7 @@ describe('syncExecutor', () => {
 
   describe('strategy option', () => {
     it('defaults to pull strategy', async () => {
+      setup();
       setupPluginConfig([
         {
           type: 'remote',
@@ -770,12 +777,13 @@ describe('syncExecutor', () => {
       ]);
       mockDetectRepoState.mockReturnValue('cloned');
 
-      await syncExecutor({}, createContext());
+      await syncExecutor({}, createTestContext());
 
       expect(mockGitPull).toHaveBeenCalled();
     });
 
     it('strategy "fetch" calls gitFetch instead of gitPull', async () => {
+      setup();
       setupPluginConfig([
         {
           type: 'remote',
@@ -787,13 +795,14 @@ describe('syncExecutor', () => {
       ]);
       mockDetectRepoState.mockReturnValue('cloned');
 
-      await syncExecutor({ strategy: 'fetch' }, createContext());
+      await syncExecutor({ strategy: 'fetch' }, createTestContext());
 
       expect(mockGitFetch).toHaveBeenCalled();
       expect(mockGitPull).not.toHaveBeenCalled();
     });
 
     it('strategy "rebase" calls gitPullRebase', async () => {
+      setup();
       setupPluginConfig([
         {
           type: 'remote',
@@ -805,13 +814,14 @@ describe('syncExecutor', () => {
       ]);
       mockDetectRepoState.mockReturnValue('cloned');
 
-      await syncExecutor({ strategy: 'rebase' }, createContext());
+      await syncExecutor({ strategy: 'rebase' }, createTestContext());
 
       expect(mockGitPullRebase).toHaveBeenCalled();
       expect(mockGitPull).not.toHaveBeenCalled();
     });
 
     it('strategy "ff-only" calls gitPullFfOnly', async () => {
+      setup();
       setupPluginConfig([
         {
           type: 'remote',
@@ -823,7 +833,7 @@ describe('syncExecutor', () => {
       ]);
       mockDetectRepoState.mockReturnValue('cloned');
 
-      await syncExecutor({ strategy: 'ff-only' }, createContext());
+      await syncExecutor({ strategy: 'ff-only' }, createTestContext());
 
       expect(mockGitPullFfOnly).toHaveBeenCalled();
       expect(mockGitPull).not.toHaveBeenCalled();
@@ -832,6 +842,7 @@ describe('syncExecutor', () => {
 
   describe('dry-run mode', () => {
     it('shows "would clone" for unsynced remote repos', async () => {
+      setup();
       setupPluginConfig([
         {
           type: 'remote',
@@ -843,7 +854,7 @@ describe('syncExecutor', () => {
       ]);
       mockDetectRepoState.mockReturnValue('not-synced');
 
-      await syncExecutor({ dryRun: true }, createContext());
+      await syncExecutor({ dryRun: true }, createTestContext());
 
       const infoCalls = mockLoggerInfo.mock.calls.map((c) => String(c[0]));
       const hasWouldClone = infoCalls.some(
@@ -855,6 +866,7 @@ describe('syncExecutor', () => {
     });
 
     it('shows "would pull" for synced remote repos with branch ref', async () => {
+      setup();
       setupPluginConfig([
         {
           type: 'remote',
@@ -867,7 +879,7 @@ describe('syncExecutor', () => {
       ]);
       mockDetectRepoState.mockReturnValue('cloned');
 
-      await syncExecutor({ dryRun: true }, createContext());
+      await syncExecutor({ dryRun: true }, createTestContext());
 
       const infoCalls = mockLoggerInfo.mock.calls.map((c) => String(c[0]));
       const hasWouldPull = infoCalls.some(
@@ -879,6 +891,7 @@ describe('syncExecutor', () => {
     });
 
     it('shows "would sync to tag" for synced remote repos with tag ref', async () => {
+      setup();
       setupPluginConfig([
         {
           type: 'remote',
@@ -892,7 +905,7 @@ describe('syncExecutor', () => {
       mockDetectRepoState.mockReturnValue('cloned');
       mockIsGitTag.mockResolvedValue(true);
 
-      await syncExecutor({ dryRun: true }, createContext());
+      await syncExecutor({ dryRun: true }, createTestContext());
 
       const infoCalls = mockLoggerInfo.mock.calls.map((c) => String(c[0]));
       const hasWouldSwitchToTag = infoCalls.some(
@@ -904,6 +917,7 @@ describe('syncExecutor', () => {
     });
 
     it('shows dirty warning in dry-run when working tree is dirty', async () => {
+      setup();
       setupPluginConfig([
         {
           type: 'remote',
@@ -923,7 +937,7 @@ describe('syncExecutor', () => {
         conflicts: 0,
       });
 
-      await syncExecutor({ dryRun: true }, createContext());
+      await syncExecutor({ dryRun: true }, createTestContext());
 
       const infoCalls = mockLoggerInfo.mock.calls.map((c) => String(c[0]));
       const hasDirtyWarning = infoCalls.some((msg) =>
@@ -934,12 +948,13 @@ describe('syncExecutor', () => {
     });
 
     it('shows "would skip" for local repos that do not exist', async () => {
+      setup();
       setupPluginConfig([
         { type: 'local', alias: 'repo-b', path: 'D:/projects/repo-b' },
       ]);
       mockDetectRepoState.mockReturnValue('not-synced');
 
-      await syncExecutor({ dryRun: true }, createContext());
+      await syncExecutor({ dryRun: true }, createTestContext());
 
       const infoCalls = mockLoggerInfo.mock.calls.map((c) => String(c[0]));
       const hasWouldSkip = infoCalls.some(
@@ -950,6 +965,7 @@ describe('syncExecutor', () => {
     });
 
     it('returns success:true in dry-run mode', async () => {
+      setup();
       setupPluginConfig([
         {
           type: 'remote',
@@ -961,12 +977,13 @@ describe('syncExecutor', () => {
       ]);
       mockDetectRepoState.mockReturnValue('not-synced');
 
-      const result = await syncExecutor({ dryRun: true }, createContext());
+      const result = await syncExecutor({ dryRun: true }, createTestContext());
 
       expect(result).toEqual({ success: true });
     });
 
     it('shows [WARN: detached HEAD] in dry-run when repo has detached HEAD (non-tag)', async () => {
+      setup();
       setupPluginConfig([
         {
           type: 'remote',
@@ -981,7 +998,7 @@ describe('syncExecutor', () => {
       mockGetCurrentBranch.mockResolvedValue(null);
       mockGetCurrentRef.mockResolvedValue('abc1234');
 
-      await syncExecutor({ dryRun: true }, createContext());
+      await syncExecutor({ dryRun: true }, createTestContext());
 
       const infoCalls = mockLoggerInfo.mock.calls.map((c) => String(c[0]));
       const hasDetachedWarning = infoCalls.some((msg) =>
@@ -992,6 +1009,7 @@ describe('syncExecutor', () => {
     });
 
     it('shows [WARN: tag-pinned] in dry-run when repo is at a tag ref', async () => {
+      setup();
       setupPluginConfig([
         {
           type: 'remote',
@@ -1007,7 +1025,7 @@ describe('syncExecutor', () => {
       mockGetCurrentRef.mockResolvedValue('v1.2.3');
       mockIsGitTag.mockResolvedValue(true);
 
-      await syncExecutor({ dryRun: true }, createContext());
+      await syncExecutor({ dryRun: true }, createTestContext());
 
       const infoCalls = mockLoggerInfo.mock.calls.map((c) => String(c[0]));
       const hasTagPinnedWarning = infoCalls.some((msg) =>
@@ -1018,6 +1036,7 @@ describe('syncExecutor', () => {
     });
 
     it('shows both dirty and detached HEAD warnings in dry-run', async () => {
+      setup();
       setupPluginConfig([
         {
           type: 'remote',
@@ -1039,7 +1058,7 @@ describe('syncExecutor', () => {
       mockGetCurrentBranch.mockResolvedValue(null);
       mockGetCurrentRef.mockResolvedValue('abc1234');
 
-      await syncExecutor({ dryRun: true }, createContext());
+      await syncExecutor({ dryRun: true }, createTestContext());
 
       const infoCalls = mockLoggerInfo.mock.calls.map((c) => String(c[0]));
       const hasBothWarnings = infoCalls.some(
@@ -1052,6 +1071,7 @@ describe('syncExecutor', () => {
     });
 
     it('shows both dirty and tag-pinned warnings in dry-run', async () => {
+      setup();
       setupPluginConfig([
         {
           type: 'remote',
@@ -1074,7 +1094,7 @@ describe('syncExecutor', () => {
       mockGetCurrentRef.mockResolvedValue('v1.2.3');
       mockIsGitTag.mockResolvedValue(true);
 
-      await syncExecutor({ dryRun: true }, createContext());
+      await syncExecutor({ dryRun: true }, createTestContext());
 
       const infoCalls = mockLoggerInfo.mock.calls.map((c) => String(c[0]));
       const hasBothWarnings = infoCalls.some(
@@ -1087,6 +1107,7 @@ describe('syncExecutor', () => {
     });
 
     it('does not call any git commands in dry-run mode', async () => {
+      setup();
       setupPluginConfig([
         {
           type: 'remote',
@@ -1107,7 +1128,7 @@ describe('syncExecutor', () => {
       ]);
       mockDetectRepoState.mockReturnValue('cloned');
 
-      await syncExecutor({ dryRun: true }, createContext());
+      await syncExecutor({ dryRun: true }, createTestContext());
 
       expect(mockGitClone).not.toHaveBeenCalled();
       expect(mockGitPull).not.toHaveBeenCalled();
@@ -1120,6 +1141,7 @@ describe('syncExecutor', () => {
 
   describe('summary table', () => {
     it('prints aligned Results table after sync completes', async () => {
+      setup();
       setupPluginConfig([
         {
           type: 'remote',
@@ -1138,7 +1160,7 @@ describe('syncExecutor', () => {
       ]);
       mockDetectRepoState.mockReturnValue('not-synced');
 
-      await syncExecutor({}, createContext());
+      await syncExecutor({}, createTestContext());
 
       const infoCalls = mockLoggerInfo.mock.calls.map((c) => String(c[0]));
       const hasResults = infoCalls.some((msg) => msg === 'Results:');
@@ -1148,6 +1170,7 @@ describe('syncExecutor', () => {
     });
 
     it('shows [OK] for successful repos and [ERROR] for failed repos', async () => {
+      setup();
       setupPluginConfig([
         {
           type: 'remote',
@@ -1169,7 +1192,7 @@ describe('syncExecutor', () => {
         .mockResolvedValueOnce(undefined)
         .mockRejectedValueOnce(new Error('auth denied'));
 
-      await syncExecutor({}, createContext());
+      await syncExecutor({}, createTestContext());
 
       const tableCallArgs = mockFormatAlignedTable.mock.calls[0][0];
       const hasOk = tableCallArgs.some((row: Array<{ value: string }>) =>
@@ -1184,6 +1207,7 @@ describe('syncExecutor', () => {
     });
 
     it('summary table appears after streaming progress lines', async () => {
+      setup();
       setupPluginConfig([
         {
           type: 'remote',
@@ -1195,7 +1219,7 @@ describe('syncExecutor', () => {
       ]);
       mockDetectRepoState.mockReturnValue('not-synced');
 
-      await syncExecutor({}, createContext());
+      await syncExecutor({}, createTestContext());
 
       const infoCalls = mockLoggerInfo.mock.calls.map((c) => String(c[0]));
       const cloningIndex = infoCalls.findIndex((msg) =>
@@ -1210,6 +1234,7 @@ describe('syncExecutor', () => {
     });
 
     it('summary line still shows N synced, M failed', async () => {
+      setup();
       setupPluginConfig([
         {
           type: 'remote',
@@ -1231,7 +1256,7 @@ describe('syncExecutor', () => {
         .mockResolvedValueOnce(undefined)
         .mockRejectedValueOnce(new Error('failed'));
 
-      await syncExecutor({}, createContext());
+      await syncExecutor({}, createTestContext());
 
       const infoCalls = mockLoggerInfo.mock.calls.map((c) => String(c[0]));
       const summaryLine = infoCalls.find(
@@ -1246,6 +1271,7 @@ describe('syncExecutor', () => {
 
   describe('disableHooks', () => {
     it('passes disableHooks=true to gitClone by default for remote repos', async () => {
+      setup();
       setupPluginConfig([
         {
           type: 'remote',
@@ -1257,7 +1283,7 @@ describe('syncExecutor', () => {
       ]);
       mockDetectRepoState.mockReturnValue('not-synced');
 
-      await syncExecutor({}, createContext());
+      await syncExecutor({}, createTestContext());
 
       expect(mockGitClone).toHaveBeenCalledWith(
         'https://github.com/org/repo-a.git',
@@ -1267,6 +1293,7 @@ describe('syncExecutor', () => {
     });
 
     it('passes disableHooks=true to gitPull by default for synced remote repos', async () => {
+      setup();
       setupPluginConfig([
         {
           type: 'remote',
@@ -1278,7 +1305,7 @@ describe('syncExecutor', () => {
       ]);
       mockDetectRepoState.mockReturnValue('cloned');
 
-      await syncExecutor({}, createContext());
+      await syncExecutor({}, createTestContext());
 
       expect(mockGitPull).toHaveBeenCalledWith(
         expect.stringContaining('.repos'),
@@ -1287,6 +1314,7 @@ describe('syncExecutor', () => {
     });
 
     it('passes disableHooks=true to gitFetchTag for tag ref repos', async () => {
+      setup();
       setupPluginConfig([
         {
           type: 'remote',
@@ -1300,7 +1328,7 @@ describe('syncExecutor', () => {
       mockDetectRepoState.mockReturnValue('cloned');
       mockIsGitTag.mockResolvedValue(true);
 
-      await syncExecutor({}, createContext());
+      await syncExecutor({}, createTestContext());
 
       expect(mockGitFetchTag).toHaveBeenCalledWith(
         expect.stringContaining('.repos'),
@@ -1311,17 +1339,19 @@ describe('syncExecutor', () => {
     });
 
     it('does not pass disableHooks for local repos', async () => {
+      setup();
       setupPluginConfig([
         { type: 'local', alias: 'repo-b', path: 'D:/projects/repo-b' },
       ]);
       mockDetectRepoState.mockReturnValue('referenced');
 
-      await syncExecutor({}, createContext());
+      await syncExecutor({}, createTestContext());
 
       expect(mockGitPull).toHaveBeenCalledWith('D:/projects/repo-b', undefined);
     });
 
     it('passes disableHooks=false when explicitly set to false', async () => {
+      setup();
       setupPluginConfig([
         {
           type: 'remote',
@@ -1333,7 +1363,7 @@ describe('syncExecutor', () => {
       ]);
       mockDetectRepoState.mockReturnValue('cloned');
 
-      await syncExecutor({}, createContext());
+      await syncExecutor({}, createTestContext());
 
       expect(mockGitPull).toHaveBeenCalledWith(
         expect.stringContaining('.repos'),
@@ -1344,6 +1374,7 @@ describe('syncExecutor', () => {
 
   describe('branch transition (tag-to-branch, branch-to-branch)', () => {
     it('checks out target branch when repo is on detached HEAD (tag-to-branch)', async () => {
+      setup();
       setupPluginConfig([
         {
           type: 'remote',
@@ -1358,7 +1389,7 @@ describe('syncExecutor', () => {
       mockIsGitTag.mockResolvedValue(false);
       mockGetCurrentBranch.mockResolvedValue(null); // detached HEAD
 
-      await syncExecutor({}, createContext());
+      await syncExecutor({}, createTestContext());
 
       expect(mockGitCheckoutBranch).toHaveBeenCalledWith(
         expect.stringContaining('.repos'),
@@ -1369,6 +1400,7 @@ describe('syncExecutor', () => {
     });
 
     it('checks out target branch when repo is on wrong branch', async () => {
+      setup();
       setupPluginConfig([
         {
           type: 'remote',
@@ -1383,7 +1415,7 @@ describe('syncExecutor', () => {
       mockIsGitTag.mockResolvedValue(false);
       mockGetCurrentBranch.mockResolvedValue('develop'); // wrong branch
 
-      await syncExecutor({}, createContext());
+      await syncExecutor({}, createTestContext());
 
       expect(mockGitCheckoutBranch).toHaveBeenCalledWith(
         expect.stringContaining('.repos'),
@@ -1394,6 +1426,7 @@ describe('syncExecutor', () => {
     });
 
     it('skips checkout when already on the correct branch', async () => {
+      setup();
       setupPluginConfig([
         {
           type: 'remote',
@@ -1408,13 +1441,14 @@ describe('syncExecutor', () => {
       mockIsGitTag.mockResolvedValue(false);
       mockGetCurrentBranch.mockResolvedValue('main'); // already on correct branch
 
-      await syncExecutor({}, createContext());
+      await syncExecutor({}, createTestContext());
 
       expect(mockGitCheckoutBranch).not.toHaveBeenCalled();
       expect(mockGitPull).toHaveBeenCalled();
     });
 
     it('skips checkout when ref is undefined', async () => {
+      setup();
       setupPluginConfig([
         {
           type: 'remote',
@@ -1427,13 +1461,14 @@ describe('syncExecutor', () => {
       mockDetectRepoState.mockReturnValue('cloned');
       mockIsGitTag.mockResolvedValue(false);
 
-      await syncExecutor({}, createContext());
+      await syncExecutor({}, createTestContext());
 
       expect(mockGitCheckoutBranch).not.toHaveBeenCalled();
       expect(mockGitPull).toHaveBeenCalled();
     });
 
     it('dry-run shows "would switch to branch and pull" when on detached HEAD', async () => {
+      setup();
       setupPluginConfig([
         {
           type: 'remote',
@@ -1448,7 +1483,7 @@ describe('syncExecutor', () => {
       mockIsGitTag.mockResolvedValue(false);
       mockGetCurrentBranch.mockResolvedValue(null); // detached HEAD
 
-      await syncExecutor({ dryRun: true }, createContext());
+      await syncExecutor({ dryRun: true }, createTestContext());
 
       const infoCalls = mockLoggerInfo.mock.calls.map((c) => String(c[0]));
       const hasSwitch = infoCalls.some(
@@ -1462,6 +1497,7 @@ describe('syncExecutor', () => {
     });
 
     it('logs switching message before checkout', async () => {
+      setup();
       setupPluginConfig([
         {
           type: 'remote',
@@ -1476,7 +1512,7 @@ describe('syncExecutor', () => {
       mockIsGitTag.mockResolvedValue(false);
       mockGetCurrentBranch.mockResolvedValue(null);
 
-      await syncExecutor({}, createContext());
+      await syncExecutor({}, createTestContext());
 
       const infoCalls = mockLoggerInfo.mock.calls.map((c) => String(c[0]));
       const hasSwitchMsg = infoCalls.some((msg) =>
@@ -1501,10 +1537,7 @@ describe('syncExecutor', () => {
         plugins: [{ plugin: '@op-nx/polyrepo', options: fakeConfig }],
       });
       const lockContent = Buffer.from('lockfile-content');
-      const hash = require('node:crypto')
-        .createHash('sha256')
-        .update(lockContent)
-        .digest('hex');
+      const hash = createHash('sha256').update(lockContent).digest('hex');
       mockExistsSync.mockImplementation((p) => {
         const path = String(p);
 
@@ -1566,6 +1599,7 @@ describe('syncExecutor', () => {
     }
 
     it('skips install when lockfile hash matches stored hash (deps up to date)', async () => {
+      setup();
       setupPluginConfig([
         {
           type: 'remote',
@@ -1581,12 +1615,13 @@ describe('syncExecutor', () => {
       setupDepsInstalled();
       setupSpawnMockSuccess();
 
-      await syncExecutor({}, createContext());
+      await syncExecutor({}, createTestContext());
 
       expect(mockSpawn).not.toHaveBeenCalled();
     });
 
     it('installs when no stored hash exists (first install or failed previous)', async () => {
+      setup();
       setupPluginConfig([
         {
           type: 'remote',
@@ -1602,7 +1637,7 @@ describe('syncExecutor', () => {
       setupDepsNotInstalled();
       setupSpawnMockSuccess();
 
-      await syncExecutor({}, createContext());
+      await syncExecutor({}, createTestContext());
 
       expect(mockSpawn).toHaveBeenCalledWith(
         expect.stringContaining('install'),
@@ -1611,6 +1646,7 @@ describe('syncExecutor', () => {
     });
 
     it('installs after pull when no stored hash exists', async () => {
+      setup();
       setupPluginConfig([
         {
           type: 'remote',
@@ -1625,7 +1661,7 @@ describe('syncExecutor', () => {
       setupDepsNotInstalled();
       setupSpawnMockSuccess();
 
-      await syncExecutor({}, createContext());
+      await syncExecutor({}, createTestContext());
 
       expect(mockSpawn).toHaveBeenCalledWith(
         expect.stringContaining('install'),
@@ -1634,6 +1670,7 @@ describe('syncExecutor', () => {
     });
 
     it('skips install after pull when deps already installed', async () => {
+      setup();
       setupPluginConfig([
         {
           type: 'remote',
@@ -1648,12 +1685,13 @@ describe('syncExecutor', () => {
       setupDepsInstalled();
       setupSpawnMockSuccess();
 
-      await syncExecutor({}, createContext());
+      await syncExecutor({}, createTestContext());
 
       expect(mockSpawn).not.toHaveBeenCalled();
     });
 
     it('always installs after clone (new repo)', async () => {
+      setup();
       setupPluginConfig([
         {
           type: 'remote',
@@ -1666,7 +1704,7 @@ describe('syncExecutor', () => {
       mockDetectRepoState.mockReturnValue('not-synced');
       setupSpawnMockSuccess();
 
-      await syncExecutor({}, createContext());
+      await syncExecutor({}, createTestContext());
 
       expect(mockSpawn).toHaveBeenCalledWith(
         expect.stringContaining('install'),
@@ -1675,6 +1713,7 @@ describe('syncExecutor', () => {
     });
 
     it('installs when no lockfile exists (cannot determine if deps changed)', async () => {
+      setup();
       setupPluginConfig([
         {
           type: 'remote',
@@ -1689,7 +1728,7 @@ describe('syncExecutor', () => {
       // Default existsSync returns false -> no lockfile found
       setupSpawnMockSuccess();
 
-      await syncExecutor({}, createContext());
+      await syncExecutor({}, createTestContext());
 
       expect(mockSpawn).toHaveBeenCalledWith(
         expect.stringContaining('install'),
@@ -1698,6 +1737,7 @@ describe('syncExecutor', () => {
     });
 
     it('retries install when previous install failed (no stored hash written)', async () => {
+      setup();
       setupPluginConfig([
         {
           type: 'remote',
@@ -1710,11 +1750,11 @@ describe('syncExecutor', () => {
       ]);
       mockDetectRepoState.mockReturnValue('cloned');
       mockIsGitTag.mockResolvedValue(true);
-      // Lockfile exists but no stored hash → needsInstall returns true
+      // Lockfile exists but no stored hash -> needsInstall returns true
       setupDepsNotInstalled();
       setupSpawnMockSuccess();
 
-      await syncExecutor({}, createContext());
+      await syncExecutor({}, createTestContext());
 
       expect(mockSpawn).toHaveBeenCalledWith(
         expect.stringContaining('install'),
@@ -1723,6 +1763,7 @@ describe('syncExecutor', () => {
     });
 
     it('writes stored hash after successful install', async () => {
+      setup();
       setupPluginConfig([
         {
           type: 'remote',
@@ -1736,7 +1777,7 @@ describe('syncExecutor', () => {
       setupDepsNotInstalled();
       setupSpawnMockSuccess();
 
-      await syncExecutor({}, createContext());
+      await syncExecutor({}, createTestContext());
 
       expect(mockWriteFileSync).toHaveBeenCalledWith(
         expect.stringContaining('.lock-hash'),
@@ -1745,6 +1786,7 @@ describe('syncExecutor', () => {
     });
 
     it('does not write stored hash when install fails', async () => {
+      setup();
       setupPluginConfig([
         {
           type: 'remote',
@@ -1758,7 +1800,7 @@ describe('syncExecutor', () => {
       mockExistsSync.mockReturnValue(false);
       mockSpawn.mockImplementation(() => createMockChildProcess(1));
 
-      await syncExecutor({}, createContext());
+      await syncExecutor({}, createTestContext());
 
       const hashWrites = mockWriteFileSync.mock.calls.filter((call) =>
         String(call[0]).endsWith('.lock-hash'),
@@ -1768,6 +1810,7 @@ describe('syncExecutor', () => {
     });
 
     it('skips install for local repo when deps already installed', async () => {
+      setup();
       setupPluginConfig([
         { type: 'local', alias: 'repo-b', path: 'D:/projects/repo-b' },
       ]);
@@ -1775,7 +1818,7 @@ describe('syncExecutor', () => {
       setupDepsInstalled();
       setupSpawnMockSuccess();
 
-      await syncExecutor({}, createContext());
+      await syncExecutor({}, createTestContext());
 
       expect(mockSpawn).not.toHaveBeenCalled();
     });
