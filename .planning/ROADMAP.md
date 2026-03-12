@@ -13,7 +13,7 @@ This roadmap delivers a working Nx plugin for synthetic monorepos in three phase
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Plugin Foundation + Repo Assembly** - Plugin skeleton, git clone/pull, nx.json config with validation
-- [ ] **Phase 2: Unified Project Graph** - External projects in nx graph with namespacing and cached extraction
+- [x] **Phase 2: Unified Project Graph** - External projects in nx graph with namespacing and cached extraction (completed 2026-03-12)
 - [x] **Phase 3: Multi-Repo Git DX** - Combined status, bulk operations, per-repo output (completed 2026-03-11)
 
 ## Phase Details
@@ -49,7 +49,7 @@ Plans:
 - [x] 02-01-PLAN.md -- Graph types, git utilities, config duplicate URL detection, sync dep install
 - [x] 02-02-PLAN.md -- Graph extraction pipeline (nx graph --print), two-layer cache, transformation (namespacing, tags, target rewriting)
 - [x] 02-03-PLAN.md -- Run executor, createNodesV2 extension for external projects, createDependencies for intra-repo edges
-- [ ] 02-04-PLAN.md -- Gap closure: fix stdout contamination in extractGraphFromRepo (NX_VERBOSE_LOGGING env leak)
+- [x] 02-04-PLAN.md -- Gap closure: fix stdout contamination in extractGraphFromRepo (NX_VERBOSE_LOGGING env leak)
 
 ### Phase 3: Multi-Repo Git DX
 **Goal**: Users can monitor and manage git state across all synced repos from a single command surface
@@ -80,5 +80,5 @@ Phases execute in numeric order: 1 -> 2 -> 3
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Plugin Foundation + Repo Assembly | 3/3 | Complete | 2026-03-10 |
-| 2. Unified Project Graph | 3/4 | Gap Closure | -- |
+| 2. Unified Project Graph | 4/4 | Complete | 2026-03-12 |
 | 3. Multi-Repo Git DX | 9/9 | Complete   | 2026-03-11 |
