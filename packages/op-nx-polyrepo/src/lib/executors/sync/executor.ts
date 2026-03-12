@@ -2,6 +2,7 @@ import { readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
+import { z } from 'zod';
 import { logger } from '@nx/devkit';
 import type { ExecutorContext } from '@nx/devkit';
 import { resolvePluginConfig } from '../../config/resolve';
@@ -38,6 +39,12 @@ function detectPackageManager(
   return 'npm';
 }
 
+const packageJsonSchema = z
+  .object({
+    packageManager: z.string().optional(),
+  })
+  .loose();
+
 function getCorepackPm(
   repoPath: string,
 ): string | undefined {
@@ -48,8 +55,15 @@ function getCorepackPm(
       return undefined;
     }
 
-    const pkgJson = JSON.parse(readFileSync(pkgJsonPath, 'utf-8'));
-    const field: unknown = pkgJson.packageManager;
+    const result = packageJsonSchema.safeParse(
+      JSON.parse(readFileSync(pkgJsonPath, 'utf-8')),
+    );
+
+    if (!result.success) {
+      return undefined;
+    }
+
+    const field = result.data.packageManager;
 
     if (typeof field !== 'string') {
       return undefined;

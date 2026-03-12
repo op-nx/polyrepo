@@ -1,5 +1,6 @@
 import { exec } from 'node:child_process';
 import { join } from 'node:path';
+import { externalGraphJsonSchema } from './types';
 import type { ExternalGraphJson } from './types';
 
 /**
@@ -61,8 +62,21 @@ export function extractGraphFromRepo(
         const jsonPayload = stdout.substring(jsonStart);
 
         try {
-          const parsed: ExternalGraphJson = JSON.parse(jsonPayload);
-          resolve(parsed);
+          const result = externalGraphJsonSchema.safeParse(
+            JSON.parse(jsonPayload),
+          );
+
+          if (!result.success) {
+            reject(
+              new Error(
+                `Invalid graph JSON from ${repoPath}: ${result.error.message}`,
+              ),
+            );
+
+            return;
+          }
+
+          resolve(result.data);
         } catch (parseError) {
           reject(
             new Error(
