@@ -27,7 +27,12 @@ export function extractGraphFromRepo(
       {
         cwd: repoPath,
         maxBuffer: LARGE_BUFFER,
-        env: { ...process.env, NX_DAEMON: 'false' },
+        env: {
+          ...process.env,
+          NX_DAEMON: 'false',
+          NX_VERBOSE_LOGGING: 'false',
+          NX_PERF_LOGGING: 'false',
+        },
         windowsHide: true,
       },
       (error, stdout, stderr) => {
@@ -41,8 +46,22 @@ export function extractGraphFromRepo(
           return;
         }
 
+        const jsonStart = stdout.indexOf('{');
+
+        if (jsonStart < 0) {
+          reject(
+            new Error(
+              `No JSON found in stdout from ${repoPath}: ${stdout.slice(0, 200)}`,
+            ),
+          );
+
+          return;
+        }
+
+        const jsonPayload = stdout.substring(jsonStart);
+
         try {
-          const parsed = JSON.parse(stdout) as ExternalGraphJson;
+          const parsed = JSON.parse(jsonPayload) as ExternalGraphJson;
           resolve(parsed);
         } catch (parseError) {
           reject(
