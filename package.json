@@ -36,6 +36,7 @@
     "@swc/helpers": "~0.5.18",
     "@types/node": "20.19.9",
     "@vitest/coverage-v8": "^4.0.0",
+    "@vitest/eslint-plugin": "^1.6.11",
     "@vitest/ui": "^4.0.0",
     "create-nx-workspace": "^22.5.4",
     "esbuild": "^0.25.0",
