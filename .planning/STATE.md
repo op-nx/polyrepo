@@ -58,6 +58,7 @@ Progress: [██████████] 100% (17/17 plans)
 ### Roadmap Evolution
 
 - Phase 4 added: Code cleanup (tech debt from v1.0 audit — hardcoded cache filename, duplicated config reading)
+- Phase 5 added: Maximum type safety (originally "Avoid type casting and prefer satisfies", scope expanded during discussion)
 
 ### Decisions
 
