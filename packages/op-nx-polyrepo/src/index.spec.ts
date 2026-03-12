@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import type {
   CreateNodesContextV2,
   CreateDependenciesContext,
@@ -49,17 +49,36 @@ import { logger } from '@nx/devkit';
 import { populateGraphReport } from './lib/graph/cache';
 import type { PolyrepoGraphReport } from './lib/graph/types';
 
-const mockedPopulateGraphReport = vi.mocked(populateGraphReport);
-const mockedLoggerWarn = vi.mocked(logger.warn);
-
-const mockContext: CreateNodesContextV2 = {
-  nxJsonConfiguration: {},
-  workspaceRoot: '/workspace',
-};
-
-beforeEach(() => {
+function setup() {
   vi.clearAllMocks();
-});
+
+  const mockedPopulateGraphReport = vi.mocked(populateGraphReport);
+  const mockedLoggerWarn = vi.mocked(logger.warn);
+
+  const mockContext: CreateNodesContextV2 = {
+    nxJsonConfiguration: {},
+    workspaceRoot: '/workspace',
+  };
+
+  return { mockedPopulateGraphReport, mockedLoggerWarn, mockContext };
+}
+
+/**
+ * Create a minimal CreateDependenciesContext for testing.
+ * Uses properly typed fields instead of stub casts.
+ */
+function createDepContext(
+  projects: Record<string, { root: string }>,
+): CreateDependenciesContext {
+  return {
+    projects,
+    nxJsonConfiguration: {},
+    workspaceRoot: '/workspace',
+    externalNodes: {},
+    fileMap: { projectFileMap: {}, nonProjectFiles: [] },
+    filesToProcess: { projectFileMap: {}, nonProjectFiles: [] },
+  };
+}
 
 describe('createNodesV2', () => {
   it('is exported as a tuple with nx.json glob', () => {
@@ -69,15 +88,18 @@ describe('createNodesV2', () => {
   });
 
   it('callback throws for invalid config (no repos key)', async () => {
+    const { mockContext } = setup();
+
     const [, callback] = createNodesV2;
 
     await expect(
-      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- stub object for test data not inspected by SUT
-      callback(['nx.json'], {} as never, mockContext),
+      callback(['nx.json'], undefined, mockContext),
     ).rejects.toThrow();
   });
 
   it('callback returns polyrepo-sync and polyrepo-status targets on root project', async () => {
+    const { mockedPopulateGraphReport, mockContext } = setup();
+
     mockedPopulateGraphReport.mockResolvedValue({ repos: {} });
 
     const [, callback] = createNodesV2;
@@ -89,9 +111,17 @@ describe('createNodesV2', () => {
     const results = await callback(['nx.json'], options, mockContext);
 
     expect(results).toHaveLength(1);
-    expect(results[0][0]).toBe('nx.json');
 
-    const createNodesResult = results[0][1];
+    const firstResult = results[0];
+    expect(firstResult).toBeDefined();
+
+    if (!firstResult) {
+      return;
+    }
+
+    expect(firstResult[0]).toBe('nx.json');
+
+    const createNodesResult = firstResult[1];
 
     const projects = createNodesResult.projects;
     expect(projects).toBeDefined();
@@ -113,6 +143,8 @@ describe('createNodesV2', () => {
   });
 
   it('calls populateGraphReport with config, workspaceRoot, and options hash', async () => {
+    const { mockedPopulateGraphReport, mockContext } = setup();
+
     mockedPopulateGraphReport.mockResolvedValue({ repos: {} });
 
     const [, callback] = createNodesV2;
@@ -132,6 +164,8 @@ describe('createNodesV2', () => {
   });
 
   it('registers external projects from graph report alongside root project', async () => {
+    const { mockedPopulateGraphReport, mockContext } = setup();
+
     const report: PolyrepoGraphReport = {
       repos: {
         'repo-a': {
@@ -186,35 +220,43 @@ describe('createNodesV2', () => {
     };
 
     const results = await callback(['nx.json'], options, mockContext);
-    const projects = results[0][1].projects ?? {};
+    const firstResult = results[0];
+
+    if (!firstResult) {
+      throw new Error('Expected at least one result');
+    }
+
+    const projects = firstResult[1].projects ?? {};
 
     // Root project still there
     expect(projects['.']).toBeDefined();
-    expect(projects['.'].targets?.['polyrepo-sync']).toBeDefined();
+    expect(projects['.']?.targets?.['polyrepo-sync']).toBeDefined();
 
     // External projects registered by root path
     const myLib = projects['.repos/repo-a/libs/my-lib'];
     expect(myLib).toBeDefined();
-    expect(myLib.name).toBe('repo-a/my-lib');
-    expect(myLib.projectType).toBe('library');
-    expect(myLib.sourceRoot).toBe('.repos/repo-a/libs/my-lib/src');
-    expect(myLib.tags).toEqual([
+    expect(myLib?.name).toBe('repo-a/my-lib');
+    expect(myLib?.projectType).toBe('library');
+    expect(myLib?.sourceRoot).toBe('.repos/repo-a/libs/my-lib/src');
+    expect(myLib?.tags).toEqual([
       'scope:shared',
       'polyrepo:external',
       'polyrepo:repo-a',
     ]);
-    expect(myLib.metadata).toEqual({
+    expect(myLib?.metadata).toEqual({
       description: 'My library',
     });
-    expect(myLib.targets?.['build']).toBeDefined();
+    expect(myLib?.targets?.['build']).toBeDefined();
 
     const myApp = projects['.repos/repo-a/apps/my-app'];
     expect(myApp).toBeDefined();
-    expect(myApp.name).toBe('repo-a/my-app');
-    expect(myApp.projectType).toBe('application');
+    expect(myApp?.name).toBe('repo-a/my-app');
+    expect(myApp?.projectType).toBe('application');
   });
 
   it('registers only root project when graph report has empty repos', async () => {
+    const { mockedPopulateGraphReport, mockContext } = setup();
+
     mockedPopulateGraphReport.mockResolvedValue({ repos: {} });
 
     const [, callback] = createNodesV2;
@@ -224,12 +266,20 @@ describe('createNodesV2', () => {
     };
 
     const results = await callback(['nx.json'], options, mockContext);
-    const projects = results[0][1].projects ?? {};
+    const firstResult = results[0];
+
+    if (!firstResult) {
+      throw new Error('Expected at least one result');
+    }
+
+    const projects = firstResult[1].projects ?? {};
 
     expect(Object.keys(projects)).toEqual(['.']);
   });
 
   it('logs warning and registers only root project when populateGraphReport throws', async () => {
+    const { mockedPopulateGraphReport, mockedLoggerWarn, mockContext } = setup();
+
     mockedPopulateGraphReport.mockRejectedValue(new Error('extraction failed'));
 
     const [, callback] = createNodesV2;
@@ -239,7 +289,13 @@ describe('createNodesV2', () => {
     };
 
     const results = await callback(['nx.json'], options, mockContext);
-    const projects = results[0][1].projects ?? {};
+    const firstResult = results[0];
+
+    if (!firstResult) {
+      throw new Error('Expected at least one result');
+    }
+
+    const projects = firstResult[1].projects ?? {};
 
     // Only root project registered
     expect(Object.keys(projects)).toEqual(['.']);
@@ -253,6 +309,8 @@ describe('createNodesV2', () => {
 
 describe('createDependencies', () => {
   it('returns implicit dependencies from graph report', async () => {
+    const { mockedPopulateGraphReport } = setup();
+
     const report: PolyrepoGraphReport = {
       repos: {
         'repo-a': {
@@ -270,21 +328,14 @@ describe('createDependencies', () => {
 
     mockedPopulateGraphReport.mockResolvedValue(report);
 
-    const depContext: CreateDependenciesContext = {
-      projects: {
-        'repo-a/my-app': {
-          root: '.repos/repo-a/apps/my-app',
-        },
-        'repo-a/my-lib': {
-          root: '.repos/repo-a/libs/my-lib',
-        },
+    const depContext = createDepContext({
+      'repo-a/my-app': {
+        root: '.repos/repo-a/apps/my-app',
       },
-      nxJsonConfiguration: {},
-      workspaceRoot: '/workspace',
-      externalNodes: {},
-      fileMap: { projectFileMap: {}, nonProjectFiles: [] },
-      filesToProcess: { projectFileMap: {}, nonProjectFiles: [] },
-    };
+      'repo-a/my-lib': {
+        root: '.repos/repo-a/libs/my-lib',
+      },
+    });
 
     const options = {
       repos: { 'repo-a': 'git@github.com:org/repo-a.git' },
@@ -301,6 +352,8 @@ describe('createDependencies', () => {
   });
 
   it('only includes edges where both source and target exist in context.projects', async () => {
+    const { mockedPopulateGraphReport } = setup();
+
     const report: PolyrepoGraphReport = {
       repos: {
         'repo-a': {
@@ -323,22 +376,15 @@ describe('createDependencies', () => {
 
     mockedPopulateGraphReport.mockResolvedValue(report);
 
-    const depContext: CreateDependenciesContext = {
-      projects: {
-        'repo-a/my-app': {
-          root: '.repos/repo-a/apps/my-app',
-        },
-        'repo-a/my-lib': {
-          root: '.repos/repo-a/libs/my-lib',
-        },
-        // 'repo-a/missing-lib' NOT in context
+    const depContext = createDepContext({
+      'repo-a/my-app': {
+        root: '.repos/repo-a/apps/my-app',
       },
-      nxJsonConfiguration: {},
-      workspaceRoot: '/workspace',
-      externalNodes: {},
-      fileMap: { projectFileMap: {}, nonProjectFiles: [] },
-      filesToProcess: { projectFileMap: {}, nonProjectFiles: [] },
-    };
+      'repo-a/my-lib': {
+        root: '.repos/repo-a/libs/my-lib',
+      },
+      // 'repo-a/missing-lib' NOT in context
+    });
 
     const options = {
       repos: { 'repo-a': 'git@github.com:org/repo-a.git' },
@@ -347,20 +393,15 @@ describe('createDependencies', () => {
     const deps = await createDependencies(options, depContext);
 
     expect(deps).toHaveLength(1);
-    expect(deps[0].target).toBe('repo-a/my-lib');
+    expect(deps[0]).toEqual(expect.objectContaining({ target: 'repo-a/my-lib' }));
   });
 
   it('returns empty array when populateGraphReport fails', async () => {
+    const { mockedPopulateGraphReport } = setup();
+
     mockedPopulateGraphReport.mockRejectedValue(new Error('extraction failed'));
 
-    const depContext: CreateDependenciesContext = {
-      projects: {},
-      nxJsonConfiguration: {},
-      workspaceRoot: '/workspace',
-      externalNodes: {},
-      fileMap: { projectFileMap: {}, nonProjectFiles: [] },
-      filesToProcess: { projectFileMap: {}, nonProjectFiles: [] },
-    };
+    const depContext = createDepContext({});
 
     const options = {
       repos: { 'repo-a': 'git@github.com:org/repo-a.git' },
@@ -372,16 +413,11 @@ describe('createDependencies', () => {
   });
 
   it('returns empty array when no graph report exists (no synced repos)', async () => {
+    const { mockedPopulateGraphReport } = setup();
+
     mockedPopulateGraphReport.mockResolvedValue({ repos: {} });
 
-    const depContext: CreateDependenciesContext = {
-      projects: {},
-      nxJsonConfiguration: {},
-      workspaceRoot: '/workspace',
-      externalNodes: {},
-      fileMap: { projectFileMap: {}, nonProjectFiles: [] },
-      filesToProcess: { projectFileMap: {}, nonProjectFiles: [] },
-    };
+    const depContext = createDepContext({});
 
     const options = {
       repos: { 'repo-a': 'git@github.com:org/repo-a.git' },

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import type { ExecFileException } from 'node:child_process';
+import type { ChildProcess, ExecFileException } from 'node:child_process';
+import { EventEmitter } from 'node:events';
 
 // Mock node:child_process before importing commands
 vi.mock('node:child_process', () => {
@@ -21,12 +22,69 @@ import {
   gitCheckoutBranch,
 } from './commands';
 
-function createExecError(message: string): ExecFileException {
-  return Object.assign(new Error(message), {
+/**
+ * Create a minimal ChildProcess stub to satisfy the execFile return type.
+ */
+function createChildProcessStub(): ChildProcess {
+  const emitter = new EventEmitter();
+
+  return Object.assign(emitter, {
+    stdin: null,
+    stdout: null,
+    stderr: null,
+    stdio: [null, null, null, undefined, undefined] satisfies ChildProcess['stdio'],
+    pid: undefined,
+    connected: false,
+    exitCode: null,
+    signalCode: null,
+    spawnargs: [],
+    spawnfile: '',
     killed: false,
-    code: null,
-    signal: null,
-    cmd: '',
+    kill: () => false,
+    send: () => false,
+    disconnect: () => undefined,
+    unref: () => undefined,
+    ref: () => undefined,
+    [Symbol.dispose]: () => undefined,
+  }) satisfies ChildProcess;
+}
+
+function createExecError(message: string): ExecFileException {
+  const err: ExecFileException = new Error(message);
+  err.killed = false;
+  err.code = undefined;
+  err.signal = undefined;
+  err.cmd = '';
+
+  return err;
+}
+
+type ExecFileCallback = (
+  error: ExecFileException | null,
+  stdout: string,
+  stderr: string,
+) => void;
+
+/**
+ * Helper to mock execFile with correct overloaded types.
+ * Wraps a simple callback handler with the full overload-compatible signature.
+ */
+function mockExecFileImpl(
+  mock: ReturnType<typeof vi.mocked<typeof execFile>>,
+  handler: (
+    args: readonly string[] | null | undefined,
+    callback: ExecFileCallback | undefined,
+  ) => void,
+): void {
+  mock.mockImplementation((
+    _file: string,
+    _args: readonly string[] | null | undefined,
+    _options: unknown,
+    callback?: ExecFileCallback | null,
+  ) => {
+    handler(_args, callback ?? undefined);
+
+    return createChildProcessStub();
   });
 }
 
@@ -35,16 +93,7 @@ function setup() {
 
   const mockExecFile = vi.mocked(execFile);
 
-  mockExecFile.mockImplementation((
-    _file: string,
-    _args: readonly string[],
-    _options: unknown,
-    callback?: (
-      error: ExecFileException | null,
-      stdout: string,
-      stderr: string,
-    ) => void,
-  ) => {
+  mockExecFileImpl(mockExecFile, (_args, callback) => {
     if (callback) {
       callback(null, '', '');
     }
@@ -271,16 +320,7 @@ describe('gitCheckoutBranch', () => {
 
     let callCount = 0;
 
-    mockExecFile.mockImplementation((
-      _file: string,
-      args: readonly string[],
-      _options: unknown,
-      callback?: (
-        error: ExecFileException | null,
-        stdout: string,
-        stderr: string,
-      ) => void,
-    ) => {
+    mockExecFileImpl(mockExecFile, (args, callback) => {
       callCount++;
 
       if (callback) {
@@ -289,7 +329,7 @@ describe('gitCheckoutBranch', () => {
         // Third call: checkout -b (succeeds)
         if (
           callCount === 2 &&
-          args.includes('checkout') &&
+          args?.includes('checkout') &&
           !args.includes('-b')
         ) {
           callback(

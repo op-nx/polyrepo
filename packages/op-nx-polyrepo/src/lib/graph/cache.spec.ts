@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('node:fs', () => ({
   existsSync: vi.fn(),
@@ -89,7 +89,7 @@ const transformedResult = {
 
 // We must reset the module between tests to clear module-level state
 describe('cache', () => {
-  beforeEach(async () => {
+  async function setup() {
     vi.clearAllMocks();
     vi.resetModules();
 
@@ -118,7 +118,12 @@ describe('cache', () => {
       readJsonFile: vi.fn(),
       writeJsonFile: vi.fn(),
     }));
-  });
+
+    const mocks = await loadMocks();
+    setupMocksForExtraction(mocks);
+
+    return { mocks };
+  }
 
   async function loadCacheModule() {
     const mod = await import('./cache.js');
@@ -175,8 +180,7 @@ describe('cache', () => {
 
   describe('populateGraphReport', () => {
     it('returns cached report when outer hash matches (no extraction called)', async () => {
-      const mocks = await loadMocks();
-      setupMocksForExtraction(mocks);
+      const { mocks } = await setup();
       const { populateGraphReport } = await loadCacheModule();
 
       // First call: populates cache
@@ -196,8 +200,7 @@ describe('cache', () => {
     });
 
     it('extracts fresh graph when hash changes (extraction called for each repo)', async () => {
-      const mocks = await loadMocks();
-      setupMocksForExtraction(mocks);
+      const { mocks } = await setup();
       const { populateGraphReport } = await loadCacheModule();
 
       // First call
@@ -212,8 +215,7 @@ describe('cache', () => {
     });
 
     it('skips repos without .git directory (unsynced repos)', async () => {
-      const mocks = await loadMocks();
-      setupMocksForExtraction(mocks);
+      const { mocks } = await setup();
 
       // Only repo-a has .git, repo-b does not
       mocks.existsSync.mockImplementation((p: unknown) => {
@@ -235,8 +237,7 @@ describe('cache', () => {
     });
 
     it('calls extractGraphFromRepo in parallel (Promise.all) for multiple repos', async () => {
-      const mocks = await loadMocks();
-      setupMocksForExtraction(mocks);
+      const { mocks } = await setup();
 
       const callOrder: string[] = [];
 
@@ -260,8 +261,7 @@ describe('cache', () => {
     });
 
     it('calls transformGraphForRepo on each extracted JSON', async () => {
-      const mocks = await loadMocks();
-      setupMocksForExtraction(mocks);
+      const { mocks } = await setup();
       const { populateGraphReport } = await loadCacheModule();
 
       await populateGraphReport(testConfig, '/workspace', 'opts-hash');
@@ -280,8 +280,7 @@ describe('cache', () => {
     });
 
     it('stores result in module-level variable accessible via getCurrentGraphReport', async () => {
-      const mocks = await loadMocks();
-      setupMocksForExtraction(mocks);
+      await setup();
       const { populateGraphReport, getCurrentGraphReport } =
         await loadCacheModule();
 
@@ -296,8 +295,7 @@ describe('cache', () => {
     });
 
     it('persists cache to disk via writeJsonFile', async () => {
-      const mocks = await loadMocks();
-      setupMocksForExtraction(mocks);
+      const { mocks } = await setup();
       const { populateGraphReport } = await loadCacheModule();
 
       await populateGraphReport(testConfig, '/workspace', 'opts-hash');
@@ -311,8 +309,7 @@ describe('cache', () => {
 
   describe('getCurrentGraphReport', () => {
     it('returns the module-level graph report when populated', async () => {
-      const mocks = await loadMocks();
-      setupMocksForExtraction(mocks);
+      await setup();
       const { populateGraphReport, getCurrentGraphReport } =
         await loadCacheModule();
 
@@ -327,6 +324,7 @@ describe('cache', () => {
     });
 
     it('throws descriptive error when report is not yet populated', async () => {
+      await setup();
       const { getCurrentGraphReport } = await loadCacheModule();
 
       expect(() => getCurrentGraphReport()).toThrow(
@@ -337,8 +335,7 @@ describe('cache', () => {
 
   describe('outer hash computation', () => {
     it('hash includes pluginOptionsHash', async () => {
-      const mocks = await loadMocks();
-      setupMocksForExtraction(mocks);
+      const { mocks } = await setup();
       const { populateGraphReport } = await loadCacheModule();
 
       await populateGraphReport(testConfig, '/workspace', 'my-plugin-opts');
@@ -349,8 +346,7 @@ describe('cache', () => {
     });
 
     it('hash includes each repo alias, HEAD SHA, and dirty files', async () => {
-      const mocks = await loadMocks();
-      setupMocksForExtraction(mocks);
+      const { mocks } = await setup();
       mocks.getHeadSha.mockResolvedValue('sha123');
       mocks.getDirtyFiles.mockResolvedValue('file.ts');
       const { populateGraphReport } = await loadCacheModule();
@@ -363,8 +359,7 @@ describe('cache', () => {
     });
 
     it('skips repos without .git dir (does not include them in hash)', async () => {
-      const mocks = await loadMocks();
-      setupMocksForExtraction(mocks);
+      const { mocks } = await setup();
 
       // Only repo-a has .git
       mocks.existsSync.mockImplementation((p: unknown) => {
@@ -386,10 +381,10 @@ describe('cache', () => {
     });
 
     it('different HEAD SHA produces different hash', async () => {
-      const mocks = await loadMocks();
-      setupMocksForExtraction(mocks);
+      const { mocks } = await setup();
 
       let callCount = 0;
+
       mocks.hashArray.mockImplementation((_parts: unknown) => {
         callCount++;
 
@@ -412,10 +407,10 @@ describe('cache', () => {
     });
 
     it('different dirty files produce different hash', async () => {
-      const mocks = await loadMocks();
-      setupMocksForExtraction(mocks);
+      const { mocks } = await setup();
 
       let callCount = 0;
+
       mocks.hashArray.mockImplementation((_parts: unknown) => {
         callCount++;
 

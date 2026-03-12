@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs')>();
@@ -12,11 +12,13 @@ vi.mock('node:fs', async (importOriginal) => {
 import { readFileSync } from 'node:fs';
 import { resolvePluginConfig } from './resolve';
 
-const mockedReadFileSync = vi.mocked(readFileSync);
-
-beforeEach(() => {
+function setup() {
   vi.clearAllMocks();
-});
+
+  const mockedReadFileSync = vi.mocked(readFileSync);
+
+  return { mockedReadFileSync };
+}
 
 function makeNxJson(pluginOptions?: Record<string, unknown>): string {
   return JSON.stringify({
@@ -31,6 +33,8 @@ function makeNxJson(pluginOptions?: Record<string, unknown>): string {
 
 describe('resolvePluginConfig', () => {
   it('returns validated config and normalized entries for valid nx.json', () => {
+    const { mockedReadFileSync } = setup();
+
     const options = {
       repos: { 'repo-a': 'git@github.com:org/repo-a.git' },
     };
@@ -53,12 +57,16 @@ describe('resolvePluginConfig', () => {
   });
 
   it('throws when nx.json has no plugins array', () => {
+    const { mockedReadFileSync } = setup();
+
     mockedReadFileSync.mockReturnValue(JSON.stringify({}));
 
     expect(() => resolvePluginConfig('/workspace')).toThrow();
   });
 
   it('throws when @op-nx/polyrepo plugin entry is missing from plugins', () => {
+    const { mockedReadFileSync } = setup();
+
     const nxJson = JSON.stringify({
       plugins: [
         { plugin: '@nx/some-other-plugin', options: {} },

@@ -116,7 +116,9 @@ describe('polyrepoConfigSchema', () => {
       expect(result.success).toBe(false);
 
       if (!result.success) {
-        const message = result.error.issues[0].message;
+        const firstIssue = result.error.issues[0];
+        expect(firstIssue).toBeDefined();
+        const message = firstIssue?.message ?? '';
         expect(message).toContain('repo-a');
         expect(message).toContain('repo-b');
       }
@@ -133,7 +135,9 @@ describe('polyrepoConfigSchema', () => {
       expect(result.success).toBe(false);
 
       if (!result.success) {
-        const message = result.error.issues[0].message;
+        const firstIssue = result.error.issues[0];
+        expect(firstIssue).toBeDefined();
+        const message = firstIssue?.message ?? '';
         expect(message).toContain('repo-a');
         expect(message).toContain('repo-b');
       }
@@ -161,7 +165,9 @@ describe('polyrepoConfigSchema', () => {
       expect(result.success).toBe(false);
 
       if (!result.success) {
-        const message = result.error.issues[0].message;
+        const firstIssue = result.error.issues[0];
+        expect(firstIssue).toBeDefined();
+        const message = firstIssue?.message ?? '';
         expect(message).toContain('repo-a');
         expect(message).toContain('repo-b');
       }
@@ -178,7 +184,9 @@ describe('polyrepoConfigSchema', () => {
       expect(result.success).toBe(false);
 
       if (!result.success) {
-        const message = result.error.issues[0].message;
+        const firstIssue = result.error.issues[0];
+        expect(firstIssue).toBeDefined();
+        const message = firstIssue?.message ?? '';
         expect(message).toContain('repo-a');
         expect(message).toContain('repo-b');
       }
@@ -411,11 +419,17 @@ describe('normalizeRepos', () => {
 
     const result = normalizeRepos(config);
 
-    expect(result[0]).toEqual({
+    const firstEntry = result[0];
+    expect(firstEntry).toBeDefined();
+
+    expect(firstEntry).toEqual({
       type: 'local',
       alias: 'repo-b',
       path: 'D:/projects/repo-b',
     });
-    expect('disableHooks' in result[0]).toBe(false);
+
+    if (firstEntry) {
+      expect('disableHooks' in firstEntry).toBe(false);
+    }
   });
 });

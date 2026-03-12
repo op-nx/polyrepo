@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   validateConfig,
   warnIfReposNotGitignored,
@@ -36,16 +36,20 @@ import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { logger } from '@nx/devkit';
 
-const mockedReadFile = vi.mocked(readFile);
-const mockedExistsSync = vi.mocked(existsSync);
-const mockedLoggerWarn = vi.mocked(logger.warn);
-
-beforeEach(() => {
+function setup() {
   vi.clearAllMocks();
-});
+
+  const mockedReadFile = vi.mocked(readFile);
+  const mockedExistsSync = vi.mocked(existsSync);
+  const mockedLoggerWarn = vi.mocked(logger.warn);
+
+  return { mockedReadFile, mockedExistsSync, mockedLoggerWarn };
+}
 
 describe('validateConfig', () => {
   it('returns parsed config for valid input', () => {
+    setup();
+
     const input = {
       repos: { 'repo-a': 'git@github.com:org/repo-a.git' },
     };
@@ -56,12 +60,16 @@ describe('validateConfig', () => {
   });
 
   it('throws with zod error details for invalid input', () => {
+    setup();
+
     expect(() => validateConfig({})).toThrow();
   });
 });
 
 describe('warnIfReposNotGitignored', () => {
   it('warns when .repos/ is not in .gitignore', async () => {
+    const { mockedReadFile, mockedLoggerWarn } = setup();
+
     mockedReadFile.mockResolvedValue('node_modules\ndist\n');
 
     await warnIfReposNotGitignored('/workspace');
@@ -72,6 +80,8 @@ describe('warnIfReposNotGitignored', () => {
   });
 
   it('does not warn when .repos/ is in .gitignore', async () => {
+    const { mockedReadFile, mockedLoggerWarn } = setup();
+
     mockedReadFile.mockResolvedValue('node_modules\n.repos/\ndist\n');
 
     await warnIfReposNotGitignored('/workspace');
@@ -82,6 +92,8 @@ describe('warnIfReposNotGitignored', () => {
 
 describe('warnUnsyncedRepos', () => {
   it('emits single grouped warning for one unsynced remote repo', () => {
+    const { mockedExistsSync, mockedLoggerWarn } = setup();
+
     const config: PolyrepoConfig = {
       repos: { 'repo-a': 'git@github.com:org/repo-a.git' },
     };
@@ -100,6 +112,8 @@ describe('warnUnsyncedRepos', () => {
   });
 
   it('emits single grouped warning listing all unsynced repos', () => {
+    const { mockedExistsSync, mockedLoggerWarn } = setup();
+
     const config: PolyrepoConfig = {
       repos: {
         'repo-a': 'git@github.com:org/repo-a.git',
@@ -115,7 +129,7 @@ describe('warnUnsyncedRepos', () => {
     // Single warning, not three
     expect(mockedLoggerWarn).toHaveBeenCalledTimes(1);
 
-    const message = mockedLoggerWarn.mock.calls[0][0];
+    const message = mockedLoggerWarn.mock.calls[0]?.[0];
 
     expect(message).toContain('repo-a');
     expect(message).toContain('repo-b');
@@ -123,6 +137,8 @@ describe('warnUnsyncedRepos', () => {
   });
 
   it('does not warn for local path repos', () => {
+    const { mockedLoggerWarn } = setup();
+
     const config: PolyrepoConfig = {
       repos: { 'repo-b': 'D:/projects/repo-b' },
     };
@@ -133,6 +149,8 @@ describe('warnUnsyncedRepos', () => {
   });
 
   it('does not warn when all remote repos are synced', () => {
+    const { mockedExistsSync, mockedLoggerWarn } = setup();
+
     const config: PolyrepoConfig = {
       repos: { 'repo-a': 'git@github.com:org/repo-a.git' },
     };

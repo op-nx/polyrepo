@@ -41,8 +41,8 @@ describe('formatAlignedTable', () => {
 
     const result = formatAlignedTable(rows);
 
-    expect(result[0].startsWith('  1')).toBe(true);
-    expect(result[1].startsWith('123')).toBe(true);
+    expect(result[0]?.startsWith('  1')).toBe(true);
+    expect(result[1]?.startsWith('123')).toBe(true);
   });
 
   it('handles mixed left and right alignment', () => {

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import type { ExecFileException } from 'node:child_process';
+import type { ChildProcess, ExecFileException } from 'node:child_process';
+import { EventEmitter } from 'node:events';
 
 vi.mock('node:fs', () => ({
   existsSync: vi.fn(),
@@ -24,11 +25,67 @@ import {
 } from './detect';
 
 function createExecError(message: string, code?: string): ExecFileException {
-  return Object.assign(new Error(message), {
+  const err: ExecFileException = new Error(message);
+  err.killed = false;
+  err.code = code;
+  err.signal = undefined;
+  err.cmd = '';
+
+  return err;
+}
+
+/**
+ * Create a minimal ChildProcess stub to satisfy the execFile return type.
+ */
+function createChildProcessStub(): ChildProcess {
+  const emitter = new EventEmitter();
+
+  return Object.assign(emitter, {
+    stdin: null,
+    stdout: null,
+    stderr: null,
+    stdio: [null, null, null, undefined, undefined] satisfies ChildProcess['stdio'],
+    pid: undefined,
+    connected: false,
+    exitCode: null,
+    signalCode: null,
+    spawnargs: [],
+    spawnfile: '',
     killed: false,
-    code: code ?? null,
-    signal: null,
-    cmd: '',
+    kill: () => false,
+    send: () => false,
+    disconnect: () => undefined,
+    unref: () => undefined,
+    ref: () => undefined,
+    [Symbol.dispose]: () => undefined,
+  }) satisfies ChildProcess;
+}
+
+type ExecFileCallback = (
+  error: ExecFileException | null,
+  stdout: string,
+  stderr: string,
+) => void;
+
+/**
+ * Helper to mock execFile with correct overloaded types.
+ */
+function mockExecFileImpl(
+  mock: ReturnType<typeof vi.mocked<typeof execFile>>,
+  handler: (
+    args: readonly string[] | null | undefined,
+    callback: ExecFileCallback | undefined,
+  ) => void,
+): void {
+  mock.mockImplementation((
+    _file: string,
+    _args: readonly string[] | null | undefined,
+    _options: unknown,
+    callback?: ExecFileCallback | null,
+  ) => {
+    handler(_args, callback ?? undefined);
+
+    return createChildProcessStub();
   });
 }
 
@@ -38,16 +95,7 @@ function setup(stdout: string, stderr = '') {
   const mockExistsSync = vi.mocked(existsSync);
   const mockExecFile = vi.mocked(execFile);
 
-  mockExecFile.mockImplementation((
-    _file: string,
-    _args: readonly string[],
-    _options: unknown,
-    callback?: (
-      error: ExecFileException | null,
-      stdout: string,
-      stderr: string,
-    ) => void,
-  ) => {
+  mockExecFileImpl(mockExecFile, (_args, callback) => {
     if (callback) {
       callback(null, stdout, stderr);
     }
@@ -209,16 +257,7 @@ describe('getCurrentRef', () => {
 
     let callCount = 0;
 
-    mockExecFile.mockImplementation((
-      _file: string,
-      _args: readonly string[],
-      _options: unknown,
-      callback?: (
-        error: ExecFileException | null,
-        stdout: string,
-        stderr: string,
-      ) => void,
-    ) => {
+    mockExecFileImpl(mockExecFile, (_args, callback) => {
       if (callback) {
         callCount++;
 
@@ -257,16 +296,7 @@ describe('getHeadSha', () => {
   it('rejects when git command fails', async () => {
     const { mockExecFile } = setup('');
 
-    mockExecFile.mockImplementation((
-      _file: string,
-      _args: readonly string[],
-      _options: unknown,
-      callback?: (
-        error: ExecFileException | null,
-        stdout: string,
-        stderr: string,
-      ) => void,
-    ) => {
+    mockExecFileImpl(mockExecFile, (_args, callback) => {
       if (callback) {
         callback(createExecError('not a git repo'), '', 'not a git repo');
       }
@@ -304,16 +334,7 @@ describe('getDirtyFiles', () => {
   it('rejects when git command fails', async () => {
     const { mockExecFile } = setup('');
 
-    mockExecFile.mockImplementation((
-      _file: string,
-      _args: readonly string[],
-      _options: unknown,
-      callback?: (
-        error: ExecFileException | null,
-        stdout: string,
-        stderr: string,
-      ) => void,
-    ) => {
+    mockExecFileImpl(mockExecFile, (_args, callback) => {
       if (callback) {
         callback(createExecError('git failed'), '', 'git failed');
       }
@@ -351,7 +372,6 @@ describe('getWorkingTreeState', () => {
   });
 
   it('counts lines where Y=M as modified (working tree changes)', async () => {
-    // ' M' = modified in working tree only
     setup(' M src/file.ts\n M src/other.ts\n');
 
     const result = await getWorkingTreeState('/workspace/.repos/repo');
@@ -361,9 +381,6 @@ describe('getWorkingTreeState', () => {
   });
 
   it('counts lines where X in MADRC as staged', async () => {
-    // 'M ' = staged modification
-    // 'A ' = staged addition
-    // 'D ' = staged deletion
     setup(
       'M  src/changed.ts\nA  src/added.ts\nD  src/deleted.ts\n',
     );
@@ -374,7 +391,6 @@ describe('getWorkingTreeState', () => {
   });
 
   it('counts X=D as deleted when Y is not D', async () => {
-    // 'D ' = staged deletion
     setup('D  src/removed.ts\n');
 
     const result = await getWorkingTreeState('/workspace/.repos/repo');
@@ -384,7 +400,6 @@ describe('getWorkingTreeState', () => {
   });
 
   it('counts Y=D as deleted', async () => {
-    // ' D' = deleted in working tree
     setup(' D src/removed.ts\n');
 
     const result = await getWorkingTreeState('/workspace/.repos/repo');
@@ -394,7 +409,6 @@ describe('getWorkingTreeState', () => {
   });
 
   it('handles MM (both staged and modified) incrementing both counts', async () => {
-    // 'MM' = staged modification + working tree modification
     setup('MM src/file.ts\n');
 
     const result = await getWorkingTreeState('/workspace/.repos/repo');
@@ -428,12 +442,12 @@ describe('getWorkingTreeState', () => {
   it('handles mixed statuses correctly', async () => {
     const porcelain =
       [
-        'M  src/staged.ts', // staged
-        ' M src/modified.ts', // modified
-        '?? src/new.ts', // untracked
-        'UU src/conflict.ts', // conflict
-        ' D src/deleted.ts', // deleted in working tree
-        'A  src/added.ts', // staged addition
+        'M  src/staged.ts',
+        ' M src/modified.ts',
+        '?? src/new.ts',
+        'UU src/conflict.ts',
+        ' D src/deleted.ts',
+        'A  src/added.ts',
       ].join('\n') + '\n';
 
     setup(porcelain);
@@ -481,16 +495,7 @@ describe('getAheadBehind', () => {
   it('returns null when command fails (detached HEAD)', async () => {
     const { mockExecFile } = setup('');
 
-    mockExecFile.mockImplementation((
-      _file: string,
-      _args: readonly string[],
-      _options: unknown,
-      callback?: (
-        error: ExecFileException | null,
-        stdout: string,
-        stderr: string,
-      ) => void,
-    ) => {
+    mockExecFileImpl(mockExecFile, (_args, callback) => {
       if (callback) {
         callback(
           createExecError('fatal: no upstream'),
@@ -508,16 +513,7 @@ describe('getAheadBehind', () => {
   it('returns null when command fails (no upstream)', async () => {
     const { mockExecFile } = setup('');
 
-    mockExecFile.mockImplementation((
-      _file: string,
-      _args: readonly string[],
-      _options: unknown,
-      callback?: (
-        error: ExecFileException | null,
-        stdout: string,
-        stderr: string,
-      ) => void,
-    ) => {
+    mockExecFileImpl(mockExecFile, (_args, callback) => {
       if (callback) {
         callback(
           createExecError('fatal: no upstream configured'),
@@ -580,28 +576,17 @@ describe('isGitTag', () => {
 
     let callCount = 0;
 
-    mockExecFile.mockImplementation((
-      _file: string,
-      _args: readonly string[],
-      _options: unknown,
-      callback?: (
-        error: ExecFileException | null,
-        stdout: string,
-        stderr: string,
-      ) => void,
-    ) => {
+    mockExecFileImpl(mockExecFile, (_args, callback) => {
       if (callback) {
         callCount++;
 
         if (callCount === 1) {
-          // Local show-ref fails
           callback(
             createExecError('fatal: not a valid ref'),
             '',
             'fatal: not a valid ref',
           );
         } else {
-          // Remote ls-remote succeeds
           callback(null, 'abc123\trefs/tags/21.0.0\n', '');
         }
       }
@@ -616,16 +601,7 @@ describe('isGitTag', () => {
   it('returns false when tag not found locally or on remote', async () => {
     const { mockExecFile } = setup('');
 
-    mockExecFile.mockImplementation((
-      _file: string,
-      _args: readonly string[],
-      _options: unknown,
-      callback?: (
-        error: ExecFileException | null,
-        stdout: string,
-        stderr: string,
-      ) => void,
-    ) => {
+    mockExecFileImpl(mockExecFile, (_args, callback) => {
       if (callback) {
         callback(
           createExecError('fatal: not a valid ref'),
@@ -645,16 +621,7 @@ describe('isGitTag', () => {
 
     let callCount = 0;
 
-    mockExecFile.mockImplementation((
-      _file: string,
-      _args: readonly string[],
-      _options: unknown,
-      callback?: (
-        error: ExecFileException | null,
-        stdout: string,
-        stderr: string,
-      ) => void,
-    ) => {
+    mockExecFileImpl(mockExecFile, (_args, callback) => {
       if (callback) {
         callCount++;
 
@@ -665,7 +632,6 @@ describe('isGitTag', () => {
             'fatal: not a valid ref',
           );
         } else {
-          // Remote returns empty (ref exists but is not a tag)
           callback(null, '', '');
         }
       }

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
+import type { TargetConfiguration } from '@nx/devkit';
 import { transformGraphForRepo } from './transform';
-import type { ExternalGraphJson } from './types';
+import type { ExternalGraphJson, TransformedNode } from './types';
 
 /**
  * Fixture representing a typical external graph with 2 projects,
@@ -84,6 +85,39 @@ function makeFixtureGraph(): ExternalGraphJson {
   };
 }
 
+/**
+ * Get a node from the result, throwing if not found.
+ * Avoids "possibly undefined" errors when indexing Records in strict mode.
+ */
+function getNode(
+  nodes: Record<string, TransformedNode>,
+  key: string,
+): TransformedNode {
+  const node = nodes[key];
+
+  if (!node) {
+    throw new Error(`Expected node "${key}" not found in result`);
+  }
+
+  return node;
+}
+
+/**
+ * Get a target from a node, throwing if not found.
+ */
+function getTarget(
+  targets: Record<string, TargetConfiguration>,
+  key: string,
+): TargetConfiguration {
+  const target = targets[key];
+
+  if (!target) {
+    throw new Error(`Expected target "${key}" not found in node`);
+  }
+
+  return target;
+}
+
 describe('transformGraphForRepo', () => {
   const repoAlias = 'repo-b';
   const workspaceRoot = '/workspace';
@@ -103,8 +137,8 @@ describe('transformGraphForRepo', () => {
       const graph = makeFixtureGraph();
       const result = transformGraphForRepo(repoAlias, graph, workspaceRoot);
 
-      expect(result.nodes['repo-b/my-lib'].name).toBe('repo-b/my-lib');
-      expect(result.nodes['repo-b/my-app'].name).toBe('repo-b/my-app');
+      expect(getNode(result.nodes, 'repo-b/my-lib').name).toBe('repo-b/my-lib');
+      expect(getNode(result.nodes, 'repo-b/my-app').name).toBe('repo-b/my-app');
     });
   });
 
@@ -113,10 +147,10 @@ describe('transformGraphForRepo', () => {
       const graph = makeFixtureGraph();
       const result = transformGraphForRepo(repoAlias, graph, workspaceRoot);
 
-      expect(result.nodes['repo-b/my-lib'].root).toBe(
+      expect(getNode(result.nodes, 'repo-b/my-lib').root).toBe(
         '.repos/repo-b/libs/my-lib',
       );
-      expect(result.nodes['repo-b/my-app'].root).toBe(
+      expect(getNode(result.nodes, 'repo-b/my-app').root).toBe(
         '.repos/repo-b/apps/my-app',
       );
     });
@@ -125,18 +159,24 @@ describe('transformGraphForRepo', () => {
       const graph = makeFixtureGraph();
       const result = transformGraphForRepo(repoAlias, graph, workspaceRoot);
 
-      expect(result.nodes['repo-b/my-lib'].sourceRoot).toBe(
+      expect(getNode(result.nodes, 'repo-b/my-lib').sourceRoot).toBe(
         '.repos/repo-b/libs/my-lib/src',
       );
     });
 
     it('handles missing sourceRoot (undefined stays undefined)', () => {
       const graph = makeFixtureGraph();
-      delete graph.graph.nodes['my-lib'].data.sourceRoot;
+      const myLib = graph.graph.nodes['my-lib'];
+
+      if (!myLib) {
+        throw new Error('Expected my-lib node in fixture');
+      }
+
+      delete myLib.data.sourceRoot;
 
       const result = transformGraphForRepo(repoAlias, graph, workspaceRoot);
 
-      expect(result.nodes['repo-b/my-lib'].sourceRoot).toBeUndefined();
+      expect(getNode(result.nodes, 'repo-b/my-lib').sourceRoot).toBeUndefined();
     });
 
     it('all paths use forward slashes (no backslashes)', () => {
@@ -157,10 +197,11 @@ describe('transformGraphForRepo', () => {
       };
 
       const result = transformGraphForRepo(repoAlias, graph, workspaceRoot);
+      const node = getNode(result.nodes, 'repo-b/win-lib');
 
-      expect(result.nodes['repo-b/win-lib'].root).not.toContain('\\');
-      expect(result.nodes['repo-b/win-lib'].sourceRoot).not.toContain('\\');
-      expect(result.nodes['repo-b/win-lib'].root).toBe(
+      expect(node.root).not.toContain('\\');
+      expect(node.sourceRoot).not.toContain('\\');
+      expect(node.root).toBe(
         '.repos/repo-b/libs/win-lib',
       );
     });
@@ -171,24 +212,30 @@ describe('transformGraphForRepo', () => {
       const graph = makeFixtureGraph();
       const result = transformGraphForRepo(repoAlias, graph, workspaceRoot);
 
-      expect(result.nodes['repo-b/my-lib'].projectType).toBe('library');
-      expect(result.nodes['repo-b/my-app'].projectType).toBe('application');
+      expect(getNode(result.nodes, 'repo-b/my-lib').projectType).toBe('library');
+      expect(getNode(result.nodes, 'repo-b/my-app').projectType).toBe('application');
     });
 
     it('falls back to node.type when projectType is missing', () => {
       const graph = makeFixtureGraph();
-      delete graph.graph.nodes['my-lib'].data.projectType;
+      const myLib = graph.graph.nodes['my-lib'];
+
+      if (!myLib) {
+        throw new Error('Expected my-lib node in fixture');
+      }
+
+      delete myLib.data.projectType;
 
       const result = transformGraphForRepo(repoAlias, graph, workspaceRoot);
 
-      expect(result.nodes['repo-b/my-lib'].projectType).toBe('lib');
+      expect(getNode(result.nodes, 'repo-b/my-lib').projectType).toBe('lib');
     });
 
     it('preserves metadata from original node', () => {
       const graph = makeFixtureGraph();
       const result = transformGraphForRepo(repoAlias, graph, workspaceRoot);
 
-      expect(result.nodes['repo-b/my-lib'].metadata).toEqual({
+      expect(getNode(result.nodes, 'repo-b/my-lib').metadata).toEqual({
         description: 'Shared utility library',
       });
     });
@@ -199,7 +246,7 @@ describe('transformGraphForRepo', () => {
       const graph = makeFixtureGraph();
       const result = transformGraphForRepo(repoAlias, graph, workspaceRoot);
 
-      const tags = result.nodes['repo-b/my-lib'].tags;
+      const tags = getNode(result.nodes, 'repo-b/my-lib').tags;
 
       expect(tags).toContain('scope:shared');
       expect(tags).toContain('type:util');
@@ -223,7 +270,7 @@ describe('transformGraphForRepo', () => {
 
       const result = transformGraphForRepo(repoAlias, graph, workspaceRoot);
 
-      expect(result.nodes['repo-b/no-tags'].tags).toEqual([
+      expect(getNode(result.nodes, 'repo-b/no-tags').tags).toEqual([
         'polyrepo:external',
         'polyrepo:repo-b',
       ]);
@@ -234,17 +281,17 @@ describe('transformGraphForRepo', () => {
     it('rewrites each target to use @op-nx/polyrepo:run executor', () => {
       const graph = makeFixtureGraph();
       const result = transformGraphForRepo(repoAlias, graph, workspaceRoot);
-      const targets = result.nodes['repo-b/my-lib'].targets;
+      const targets = getNode(result.nodes, 'repo-b/my-lib').targets;
 
-      expect(targets['build'].executor).toBe('@op-nx/polyrepo:run');
-      expect(targets['test'].executor).toBe('@op-nx/polyrepo:run');
-      expect(targets['lint'].executor).toBe('@op-nx/polyrepo:run');
+      expect(getTarget(targets, 'build').executor).toBe('@op-nx/polyrepo:run');
+      expect(getTarget(targets, 'test').executor).toBe('@op-nx/polyrepo:run');
+      expect(getTarget(targets, 'lint').executor).toBe('@op-nx/polyrepo:run');
     });
 
     it('sets options with repoAlias, originalProject, targetName', () => {
       const graph = makeFixtureGraph();
       const result = transformGraphForRepo(repoAlias, graph, workspaceRoot);
-      const buildTarget = result.nodes['repo-b/my-lib'].targets['build'];
+      const buildTarget = getTarget(getNode(result.nodes, 'repo-b/my-lib').targets, 'build');
 
       expect(buildTarget.options).toEqual({
         repoAlias: 'repo-b',
@@ -256,7 +303,7 @@ describe('transformGraphForRepo', () => {
     it('sets inputs to empty array (prevents native hasher from resolving external files)', () => {
       const graph = makeFixtureGraph();
       const result = transformGraphForRepo(repoAlias, graph, workspaceRoot);
-      const buildTarget = result.nodes['repo-b/my-lib'].targets['build'];
+      const buildTarget = getTarget(getNode(result.nodes, 'repo-b/my-lib').targets, 'build');
 
       expect(buildTarget.inputs).toEqual([]);
     });
@@ -264,7 +311,7 @@ describe('transformGraphForRepo', () => {
     it('omits outputs from proxy target (child repo manages its own outputs)', () => {
       const graph = makeFixtureGraph();
       const result = transformGraphForRepo(repoAlias, graph, workspaceRoot);
-      const testTarget = result.nodes['repo-b/my-lib'].targets['test'];
+      const testTarget = getTarget(getNode(result.nodes, 'repo-b/my-lib').targets, 'test');
 
       expect(testTarget.outputs).toBeUndefined();
     });
@@ -273,7 +320,7 @@ describe('transformGraphForRepo', () => {
       const graph = makeFixtureGraph();
       const result = transformGraphForRepo(repoAlias, graph, workspaceRoot);
 
-      expect(result.nodes['repo-b/my-lib'].targets['build'].cache).toBe(false);
+      expect(getTarget(getNode(result.nodes, 'repo-b/my-lib').targets, 'build').cache).toBe(false);
     });
 
     it('copies parallelism from original target', () => {
@@ -281,7 +328,7 @@ describe('transformGraphForRepo', () => {
       const result = transformGraphForRepo(repoAlias, graph, workspaceRoot);
 
       expect(
-        result.nodes['repo-b/my-lib'].targets['build'].parallelism,
+        getTarget(getNode(result.nodes, 'repo-b/my-lib').targets, 'build').parallelism,
       ).toBe(true);
     });
 
@@ -290,14 +337,14 @@ describe('transformGraphForRepo', () => {
       const result = transformGraphForRepo(repoAlias, graph, workspaceRoot);
 
       expect(
-        result.nodes['repo-b/my-lib'].targets['build'].metadata,
+        getTarget(getNode(result.nodes, 'repo-b/my-lib').targets, 'build').metadata,
       ).toEqual({ technologies: ['typescript'] });
     });
 
     it('copies configurations from original target', () => {
       const graph = makeFixtureGraph();
       const result = transformGraphForRepo(repoAlias, graph, workspaceRoot);
-      const buildTarget = result.nodes['repo-b/my-lib'].targets['build'];
+      const buildTarget = getTarget(getNode(result.nodes, 'repo-b/my-lib').targets, 'build');
 
       expect(buildTarget.configurations).toEqual({
         production: { optimization: true },
@@ -320,7 +367,7 @@ describe('transformGraphForRepo', () => {
 
       const result = transformGraphForRepo(repoAlias, graph, workspaceRoot);
 
-      expect(result.nodes['repo-b/no-targets'].targets).toEqual({});
+      expect(getNode(result.nodes, 'repo-b/no-targets').targets).toEqual({});
     });
   });
 
@@ -331,12 +378,12 @@ describe('transformGraphForRepo', () => {
 
       // my-lib:build originally had dependsOn: ['^build']
       expect(
-        result.nodes['repo-b/my-lib'].targets['build'].dependsOn,
+        getTarget(getNode(result.nodes, 'repo-b/my-lib').targets, 'build').dependsOn,
       ).toBeUndefined();
 
       // my-app:build originally had dependsOn: ['^build', 'generate-api']
       expect(
-        result.nodes['repo-b/my-app'].targets['build'].dependsOn,
+        getTarget(getNode(result.nodes, 'repo-b/my-app').targets, 'build').dependsOn,
       ).toBeUndefined();
     });
 
@@ -370,7 +417,7 @@ describe('transformGraphForRepo', () => {
       const result = transformGraphForRepo(repoAlias, graph, workspaceRoot);
 
       expect(
-        result.nodes['repo-b/lib-a'].targets['build'].dependsOn,
+        getTarget(getNode(result.nodes, 'repo-b/lib-a').targets, 'build').dependsOn,
       ).toBeUndefined();
     });
   });

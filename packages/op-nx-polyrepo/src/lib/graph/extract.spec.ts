@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { ExecException } from 'node:child_process';
+import { describe, it, expect, vi } from 'vitest';
+import type { ChildProcess, ExecException } from 'node:child_process';
+import { EventEmitter } from 'node:events';
 
 vi.mock('node:child_process', () => ({
   exec: vi.fn(),
@@ -8,11 +9,40 @@ vi.mock('node:child_process', () => ({
 import { exec } from 'node:child_process';
 import { extractGraphFromRepo } from './extract';
 
-const mockExec = vi.mocked(exec);
+/**
+ * Create a minimal ChildProcess stub to satisfy the exec return type.
+ * exec() overloads all return ChildProcess, so mocks must too.
+ */
+function createChildProcessStub(): ChildProcess {
+  const emitter = new EventEmitter();
 
-function setupExecSuccess(stdout: string): void {
-  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- overloaded function mock requires cast
-  mockExec.mockImplementation(((
+  return Object.assign(emitter, {
+    stdin: null,
+    stdout: null,
+    stderr: null,
+    stdio: [null, null, null, undefined, undefined] satisfies ChildProcess['stdio'],
+    pid: undefined,
+    connected: false,
+    exitCode: null,
+    signalCode: null,
+    spawnargs: [],
+    spawnfile: '',
+    killed: false,
+    kill: () => false,
+    send: () => false,
+    disconnect: () => undefined,
+    unref: () => undefined,
+    ref: () => undefined,
+    [Symbol.dispose]: () => undefined,
+  }) satisfies ChildProcess;
+}
+
+function setupExecSuccess(stdout: string) {
+  vi.clearAllMocks();
+
+  const mockExec = vi.mocked(exec);
+
+  mockExec.mockImplementation((
     _command: string,
     _options: unknown,
     callback?: (
@@ -24,12 +54,19 @@ function setupExecSuccess(stdout: string): void {
     if (callback) {
       callback(null, stdout, '');
     }
-  }) as typeof exec);
+
+    return createChildProcessStub();
+  });
+
+  return { mockExec };
 }
 
-function setupExecFailure(errorMessage: string, stderr = ''): void {
-  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- overloaded function mock requires cast
-  mockExec.mockImplementation(((
+function setupExecFailure(errorMessage: string, stderr = '') {
+  vi.clearAllMocks();
+
+  const mockExec = vi.mocked(exec);
+
+  mockExec.mockImplementation((
     _command: string,
     _options: unknown,
     callback?: (
@@ -42,19 +79,18 @@ function setupExecFailure(errorMessage: string, stderr = ''): void {
       const err: ExecException = new Error(errorMessage);
       callback(err, '', stderr);
     }
-  }) as typeof exec);
+
+    return createChildProcessStub();
+  });
+
+  return { mockExec };
 }
 
 describe('extractGraphFromRepo', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('calls exec with command containing node_modules/.bin/nx and graph --print', async () => {
-    const graphJson = {
-      graph: { nodes: {}, dependencies: {} },
-    };
-    setupExecSuccess(JSON.stringify(graphJson));
+    const { mockExec } = setupExecSuccess(
+      JSON.stringify({ graph: { nodes: {}, dependencies: {} } }),
+    );
 
     await extractGraphFromRepo('/workspace/.repos/repo-a');
 
@@ -66,8 +102,9 @@ describe('extractGraphFromRepo', () => {
   });
 
   it('sets cwd to repoPath', async () => {
-    const graphJson = { graph: { nodes: {}, dependencies: {} } };
-    setupExecSuccess(JSON.stringify(graphJson));
+    const { mockExec } = setupExecSuccess(
+      JSON.stringify({ graph: { nodes: {}, dependencies: {} } }),
+    );
 
     await extractGraphFromRepo('/some/custom/path');
 
@@ -79,8 +116,9 @@ describe('extractGraphFromRepo', () => {
   });
 
   it('sets maxBuffer to LARGE_BUFFER (1GB)', async () => {
-    const graphJson = { graph: { nodes: {}, dependencies: {} } };
-    setupExecSuccess(JSON.stringify(graphJson));
+    const { mockExec } = setupExecSuccess(
+      JSON.stringify({ graph: { nodes: {}, dependencies: {} } }),
+    );
 
     await extractGraphFromRepo('/workspace/.repos/repo-a');
 
@@ -92,8 +130,9 @@ describe('extractGraphFromRepo', () => {
   });
 
   it('sets env with NX_DAEMON, NX_VERBOSE_LOGGING, and NX_PERF_LOGGING all false', async () => {
-    const graphJson = { graph: { nodes: {}, dependencies: {} } };
-    setupExecSuccess(JSON.stringify(graphJson));
+    const { mockExec } = setupExecSuccess(
+      JSON.stringify({ graph: { nodes: {}, dependencies: {} } }),
+    );
 
     await extractGraphFromRepo('/workspace/.repos/repo-a');
 
@@ -114,6 +153,7 @@ describe('extractGraphFromRepo', () => {
     const graphJson = { graph: { nodes: {}, dependencies: {} } };
     const contaminatedStdout =
       '[isolated-plugin] some log line\n' + JSON.stringify(graphJson);
+
     setupExecSuccess(contaminatedStdout);
 
     const result = await extractGraphFromRepo('/workspace/.repos/repo-a');
@@ -130,8 +170,9 @@ describe('extractGraphFromRepo', () => {
   });
 
   it('sets windowsHide=true', async () => {
-    const graphJson = { graph: { nodes: {}, dependencies: {} } };
-    setupExecSuccess(JSON.stringify(graphJson));
+    const { mockExec } = setupExecSuccess(
+      JSON.stringify({ graph: { nodes: {}, dependencies: {} } }),
+    );
 
     await extractGraphFromRepo('/workspace/.repos/repo-a');
 
@@ -155,6 +196,7 @@ describe('extractGraphFromRepo', () => {
         dependencies: { 'my-lib': [] },
       },
     };
+
     setupExecSuccess(JSON.stringify(graphJson));
 
     const result = await extractGraphFromRepo('/workspace/.repos/repo-a');
@@ -168,6 +210,8 @@ describe('extractGraphFromRepo', () => {
     await expect(
       extractGraphFromRepo('/workspace/.repos/repo-a'),
     ).rejects.toThrow('/workspace/.repos/repo-a');
+
+    setupExecFailure('Command failed', 'nx: command not found');
 
     await expect(
       extractGraphFromRepo('/workspace/.repos/repo-a'),
