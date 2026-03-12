@@ -89,6 +89,9 @@
     },
     "e2e": {
       "dependsOn": ["^build"]
+    },
+    "lint": {
+      "command": "eslint . --max-warnings=0"
     }
   }
 }

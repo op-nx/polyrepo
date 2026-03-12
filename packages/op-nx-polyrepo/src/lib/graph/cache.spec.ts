@@ -30,24 +30,8 @@ vi.mock('@nx/devkit', () => ({
   writeJsonFile: vi.fn(),
 }));
 
-import { existsSync } from 'node:fs';
-import { extractGraphFromRepo } from './extract';
-import { transformGraphForRepo } from './transform';
-import { getHeadSha, getDirtyFiles } from '../git/detect';
-import { normalizeRepos } from '../config/schema';
-import { hashArray, readJsonFile, writeJsonFile } from '@nx/devkit';
 import type { PolyrepoConfig, NormalizedRepoEntry } from '../config/schema';
 import type { ExternalGraphJson } from './types';
-
-const _mockExistsSync = vi.mocked(existsSync);
-const _mockExtract = vi.mocked(extractGraphFromRepo);
-const _mockTransform = vi.mocked(transformGraphForRepo);
-const _mockGetHeadSha = vi.mocked(getHeadSha);
-const _mockGetDirtyFiles = vi.mocked(getDirtyFiles);
-const _mockNormalizeRepos = vi.mocked(normalizeRepos);
-const _mockHashArray = vi.mocked(hashArray);
-const _mockReadJsonFile = vi.mocked(readJsonFile);
-const _mockWriteJsonFile = vi.mocked(writeJsonFile);
 
 const testConfig: PolyrepoConfig = {
   repos: {
@@ -162,7 +146,9 @@ describe('cache', () => {
     };
   }
 
-  function setupMocksForExtraction(mocks: Awaited<ReturnType<typeof loadMocks>>) {
+  function setupMocksForExtraction(
+    mocks: Awaited<ReturnType<typeof loadMocks>>,
+  ) {
     mocks.normalizeRepos.mockReturnValue(testEntries);
     // .repos/repo-a/.git exists, /local/repo-b/.git exists
     mocks.existsSync.mockImplementation((p: unknown) => {
@@ -197,7 +183,11 @@ describe('cache', () => {
       mocks.extractGraphFromRepo.mockClear();
 
       // Second call with same hash: should return cached
-      const result = await populateGraphReport(testConfig, '/workspace', 'opts-hash');
+      const result = await populateGraphReport(
+        testConfig,
+        '/workspace',
+        'opts-hash',
+      );
 
       expect(mocks.extractGraphFromRepo).not.toHaveBeenCalled();
       expect(result).toBeDefined();
@@ -249,14 +239,16 @@ describe('cache', () => {
 
       const callOrder: string[] = [];
 
-      mocks.extractGraphFromRepo.mockImplementation(async (repoPath: string) => {
-        callOrder.push(`start:${repoPath}`);
-        // Simulate async work
-        await new Promise((r) => setTimeout(r, 10));
-        callOrder.push(`end:${repoPath}`);
+      mocks.extractGraphFromRepo.mockImplementation(
+        async (repoPath: string) => {
+          callOrder.push(`start:${repoPath}`);
+          // Simulate async work
+          await new Promise((r) => setTimeout(r, 10));
+          callOrder.push(`end:${repoPath}`);
 
-        return rawGraph;
-      });
+          return rawGraph;
+        },
+      );
 
       const { populateGraphReport } = await loadCacheModule();
 
@@ -289,9 +281,14 @@ describe('cache', () => {
     it('stores result in module-level variable accessible via getCurrentGraphReport', async () => {
       const mocks = await loadMocks();
       setupMocksForExtraction(mocks);
-      const { populateGraphReport, getCurrentGraphReport } = await loadCacheModule();
+      const { populateGraphReport, getCurrentGraphReport } =
+        await loadCacheModule();
 
-      const populated = await populateGraphReport(testConfig, '/workspace', 'opts-hash');
+      const populated = await populateGraphReport(
+        testConfig,
+        '/workspace',
+        'opts-hash',
+      );
       const current = getCurrentGraphReport();
 
       expect(current).toBe(populated);
@@ -315,9 +312,14 @@ describe('cache', () => {
     it('returns the module-level graph report when populated', async () => {
       const mocks = await loadMocks();
       setupMocksForExtraction(mocks);
-      const { populateGraphReport, getCurrentGraphReport } = await loadCacheModule();
+      const { populateGraphReport, getCurrentGraphReport } =
+        await loadCacheModule();
 
-      const report = await populateGraphReport(testConfig, '/workspace', 'opts-hash');
+      const report = await populateGraphReport(
+        testConfig,
+        '/workspace',
+        'opts-hash',
+      );
       const current = getCurrentGraphReport();
 
       expect(current).toEqual(report);
