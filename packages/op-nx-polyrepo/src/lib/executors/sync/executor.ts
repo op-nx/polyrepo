@@ -3,9 +3,9 @@ import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
 import { logger } from '@nx/devkit';
-import type { ExecutorContext, NxJsonConfiguration } from '@nx/devkit';
-import { validateConfig } from '../../config/validate';
-import { normalizeRepos, type NormalizedRepoEntry } from '../../config/schema';
+import type { ExecutorContext } from '@nx/devkit';
+import { resolvePluginConfig } from '../../config/resolve';
+import type { NormalizedRepoEntry } from '../../config/schema';
 import {
   gitClone,
   gitPull,
@@ -427,22 +427,7 @@ export default async function syncExecutor(
   options: SyncExecutorOptions,
   context: ExecutorContext,
 ): Promise<{ success: boolean }> {
-  const nxJsonPath = join(context.root, 'nx.json');
-  const nxJson: NxJsonConfiguration = JSON.parse(
-    readFileSync(nxJsonPath, 'utf-8'),
-  );
-  const pluginEntry = nxJson?.plugins?.find(
-    (p) =>
-      typeof p === 'object' && 'plugin' in p && p.plugin === '@op-nx/polyrepo',
-  );
-
-  const pluginOptions =
-    pluginEntry && typeof pluginEntry === 'object' && 'options' in pluginEntry
-      ? pluginEntry.options
-      : undefined;
-
-  const config = validateConfig(pluginOptions);
-  const entries = normalizeRepos(config);
+  const { entries } = resolvePluginConfig(context.root);
   const strategy = options.strategy;
   const verbose = options.verbose ?? false;
 

@@ -1,9 +1,9 @@
-import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { logger, readJsonFile } from '@nx/devkit';
-import type { ExecutorContext, NxJsonConfiguration } from '@nx/devkit';
-import { validateConfig } from '../../config/validate';
-import { normalizeRepos, type NormalizedRepoEntry } from '../../config/schema';
+import type { ExecutorContext } from '@nx/devkit';
+import { resolvePluginConfig } from '../../config/resolve';
+import type { NormalizedRepoEntry } from '../../config/schema';
+import { CACHE_FILENAME } from '../../graph/cache';
 import {
   detectRepoState,
   getCurrentBranch,
@@ -41,7 +41,7 @@ function getProjectCount(
   alias: string,
 ): number | null {
   try {
-    const cachePath = join(workspaceRoot, '.repos', '.polyrepo-graph-cache.json');
+    const cachePath = join(workspaceRoot, '.repos', CACHE_FILENAME);
     const cache = readJsonFile<GraphCacheFile>(cachePath);
     const repoReport = cache.report?.repos?.[alias];
 
@@ -95,22 +95,7 @@ export default async function statusExecutor(
   _options: StatusExecutorOptions,
   context: ExecutorContext,
 ): Promise<{ success: boolean }> {
-  const nxJsonPath = join(context.root, 'nx.json');
-  const nxJson: NxJsonConfiguration = JSON.parse(
-    readFileSync(nxJsonPath, 'utf-8'),
-  );
-  const pluginEntry = nxJson?.plugins?.find(
-    (p) =>
-      typeof p === 'object' && 'plugin' in p && p.plugin === '@op-nx/polyrepo',
-  );
-
-  const pluginOptions =
-    pluginEntry && typeof pluginEntry === 'object' && 'options' in pluginEntry
-      ? pluginEntry.options
-      : undefined;
-
-  const config = validateConfig(pluginOptions);
-  const entries = normalizeRepos(config);
+  const { entries } = resolvePluginConfig(context.root);
 
   // Determine repo states
   const syncedEntries: Array<{
