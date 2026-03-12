@@ -103,7 +103,7 @@ Recent decisions affecting current work:
 | 3 | Add npm scripts for common Nx tasks | 2026-03-10 | d12c037 | [3-add-scripts-for-common-tasks-to-package-](./quick/3-add-scripts-for-common-tasks-to-package-/) |
 | 4 | Run all scripts in package.json and resolve errors | 2026-03-11 | 9311e16 | [4-run-all-scripts-in-package-json-and-reso](./quick/4-run-all-scripts-in-package-json-and-reso/) |
 | 5 | CI check: add --max-warnings=0 to lint, fix all typecheck errors, scope scripts to host projects | 2026-03-12 | 3a3db26 | [5-ci-check-add-max-warnings-0-to-the-lint-](./quick/5-ci-check-add-max-warnings-0-to-the-lint-/) |
-| 6 | Ban as-type assertions via consistent-type-assertions lint rule | 2026-03-12 | eabbc1f | [6-research-and-add-lint-rule-to-ban-as-typ](./quick/6-research-and-add-lint-rule-to-ban-as-typ/) |
+| 6 | Ban as-type assertions lint rule + require-description on eslint-disable | 2026-03-12 | 3ee8b4d | [6-research-and-add-lint-rule-to-ban-as-typ](./quick/6-research-and-add-lint-rule-to-ban-as-typ/) |
 
 ### Blockers/Concerns
 
@@ -113,6 +113,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-03-12T17:28:07Z
-Stopped at: Completed quick task 5 (lint --max-warnings=0)
+Last session: 2026-03-12T20:15:00Z
+Stopped at: Completed quick task 6 (ban as-casts + require-description)
 Resume file: None
