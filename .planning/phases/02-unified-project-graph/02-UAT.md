@@ -1,9 +1,9 @@
 ---
-status: diagnosed
+status: resolved
 phase: 02-unified-project-graph
 source: [02-01-SUMMARY.md, 02-02-SUMMARY.md, 02-03-SUMMARY.md]
 started: 2026-03-12T00:00:00Z
-updated: 2026-03-12T00:15:00Z
+updated: 2026-03-12T08:25:00Z
 ---
 
 ## Current Test
@@ -50,7 +50,7 @@ skipped: 4
 ## Gaps
 
 - truth: "External repo projects appear in nx show projects output alongside host workspace projects"
-  status: failed
+  status: resolved
   reason: "User reported: Still only host workspace projects after sync. .repos/nx/ exists with node_modules and graph cache, but nx show projects only returns 3 host projects. polyrepo-status sees 149 projects — graph cache is populated but createNodesV2 is not registering external projects."
   severity: major
   test: 1

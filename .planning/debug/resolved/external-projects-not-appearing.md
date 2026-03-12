@@ -1,5 +1,5 @@
 ---
-status: diagnosed
+status: resolved
 trigger: "Investigate why external repo projects are not appearing in `nx show projects` despite the graph cache being populated and readable."
 created: 2026-03-12T00:00:00Z
 updated: 2026-03-12T00:00:00Z
