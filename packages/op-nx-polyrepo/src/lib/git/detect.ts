@@ -2,8 +2,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { execFile } from 'node:child_process';
 import type { NormalizedRepoEntry } from '../config/schema';
-
-export const gitUrlPattern = /^(git@|https?:\/\/|ssh:\/\/|file:\/\/)/;
+import { gitUrlPattern } from './patterns';
 
 export function isGitUrl(value: string): boolean {
   return gitUrlPattern.test(value);

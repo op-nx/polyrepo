@@ -1,6 +1,6 @@
 import { resolve } from 'node:path';
 import { z } from 'zod';
-import { gitUrlPattern } from '../git/detect';
+import { gitUrlPattern } from '../git/patterns';
 import { normalizeGitUrl } from '../git/normalize-url';
 
 const remoteRepoObject = z
