@@ -88,7 +88,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3 -> 4
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -99,10 +99,21 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 
 ### Phase 5: Maximum Type Safety
 
-**Goal:** Harden the entire TypeScript codebase for maximum type safety — eliminate all `as` assertions and `any`, adopt strictest ESLint presets and tsconfig flags, establish `satisfies`/Zod/value type patterns, refactor tests to SIFERs, create enforcement skills
-**Requirements**: TBD
+**Goal:** Harden the entire TypeScript codebase for maximum type safety -- eliminate all `as` assertions and `any`, adopt strictest ESLint presets and tsconfig flags, establish `satisfies`/Zod/value type patterns, refactor tests to SIFERs, create enforcement skills
+**Requirements**: SAFE-ESLINT, SAFE-TSCONFIG, SAFE-ZOD, SAFE-ANY, SAFE-TYPES, SAFE-CASTS, SAFE-SIFER, SAFE-ENFORCE, SAFE-SKILLS
 **Depends on:** Phase 4
-**Plans:** 0 plans
+**Success Criteria** (what must be TRUE):
+  1. ESLint uses strict-type-checked preset with all warn rules promoted to error
+  2. TSConfig has noUncheckedIndexedAccess and noPropertyAccessFromIndexSignature enabled
+  3. All JSON.parse sites use Zod safeParse for runtime validation
+  4. Zero `as` type assertions, zero `any`, zero eslint-disable comments
+  5. All test files use SIFER pattern (zero beforeEach/afterEach hooks)
+  6. Project-local skills teach AI agents the approved patterns
+**Plans:** 5 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 5 to break down)
+- [ ] 05-01-PLAN.md -- ESLint strict-type-checked preset + TSConfig hardening + @vitest/eslint-plugin install
+- [ ] 05-02-PLAN.md -- Zod schemas at JSON.parse boundaries + fix all production code strict violations
+- [ ] 05-03-PLAN.md -- Test refactoring: git/, graph/, config/, format/, index -- cast elimination + SIFERs
+- [ ] 05-04-PLAN.md -- Test refactoring: executor tests -- ChildProcess mock factory, ExecutorContext factory, SIFERs
+- [ ] 05-05-PLAN.md -- Final enforcement verification + project-local type safety skills
