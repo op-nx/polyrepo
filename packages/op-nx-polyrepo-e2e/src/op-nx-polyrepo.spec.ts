@@ -74,8 +74,8 @@ describe('@op-nx/polyrepo', () => {
 
     it('should report unsynced repos', () => {
       const output = runNx(projectDirectory, 'polyrepo-status');
-      expect(output).toContain('nx: not synced');
-      expect(output).toContain('url: https://github.com/nrwl/nx.git');
+      expect(output).toContain('[not synced]');
+      expect(output).toContain('1 configured, 0 synced, 1 not synced');
     });
 
     it('should register target on root project', () => {
