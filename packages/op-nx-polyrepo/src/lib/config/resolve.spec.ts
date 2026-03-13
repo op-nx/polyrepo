@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
+import type * as NodeFs from 'node:fs';
 
 vi.mock('node:fs', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:fs')>();
+  const actual = await importOriginal<typeof NodeFs>();
 
   return {
     ...actual,

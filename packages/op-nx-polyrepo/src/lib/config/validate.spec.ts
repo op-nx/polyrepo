@@ -5,9 +5,11 @@ import {
   warnUnsyncedRepos,
 } from './validate';
 import type { PolyrepoConfig } from './schema';
+import type * as NodeFsPromises from 'node:fs/promises';
+import type * as NodeFs from 'node:fs';
 
 vi.mock('node:fs/promises', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:fs/promises')>();
+  const actual = await importOriginal<typeof NodeFsPromises>();
 
   return {
     ...actual,
@@ -16,7 +18,7 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 });
 
 vi.mock('node:fs', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:fs')>();
+  const actual = await importOriginal<typeof NodeFs>();
 
   return {
     ...actual,
