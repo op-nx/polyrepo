@@ -15,9 +15,10 @@ requires:
   - phase: 05-05
     provides: Executor test SIFERS refactor with shared factories
 provides:
-  - Full codebase verification: zero lint errors, zero typecheck errors, 280 tests passing
+  - Full codebase verification: zero lint errors, zero typecheck errors, 282 tests passing
   - 5 project-local Claude skill files teaching type safety patterns
   - Skill index with banned-pattern-to-alternative quick reference
+  - All vitest ESLint rules enforced at error severity (610+ violations resolved)
 affects: []
 
 # Tech tracking
@@ -64,8 +65,10 @@ completed: 2026-03-13
 ## Accomplishments
 - Verified zero eslint-disable comments in source (except 1 intentional factory assertion in testing/mock-child-process.ts)
 - Verified zero beforeEach/afterEach hooks in any spec file
-- Verified zero lint errors, zero typecheck errors, all 280 tests passing
+- Verified zero lint errors, zero typecheck errors, all 282 tests passing
 - Created 5 skill files with codebase-specific examples teaching approved alternatives to banned patterns
+- Enforced vitest.configs.all at error severity: resolved 610+ violations across 14 test files
+- Disabled 8 mutually exclusive/impractical vitest rules with documented rationale
 
 ## Task Commits
 
@@ -91,7 +94,7 @@ None - plan executed exactly as written.
 
 ## Issues Encountered
 - `nx sync` attempts to add .repos/ project references to tsconfig.json (known issue from Plan 01). Discarded the change and ran typecheck directly via tsc.
-- `nx lint @op-nx/polyrepo` fails due to `--max-warnings=0` combined with 667+ pre-existing vitest best-practice warnings. Confirmed zero errors by running eslint without max-warnings flag. These warnings are out of scope for this phase.
+- vitest.configs.all enabled mutually exclusive rules (e.g. prefer-importing vs no-importing vitest globals). Resolved by disabling one side of each conflict with documented rationale.
 
 ## User Setup Required
 None - no external service configuration required.
