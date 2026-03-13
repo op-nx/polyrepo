@@ -1,33 +1,38 @@
 import { describe, it, expect, vi } from 'vitest';
+import type * as ExtractModule from './extract.js';
+import type * as TransformModule from './transform.js';
+import type * as GitDetect from '../git/detect.js';
+import type * as ConfigSchema from '../config/schema.js';
+import type * as NxDevkit from '@nx/devkit';
 
 vi.mock('node:fs', () => ({
-  existsSync: vi.fn(),
-  readFileSync: vi.fn(),
-  writeFileSync: vi.fn(),
-  mkdirSync: vi.fn(),
+  existsSync: vi.fn<(path: string) => boolean>(),
+  readFileSync: vi.fn<(path: string, options?: unknown) => string>(),
+  writeFileSync: vi.fn<(path: string, data: string) => void>(),
+  mkdirSync: vi.fn<(path: string, options?: unknown) => void>(),
 }));
 
 vi.mock('./extract', () => ({
-  extractGraphFromRepo: vi.fn(),
+  extractGraphFromRepo: vi.fn<typeof ExtractModule.extractGraphFromRepo>(),
 }));
 
 vi.mock('./transform', () => ({
-  transformGraphForRepo: vi.fn(),
+  transformGraphForRepo: vi.fn<typeof TransformModule.transformGraphForRepo>(),
 }));
 
 vi.mock('../git/detect', () => ({
-  getHeadSha: vi.fn(),
-  getDirtyFiles: vi.fn(),
+  getHeadSha: vi.fn<typeof GitDetect.getHeadSha>(),
+  getDirtyFiles: vi.fn<typeof GitDetect.getDirtyFiles>(),
 }));
 
 vi.mock('../config/schema', () => ({
-  normalizeRepos: vi.fn(),
+  normalizeRepos: vi.fn<typeof ConfigSchema.normalizeRepos>(),
 }));
 
 vi.mock('@nx/devkit', () => ({
-  hashArray: vi.fn(),
-  readJsonFile: vi.fn(),
-  writeJsonFile: vi.fn(),
+  hashArray: vi.fn<typeof NxDevkit.hashArray>(),
+  readJsonFile: vi.fn<typeof NxDevkit.readJsonFile>(),
+  writeJsonFile: vi.fn<typeof NxDevkit.writeJsonFile>(),
 }));
 
 import type { PolyrepoConfig, NormalizedRepoEntry } from '../config/schema';
@@ -93,32 +98,6 @@ describe('cache', () => {
     vi.clearAllMocks();
     vi.resetModules();
 
-    // Re-apply mocks after module reset
-    vi.mock('node:fs', () => ({
-      existsSync: vi.fn(),
-      readFileSync: vi.fn(),
-      writeFileSync: vi.fn(),
-      mkdirSync: vi.fn(),
-    }));
-    vi.mock('./extract', () => ({
-      extractGraphFromRepo: vi.fn(),
-    }));
-    vi.mock('./transform', () => ({
-      transformGraphForRepo: vi.fn(),
-    }));
-    vi.mock('../git/detect', () => ({
-      getHeadSha: vi.fn(),
-      getDirtyFiles: vi.fn(),
-    }));
-    vi.mock('../config/schema', () => ({
-      normalizeRepos: vi.fn(),
-    }));
-    vi.mock('@nx/devkit', () => ({
-      hashArray: vi.fn(),
-      readJsonFile: vi.fn(),
-      writeJsonFile: vi.fn(),
-    }));
-
     const mocks = await loadMocks();
     setupMocksForExtraction(mocks);
 
@@ -180,6 +159,8 @@ describe('cache', () => {
 
   describe('populateGraphReport', () => {
     it('returns cached report when outer hash matches (no extraction called)', async () => {
+      expect.hasAssertions();
+
       const { mocks } = await setup();
       const { populateGraphReport } = await loadCacheModule();
 
@@ -200,6 +181,8 @@ describe('cache', () => {
     });
 
     it('extracts fresh graph when hash changes (extraction called for each repo)', async () => {
+      expect.hasAssertions();
+
       const { mocks } = await setup();
       const { populateGraphReport } = await loadCacheModule();
 
@@ -215,6 +198,8 @@ describe('cache', () => {
     });
 
     it('skips repos without .git directory (unsynced repos)', async () => {
+      expect.hasAssertions();
+
       const { mocks } = await setup();
 
       // Only repo-a has .git, repo-b does not
@@ -237,6 +222,8 @@ describe('cache', () => {
     });
 
     it('calls extractGraphFromRepo in parallel (Promise.all) for multiple repos', async () => {
+      expect.hasAssertions();
+
       const { mocks } = await setup();
 
       const callOrder: string[] = [];
@@ -261,6 +248,8 @@ describe('cache', () => {
     });
 
     it('calls transformGraphForRepo on each extracted JSON', async () => {
+      expect.hasAssertions();
+
       const { mocks } = await setup();
       const { populateGraphReport } = await loadCacheModule();
 
@@ -280,6 +269,8 @@ describe('cache', () => {
     });
 
     it('stores result in module-level variable accessible via getCurrentGraphReport', async () => {
+      expect.hasAssertions();
+
       await setup();
       const { populateGraphReport, getCurrentGraphReport } =
         await loadCacheModule();
@@ -295,6 +286,8 @@ describe('cache', () => {
     });
 
     it('persists cache to disk via writeJsonFile', async () => {
+      expect.hasAssertions();
+
       const { mocks } = await setup();
       const { populateGraphReport } = await loadCacheModule();
 
@@ -309,6 +302,8 @@ describe('cache', () => {
 
   describe('getCurrentGraphReport', () => {
     it('returns the module-level graph report when populated', async () => {
+      expect.hasAssertions();
+
       await setup();
       const { populateGraphReport, getCurrentGraphReport } =
         await loadCacheModule();
@@ -320,14 +315,16 @@ describe('cache', () => {
       );
       const current = getCurrentGraphReport();
 
-      expect(current).toEqual(report);
+      expect(current).toStrictEqual(report);
     });
 
     it('throws descriptive error when report is not yet populated', async () => {
+      expect.hasAssertions();
+
       await setup();
       const { getCurrentGraphReport } = await loadCacheModule();
 
-      expect(() => getCurrentGraphReport()).toThrow(
+      expect(() => getCurrentGraphReport()).toThrowError(
         'Expected cached polyrepo graph report',
       );
     });
@@ -335,6 +332,8 @@ describe('cache', () => {
 
   describe('outer hash computation', () => {
     it('hash includes pluginOptionsHash', async () => {
+      expect.hasAssertions();
+
       const { mocks } = await setup();
       const { populateGraphReport } = await loadCacheModule();
 
@@ -346,6 +345,8 @@ describe('cache', () => {
     });
 
     it('hash includes each repo alias, HEAD SHA, and dirty files', async () => {
+      expect.hasAssertions();
+
       const { mocks } = await setup();
       mocks.getHeadSha.mockResolvedValue('sha123');
       mocks.getDirtyFiles.mockResolvedValue('file.ts');
@@ -359,6 +360,8 @@ describe('cache', () => {
     });
 
     it('skips repos without .git dir (does not include them in hash)', async () => {
+      expect.hasAssertions();
+
       const { mocks } = await setup();
 
       // Only repo-a has .git
@@ -381,6 +384,8 @@ describe('cache', () => {
     });
 
     it('different HEAD SHA produces different hash', async () => {
+      expect.hasAssertions();
+
       const { mocks } = await setup();
 
       let callCount = 0;
@@ -407,6 +412,8 @@ describe('cache', () => {
     });
 
     it('different dirty files produce different hash', async () => {
+      expect.hasAssertions();
+
       const { mocks } = await setup();
 
       let callCount = 0;

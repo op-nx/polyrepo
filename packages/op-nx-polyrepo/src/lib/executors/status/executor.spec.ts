@@ -1,44 +1,50 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { ExecutorContext } from '@nx/devkit';
+import type * as NxDevkit from '@nx/devkit';
+import type * as ConfigValidate from '../../config/validate.js';
+import type * as ConfigSchema from '../../config/schema.js';
+import type * as GitDetect from '../../git/detect.js';
+import type * as GitCommands from '../../git/commands.js';
+import type * as FormatTable from '../../format/table.js';
 import { assertDefined } from '../../testing/asserts';
 
 // Mock dependencies before importing executor
 vi.mock('node:fs', () => ({
-  readFileSync: vi.fn(),
+  readFileSync: vi.fn<(path: string, options?: unknown) => string>(),
 }));
 
 vi.mock('@nx/devkit', () => ({
   logger: {
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
+    info: vi.fn<typeof NxDevkit.logger.info>(),
+    warn: vi.fn<typeof NxDevkit.logger.warn>(),
+    error: vi.fn<typeof NxDevkit.logger.error>(),
   },
-  readJsonFile: vi.fn(),
+  readJsonFile: vi.fn<typeof NxDevkit.readJsonFile>(),
 }));
 
 vi.mock('../../config/validate', () => ({
-  validateConfig: vi.fn(),
+  validateConfig: vi.fn<typeof ConfigValidate.validateConfig>(),
 }));
 
 vi.mock('../../config/schema', () => ({
-  normalizeRepos: vi.fn(),
+  normalizeRepos: vi.fn<typeof ConfigSchema.normalizeRepos>(),
 }));
 
 vi.mock('../../git/detect', () => ({
-  detectRepoState: vi.fn(),
-  getCurrentBranch: vi.fn(),
-  getCurrentRef: vi.fn(),
-  getWorkingTreeState: vi.fn(),
-  getAheadBehind: vi.fn(),
-  isGitTag: vi.fn(),
+  detectRepoState: vi.fn<typeof GitDetect.detectRepoState>(),
+  getCurrentBranch: vi.fn<typeof GitDetect.getCurrentBranch>(),
+  getCurrentRef: vi.fn<typeof GitDetect.getCurrentRef>(),
+  getWorkingTreeState: vi.fn<typeof GitDetect.getWorkingTreeState>(),
+  getAheadBehind: vi.fn<typeof GitDetect.getAheadBehind>(),
+  isGitTag: vi.fn<typeof GitDetect.isGitTag>(),
 }));
 
 vi.mock('../../git/commands', () => ({
-  gitFetch: vi.fn(),
+  gitFetch: vi.fn<typeof GitCommands.gitFetch>(),
 }));
 
 vi.mock('../../format/table', () => ({
-  formatAlignedTable: vi.fn(),
+  formatAlignedTable: vi.fn<typeof FormatTable.formatAlignedTable>(),
 }));
 
 import { readFileSync } from 'node:fs';
@@ -169,8 +175,10 @@ function setup(): void {
   setupDefaultSyncedState();
 }
 
-describe('statusExecutor', () => {
+describe(statusExecutor, () => {
   it('shows branch, ahead/behind, clean status, and project count for synced remote repo', async () => {
+    expect.hasAssertions();
+
     setup();
     setupPluginConfig([
       {
@@ -213,10 +221,13 @@ describe('statusExecutor', () => {
 
     // formatAlignedTable should have been called with row data
     expect(mockFormatAlignedTable).toHaveBeenCalledTimes(1);
+
     const rows = getTableRows();
+
     expect(rows).toHaveLength(1);
 
     const values = getFirstRowValues();
+
     expect(values).toContain('main');
     expect(values).toContain('+0 -0');
     expect(values).toContain('clean');
@@ -224,6 +235,8 @@ describe('statusExecutor', () => {
   });
 
   it('shows file counts with M/A/D/?? labels for dirty repo', async () => {
+    expect.hasAssertions();
+
     setup();
     setupPluginConfig([
       {
@@ -246,10 +259,13 @@ describe('statusExecutor', () => {
     await statusExecutor({}, createTestContext());
 
     const dirtyCol = getFirstRowValues();
+
     expect(dirtyCol).toContain('3M 1A 2??');
   });
 
   it('shows [not synced] and ? projects for unsynced repo', async () => {
+    expect.hasAssertions();
+
     setup();
     setupPluginConfig([
       {
@@ -265,11 +281,14 @@ describe('statusExecutor', () => {
     await statusExecutor({}, createTestContext());
 
     const values = getFirstRowValues();
+
     expect(values).toContain('[not synced]');
     expect(values).toContain('? projects');
   });
 
   it('omits ahead/behind for tag-pinned repo', async () => {
+    expect.hasAssertions();
+
     setup();
     setupPluginConfig([
       {
@@ -290,19 +309,24 @@ describe('statusExecutor', () => {
 
     const rows = getTableRows();
     const values = getFirstRowValues();
+
     // Tag name should be displayed
     expect(values).toContain('v2.1.0');
+
     // Ahead/behind column should be empty
     const firstRow = rows[0];
     assertDefined(firstRow, 'Table has no rows');
     const aheadBehindCol = firstRow[2];
     assertDefined(aheadBehindCol, 'Row has no third column');
+
     expect(aheadBehindCol.value).toBe('');
     // getAheadBehind should NOT have been called (tag-pinned)
     expect(mockGetAheadBehind).not.toHaveBeenCalled();
   });
 
   it('runs auto-fetch in parallel for all synced repos', async () => {
+    expect.hasAssertions();
+
     setup();
     setupPluginConfig([
       {
@@ -328,6 +352,8 @@ describe('statusExecutor', () => {
   });
 
   it('logs warning but continues when auto-fetch fails for a repo', async () => {
+    expect.hasAssertions();
+
     setup();
     setupPluginConfig([
       {
@@ -351,6 +377,8 @@ describe('statusExecutor', () => {
   });
 
   it('shows [WARN: dirty, sync may fail] for dirty repo', async () => {
+    expect.hasAssertions();
+
     setup();
     setupPluginConfig([
       {
@@ -373,7 +401,8 @@ describe('statusExecutor', () => {
     await statusExecutor({}, createTestContext());
 
     const warningCol = getFirstRowValues();
-    expect(warningCol).toEqual(
+
+    expect(warningCol).toStrictEqual(
       expect.arrayContaining([
         expect.stringContaining('[WARN: dirty, sync may fail]'),
       ]),
@@ -381,6 +410,8 @@ describe('statusExecutor', () => {
   });
 
   it('shows [WARN: detached HEAD] for detached non-tag repo', async () => {
+    expect.hasAssertions();
+
     setup();
     setupPluginConfig([
       {
@@ -398,8 +429,9 @@ describe('statusExecutor', () => {
     await statusExecutor({}, createTestContext());
 
     const values = getFirstRowValues();
+
     expect(values).toContain('(detached)');
-    expect(values).toEqual(
+    expect(values).toStrictEqual(
       expect.arrayContaining([
         expect.stringContaining('[WARN: detached HEAD]'),
       ]),
@@ -407,6 +439,8 @@ describe('statusExecutor', () => {
   });
 
   it('shows [WARN: merge conflicts] when conflicts exist', async () => {
+    expect.hasAssertions();
+
     setup();
     setupPluginConfig([
       {
@@ -429,7 +463,8 @@ describe('statusExecutor', () => {
     await statusExecutor({}, createTestContext());
 
     const warningValues = getFirstRowValues();
-    expect(warningValues).toEqual(
+
+    expect(warningValues).toStrictEqual(
       expect.arrayContaining([
         expect.stringContaining('[WARN: merge conflicts]'),
       ]),
@@ -437,6 +472,8 @@ describe('statusExecutor', () => {
   });
 
   it('shows [WARN: drift] and (expected ref) when branch differs from configured ref', async () => {
+    expect.hasAssertions();
+
     setup();
     setupPluginConfig([
       {
@@ -456,16 +493,18 @@ describe('statusExecutor', () => {
     const values = getFirstRowValues();
 
     // Branch display should show expected ref
-    expect(values).toEqual(
+    expect(values).toStrictEqual(
       expect.arrayContaining([expect.stringContaining('(expected develop)')]),
     );
     // Warning column should contain drift warning
-    expect(values).toEqual(
+    expect(values).toStrictEqual(
       expect.arrayContaining([expect.stringContaining('[WARN: drift]')]),
     );
   });
 
   it('shows ? projects when graph cache is missing', async () => {
+    expect.hasAssertions();
+
     setup();
     setupPluginConfig([
       {
@@ -484,10 +523,13 @@ describe('statusExecutor', () => {
     await statusExecutor({}, createTestContext());
 
     const values = getFirstRowValues();
+
     expect(values).toContain('? projects');
   });
 
   it('shows summary line with configured/synced/not-synced totals', async () => {
+    expect.hasAssertions();
+
     setup();
     setupPluginConfig([
       {
@@ -526,6 +568,7 @@ describe('statusExecutor', () => {
         line.includes('synced') &&
         line.includes('not synced'),
     );
+
     expect(summaryLine).toBeDefined();
     expect(summaryLine).toContain('3 configured');
     expect(summaryLine).toContain('2 synced');
@@ -533,6 +576,8 @@ describe('statusExecutor', () => {
   });
 
   it('always prints legend', async () => {
+    expect.hasAssertions();
+
     setup();
     setupPluginConfig([
       {
@@ -548,27 +593,30 @@ describe('statusExecutor', () => {
     await statusExecutor({}, createTestContext());
 
     const lines = getAllLoggedLines();
-    expect(lines).toEqual(
+
+    expect(lines).toStrictEqual(
       expect.arrayContaining([expect.stringContaining('Legend:')]),
     );
-    expect(lines).toEqual(
+    expect(lines).toStrictEqual(
       expect.arrayContaining([expect.stringContaining('M  =')]),
     );
-    expect(lines).toEqual(
+    expect(lines).toStrictEqual(
       expect.arrayContaining([expect.stringContaining('A  =')]),
     );
-    expect(lines).toEqual(
+    expect(lines).toStrictEqual(
       expect.arrayContaining([expect.stringContaining('?? =')]),
     );
-    expect(lines).toEqual(
+    expect(lines).toStrictEqual(
       expect.arrayContaining([expect.stringContaining('+N =')]),
     );
-    expect(lines).toEqual(
+    expect(lines).toStrictEqual(
       expect.arrayContaining([expect.stringContaining('-N =')]),
     );
   });
 
   it('always returns { success: true }', async () => {
+    expect.hasAssertions();
+
     setup();
     setupPluginConfig([
       {
@@ -591,10 +639,12 @@ describe('statusExecutor', () => {
 
     const result = await statusExecutor({}, createTestContext());
 
-    expect(result).toEqual({ success: true });
+    expect(result).toStrictEqual({ success: true });
   });
 
   it('does not call getAheadBehind for detached HEAD (non-tag)', async () => {
+    expect.hasAssertions();
+
     setup();
     setupPluginConfig([
       {
@@ -615,6 +665,8 @@ describe('statusExecutor', () => {
   });
 
   it('shows clean when all working tree counts are zero and repo is even', async () => {
+    expect.hasAssertions();
+
     setup();
     setupPluginConfig([
       {
@@ -638,10 +690,13 @@ describe('statusExecutor', () => {
     await statusExecutor({}, createTestContext());
 
     const values = getFirstRowValues();
+
     expect(values).toContain('clean');
   });
 
   it('shows behind/ahead instead of clean when repo is clean but not even', async () => {
+    expect.hasAssertions();
+
     setup();
     setupPluginConfig([
       {
@@ -665,6 +720,7 @@ describe('statusExecutor', () => {
     await statusExecutor({}, createTestContext());
 
     const values = getFirstRowValues();
+
     expect(values).not.toContain('clean');
     expect(values).toContain('behind, ahead');
     expect(values).not.toContain('3 behind');
@@ -672,6 +728,8 @@ describe('statusExecutor', () => {
   });
 
   it('shows just "behind" without count when clean and only behind', async () => {
+    expect.hasAssertions();
+
     setup();
     setupPluginConfig([
       {
@@ -695,11 +753,14 @@ describe('statusExecutor', () => {
     await statusExecutor({}, createTestContext());
 
     const values = getFirstRowValues();
+
     expect(values).toContain('behind');
     expect(values).not.toContain('5 behind');
   });
 
   it('shows just "ahead" without count when clean and only ahead', async () => {
+    expect.hasAssertions();
+
     setup();
     setupPluginConfig([
       {
@@ -723,11 +784,14 @@ describe('statusExecutor', () => {
     await statusExecutor({}, createTestContext());
 
     const values = getFirstRowValues();
+
     expect(values).toContain('ahead');
     expect(values).not.toContain('3 ahead');
   });
 
   it('summary line includes behind count when repos are behind remote', async () => {
+    expect.hasAssertions();
+
     setup();
     setupPluginConfig([
       {
@@ -758,11 +822,14 @@ describe('statusExecutor', () => {
     const summaryLine = lines.find(
       (line) => line.includes('configured') && line.includes('synced'),
     );
+
     expect(summaryLine).toBeDefined();
     expect(summaryLine).toContain('1 behind');
   });
 
   it('summary line includes ahead count when repos are ahead of remote', async () => {
+    expect.hasAssertions();
+
     setup();
     setupPluginConfig([
       {
@@ -783,11 +850,14 @@ describe('statusExecutor', () => {
     const summaryLine = lines.find(
       (line) => line.includes('configured') && line.includes('synced'),
     );
+
     expect(summaryLine).toBeDefined();
     expect(summaryLine).toContain('1 ahead');
   });
 
   it('summary line omits behind/ahead when all repos are even', async () => {
+    expect.hasAssertions();
+
     setup();
     setupPluginConfig([
       {
@@ -808,12 +878,15 @@ describe('statusExecutor', () => {
     const summaryLine = lines.find(
       (line) => line.includes('configured') && line.includes('synced'),
     );
+
     expect(summaryLine).toBeDefined();
     expect(summaryLine).not.toContain('behind');
     expect(summaryLine).not.toContain('ahead');
   });
 
   it('shows [WARN: tag-pinned] for tag-pinned repo', async () => {
+    expect.hasAssertions();
+
     setup();
     setupPluginConfig([
       {
@@ -840,12 +913,15 @@ describe('statusExecutor', () => {
     await statusExecutor({}, createTestContext());
 
     const values = getFirstRowValues();
-    expect(values).toEqual(
+
+    expect(values).toStrictEqual(
       expect.arrayContaining([expect.stringContaining('[WARN: tag-pinned]')]),
     );
   });
 
   it('shows both dirty and tag-pinned warnings when tag-pinned repo is dirty', async () => {
+    expect.hasAssertions();
+
     setup();
     setupPluginConfig([
       {
@@ -874,6 +950,7 @@ describe('statusExecutor', () => {
     const values = getFirstRowValues();
     // Should have both warnings
     const warningsCell = values.find((v: string) => v.includes('[WARN:'));
+
     expect(warningsCell).toBeDefined();
     expect(warningsCell).toContain('[WARN: dirty, sync may fail]');
     expect(warningsCell).toContain('[WARN: tag-pinned]');

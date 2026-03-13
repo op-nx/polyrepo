@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import type { ZodError } from 'zod';
 import {
   polyrepoConfigSchema,
   normalizeRepos,
@@ -6,7 +7,18 @@ import {
   type PolyrepoConfigInput,
 } from './schema';
 
-describe('polyrepoConfigSchema', () => {
+interface ZodFailureResult {
+  success: false;
+  error: ZodError;
+}
+
+function expectZodFailure(
+  result: { success: boolean },
+): asserts result is ZodFailureResult {
+  expect(result.success).toBe(false);
+}
+
+describe('polyrepoConfig schema', () => {
   describe('valid entries', () => {
     it('accepts string URL (git@github.com:org/repo.git)', () => {
       const result = polyrepoConfigSchema.safeParse({
@@ -113,15 +125,15 @@ describe('polyrepoConfigSchema', () => {
         },
       });
 
-      expect(result.success).toBe(false);
+      expectZodFailure(result);
+      const firstIssue = result.error.issues[0];
 
-      if (!result.success) {
-        const firstIssue = result.error.issues[0];
-        expect(firstIssue).toBeDefined();
-        const message = firstIssue?.message ?? '';
-        expect(message).toContain('repo-a');
-        expect(message).toContain('repo-b');
-      }
+      expect(firstIssue).toBeDefined();
+
+      const message = firstIssue?.message ?? '';
+
+      expect(message).toContain('repo-a');
+      expect(message).toContain('repo-b');
     });
 
     it('rejects config where two repos have same URL but one has .git suffix', () => {
@@ -132,15 +144,15 @@ describe('polyrepoConfigSchema', () => {
         },
       });
 
-      expect(result.success).toBe(false);
+      expectZodFailure(result);
+      const firstIssue = result.error.issues[0];
 
-      if (!result.success) {
-        const firstIssue = result.error.issues[0];
-        expect(firstIssue).toBeDefined();
-        const message = firstIssue?.message ?? '';
-        expect(message).toContain('repo-a');
-        expect(message).toContain('repo-b');
-      }
+      expect(firstIssue).toBeDefined();
+
+      const message = firstIssue?.message ?? '';
+
+      expect(message).toContain('repo-a');
+      expect(message).toContain('repo-b');
     });
 
     it('accepts config where repos have genuinely different URLs', () => {
@@ -162,15 +174,15 @@ describe('polyrepoConfigSchema', () => {
         },
       });
 
-      expect(result.success).toBe(false);
+      expectZodFailure(result);
+      const firstIssue = result.error.issues[0];
 
-      if (!result.success) {
-        const firstIssue = result.error.issues[0];
-        expect(firstIssue).toBeDefined();
-        const message = firstIssue?.message ?? '';
-        expect(message).toContain('repo-a');
-        expect(message).toContain('repo-b');
-      }
+      expect(firstIssue).toBeDefined();
+
+      const message = firstIssue?.message ?? '';
+
+      expect(message).toContain('repo-a');
+      expect(message).toContain('repo-b');
     });
 
     it('uses path.resolve for local path duplicate comparison', () => {
@@ -181,15 +193,15 @@ describe('polyrepoConfigSchema', () => {
         },
       });
 
-      expect(result.success).toBe(false);
+      expectZodFailure(result);
+      const firstIssue = result.error.issues[0];
 
-      if (!result.success) {
-        const firstIssue = result.error.issues[0];
-        expect(firstIssue).toBeDefined();
-        const message = firstIssue?.message ?? '';
-        expect(message).toContain('repo-a');
-        expect(message).toContain('repo-b');
-      }
+      expect(firstIssue).toBeDefined();
+
+      const message = firstIssue?.message ?? '';
+
+      expect(message).toContain('repo-a');
+      expect(message).toContain('repo-b');
     });
   });
 
@@ -265,7 +277,7 @@ describe('polyrepoConfigSchema', () => {
   });
 });
 
-describe('normalizeRepos', () => {
+describe(normalizeRepos, () => {
   it('converts string URL to remote entry with defaults', () => {
     const config: PolyrepoConfig = {
       repos: { 'repo-a': 'git@github.com:org/repo-a.git' },
@@ -273,7 +285,7 @@ describe('normalizeRepos', () => {
 
     const result = normalizeRepos(config);
 
-    expect(result).toEqual([
+    expect(result).toStrictEqual([
       {
         type: 'remote',
         alias: 'repo-a',
@@ -292,7 +304,7 @@ describe('normalizeRepos', () => {
 
     const result = normalizeRepos(config);
 
-    expect(result).toEqual([
+    expect(result).toStrictEqual([
       {
         type: 'local',
         alias: 'repo-b',
@@ -315,7 +327,7 @@ describe('normalizeRepos', () => {
 
     const result = normalizeRepos(config);
 
-    expect(result).toEqual([
+    expect(result).toStrictEqual([
       {
         type: 'remote',
         alias: 'repo-c',
@@ -336,7 +348,7 @@ describe('normalizeRepos', () => {
 
     const result = normalizeRepos(config);
 
-    expect(result).toEqual([
+    expect(result).toStrictEqual([
       {
         type: 'local',
         alias: 'repo-d',
@@ -354,7 +366,7 @@ describe('normalizeRepos', () => {
 
     const result = normalizeRepos(config);
 
-    expect(result).toEqual([
+    expect(result).toStrictEqual([
       {
         type: 'remote',
         alias: 'repo-a',
@@ -420,16 +432,15 @@ describe('normalizeRepos', () => {
     const result = normalizeRepos(config);
 
     const firstEntry = result[0];
+
     expect(firstEntry).toBeDefined();
 
-    expect(firstEntry).toEqual({
+    expect(firstEntry).toStrictEqual({
       type: 'local',
       alias: 'repo-b',
       path: 'D:/projects/repo-b',
     });
 
-    if (firstEntry) {
-      expect('disableHooks' in firstEntry).toBe(false);
-    }
+    expect('disableHooks' in (firstEntry ?? {})).toBe(false);
   });
 });

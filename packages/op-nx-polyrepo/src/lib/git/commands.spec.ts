@@ -3,8 +3,9 @@ import type { ChildProcess, ExecFileException } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 
 // Mock node:child_process before importing commands
-vi.mock('node:child_process', () => {
-  const mockExecFile = vi.fn();
+vi.mock('node:child_process', async () => {
+  const { execFile: _originalExecFile } = await import('node:child_process');
+  const mockExecFile = vi.fn<typeof _originalExecFile>();
 
   return {
     execFile: mockExecFile,
@@ -102,8 +103,10 @@ function setup() {
   return { mockExecFile };
 }
 
-describe('gitClone', () => {
+describe(gitClone, () => {
   it('constructs correct args for default shallow clone', async () => {
+    expect.hasAssertions();
+
     const { mockExecFile } = setup();
 
     await gitClone(
@@ -126,6 +129,8 @@ describe('gitClone', () => {
   });
 
   it('constructs correct args for full clone (depth 0)', async () => {
+    expect.hasAssertions();
+
     const { mockExecFile } = setup();
 
     await gitClone(
@@ -143,6 +148,8 @@ describe('gitClone', () => {
   });
 
   it('constructs correct args when ref is specified', async () => {
+    expect.hasAssertions();
+
     const { mockExecFile } = setup();
 
     await gitClone(
@@ -168,6 +175,8 @@ describe('gitClone', () => {
   });
 
   it('normalizes backslashes in target directory to forward slashes', async () => {
+    expect.hasAssertions();
+
     const { mockExecFile } = setup();
 
     await gitClone(
@@ -190,8 +199,10 @@ describe('gitClone', () => {
   });
 });
 
-describe('gitPull', () => {
+describe(gitPull, () => {
   it('constructs correct args with cwd', async () => {
+    expect.hasAssertions();
+
     const { mockExecFile } = setup();
 
     await gitPull('D:/workspace/.repos/repo');
@@ -205,8 +216,10 @@ describe('gitPull', () => {
   });
 });
 
-describe('gitFetch', () => {
+describe(gitFetch, () => {
   it('constructs correct args with cwd', async () => {
+    expect.hasAssertions();
+
     const { mockExecFile } = setup();
 
     await gitFetch('D:/workspace/.repos/repo');
@@ -220,8 +233,10 @@ describe('gitFetch', () => {
   });
 });
 
-describe('gitPullRebase', () => {
+describe(gitPullRebase, () => {
   it('constructs correct args with cwd', async () => {
+    expect.hasAssertions();
+
     const { mockExecFile } = setup();
 
     await gitPullRebase('D:/workspace/.repos/repo');
@@ -235,8 +250,10 @@ describe('gitPullRebase', () => {
   });
 });
 
-describe('gitPullFfOnly', () => {
+describe(gitPullFfOnly, () => {
   it('constructs correct args with cwd', async () => {
+    expect.hasAssertions();
+
     const { mockExecFile } = setup();
 
     await gitPullFfOnly('D:/workspace/.repos/repo');
@@ -250,8 +267,10 @@ describe('gitPullFfOnly', () => {
   });
 });
 
-describe('gitFetchTag', () => {
+describe(gitFetchTag, () => {
   it('constructs fetch and checkout commands for tag', async () => {
+    expect.hasAssertions();
+
     const { mockExecFile } = setup();
 
     await gitFetchTag('D:/workspace/.repos/repo', 'v1.0.0');
@@ -276,6 +295,8 @@ describe('gitFetchTag', () => {
   });
 
   it('uses custom depth for tag fetch', async () => {
+    expect.hasAssertions();
+
     const { mockExecFile } = setup();
 
     await gitFetchTag('D:/workspace/.repos/repo', 'v2.0.0', 5);
@@ -290,8 +311,10 @@ describe('gitFetchTag', () => {
   });
 });
 
-describe('gitCheckoutBranch', () => {
+describe(gitCheckoutBranch, () => {
   it('fetches the branch from origin then checks it out', async () => {
+    expect.hasAssertions();
+
     const { mockExecFile } = setup();
 
     await gitCheckoutBranch('D:/workspace/.repos/repo', 'main');
@@ -316,6 +339,8 @@ describe('gitCheckoutBranch', () => {
   });
 
   it('falls back to checkout -b when checkout fails (branch not local)', async () => {
+    expect.hasAssertions();
+
     const { mockExecFile } = setup();
 
     let callCount = 0;
@@ -357,6 +382,8 @@ describe('gitCheckoutBranch', () => {
   });
 
   it('respects disableHooks on all git calls', async () => {
+    expect.hasAssertions();
+
     const { mockExecFile } = setup();
 
     await gitCheckoutBranch('D:/workspace/.repos/repo', 'main', true);
@@ -392,6 +419,8 @@ describe('gitCheckoutBranch', () => {
 
 describe('disableHooks', () => {
   it('gitClone prepends -c core.hooksPath=__op-nx_polyrepo_disable-hooks__ when disableHooks is true', async () => {
+    expect.hasAssertions();
+
     const { mockExecFile } = setup();
 
     await gitClone(
@@ -417,6 +446,8 @@ describe('disableHooks', () => {
   });
 
   it('gitClone does NOT prepend hooks args when disableHooks is false', async () => {
+    expect.hasAssertions();
+
     const { mockExecFile } = setup();
 
     await gitClone(
@@ -440,6 +471,8 @@ describe('disableHooks', () => {
   });
 
   it('gitClone does NOT prepend hooks args when disableHooks is undefined', async () => {
+    expect.hasAssertions();
+
     const { mockExecFile } = setup();
 
     await gitClone(
@@ -462,6 +495,8 @@ describe('disableHooks', () => {
   });
 
   it('gitPull prepends -c core.hooksPath when disableHooks is true', async () => {
+    expect.hasAssertions();
+
     const { mockExecFile } = setup();
 
     await gitPull('D:/workspace/.repos/repo', true);
@@ -475,6 +510,8 @@ describe('disableHooks', () => {
   });
 
   it('gitPull does NOT prepend hooks args when disableHooks is false', async () => {
+    expect.hasAssertions();
+
     const { mockExecFile } = setup();
 
     await gitPull('D:/workspace/.repos/repo', false);
@@ -488,6 +525,8 @@ describe('disableHooks', () => {
   });
 
   it('gitFetch prepends -c core.hooksPath when disableHooks is true', async () => {
+    expect.hasAssertions();
+
     const { mockExecFile } = setup();
 
     await gitFetch('D:/workspace/.repos/repo', true);
@@ -501,6 +540,8 @@ describe('disableHooks', () => {
   });
 
   it('gitPullRebase prepends -c core.hooksPath when disableHooks is true', async () => {
+    expect.hasAssertions();
+
     const { mockExecFile } = setup();
 
     await gitPullRebase('D:/workspace/.repos/repo', true);
@@ -519,6 +560,8 @@ describe('disableHooks', () => {
   });
 
   it('gitPullFfOnly prepends -c core.hooksPath when disableHooks is true', async () => {
+    expect.hasAssertions();
+
     const { mockExecFile } = setup();
 
     await gitPullFfOnly('D:/workspace/.repos/repo', true);
@@ -537,6 +580,8 @@ describe('disableHooks', () => {
   });
 
   it('gitFetchTag prepends -c core.hooksPath to both fetch and checkout when disableHooks is true', async () => {
+    expect.hasAssertions();
+
     const { mockExecFile } = setup();
 
     await gitFetchTag('D:/workspace/.repos/repo', 'v1.0.0', 1, true);
@@ -575,6 +620,8 @@ describe('disableHooks', () => {
   });
 
   it('gitFetchTag does NOT prepend hooks args when disableHooks is not passed', async () => {
+    expect.hasAssertions();
+
     const { mockExecFile } = setup();
 
     await gitFetchTag('D:/workspace/.repos/repo', 'v1.0.0');

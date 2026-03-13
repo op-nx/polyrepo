@@ -6,7 +6,7 @@ vi.mock('node:fs', async (importOriginal) => {
 
   return {
     ...actual,
-    readFileSync: vi.fn(),
+    readFileSync: vi.fn<(path: string, options?: unknown) => string>(),
   };
 });
 
@@ -32,7 +32,7 @@ function makeNxJson(pluginOptions?: Record<string, unknown>): string {
   });
 }
 
-describe('resolvePluginConfig', () => {
+describe(resolvePluginConfig, () => {
   it('returns validated config and normalized entries for valid nx.json', () => {
     const { mockedReadFileSync } = setup();
 
@@ -44,8 +44,8 @@ describe('resolvePluginConfig', () => {
 
     const result = resolvePluginConfig('/workspace');
 
-    expect(result.config).toEqual(options);
-    expect(result.entries).toEqual([
+    expect(result.config).toStrictEqual(options);
+    expect(result.entries).toStrictEqual([
       {
         type: 'remote',
         alias: 'repo-a',
@@ -62,7 +62,7 @@ describe('resolvePluginConfig', () => {
 
     mockedReadFileSync.mockReturnValue(JSON.stringify({}));
 
-    expect(() => resolvePluginConfig('/workspace')).toThrow();
+    expect(() => resolvePluginConfig('/workspace')).toThrowError('Invalid @op-nx/polyrepo config');
   });
 
   it('throws when @op-nx/polyrepo plugin entry is missing from plugins', () => {
@@ -76,6 +76,6 @@ describe('resolvePluginConfig', () => {
 
     mockedReadFileSync.mockReturnValue(nxJson);
 
-    expect(() => resolvePluginConfig('/workspace')).toThrow();
+    expect(() => resolvePluginConfig('/workspace')).toThrowError('Invalid @op-nx/polyrepo config');
   });
 });

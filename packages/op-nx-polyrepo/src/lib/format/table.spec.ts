@@ -2,11 +2,11 @@ import { describe, it, expect } from 'vitest';
 import { formatAlignedTable } from './table';
 import type { ColumnDef } from './table';
 
-describe('formatAlignedTable', () => {
+describe(formatAlignedTable, () => {
   it('returns empty array for empty input', () => {
     const result = formatAlignedTable([]);
 
-    expect(result).toEqual([]);
+    expect(result).toStrictEqual([]);
   });
 
   it('returns single row without padding', () => {
@@ -16,7 +16,7 @@ describe('formatAlignedTable', () => {
 
     const result = formatAlignedTable(rows);
 
-    expect(result).toEqual(['hello  world']);
+    expect(result).toStrictEqual(['hello  world']);
   });
 
   it('pads left-aligned columns with padEnd (default)', () => {
@@ -27,7 +27,7 @@ describe('formatAlignedTable', () => {
 
     const result = formatAlignedTable(rows);
 
-    expect(result).toEqual([
+    expect(result).toStrictEqual([
       'a       short',
       'longer  b    ',
     ]);
@@ -64,7 +64,7 @@ describe('formatAlignedTable', () => {
     // Column 0: max width 14, left-aligned
     // Column 1: max width 2, right-aligned
     // Column 2: max width 7, left-aligned (default)
-    expect(result).toEqual([
+    expect(result).toStrictEqual([
       'repo-a           5  main   ',
       'repo-long-name  42  develop',
     ]);
@@ -79,7 +79,7 @@ describe('formatAlignedTable', () => {
     const result = formatAlignedTable(rows);
 
     // Row 2 should have empty padding for columns 1 and 2
-    expect(result.length).toBe(2);
+    expect(result).toHaveLength(2);
     expect(result[0]).toBe('a  b  c');
     expect(result[1]).toBe('x      ');
   });

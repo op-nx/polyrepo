@@ -75,8 +75,37 @@ export default [
     files: ['**/*.spec.ts', '**/*.test.ts'],
     ...vitest.configs.all,
     rules: {
-      ...vitest.configs.all.rules,
+      ...Object.fromEntries(
+        Object.entries(vitest.configs.all.rules).map(([k, v]) => [
+          k,
+          Array.isArray(v) ? ['error', ...v.slice(1)] : 'error',
+        ]),
+      ),
       'vitest/no-hooks': 'error',
+      'vitest/valid-title': ['error', { allowArguments: true }],
+      'vitest/prefer-expect-assertions': [
+        'error',
+        { onlyFunctionsWithAsyncKeyword: true },
+      ],
+      'vitest/max-expects': ['error', { max: 10 }],
+      'vitest/consistent-test-filename': [
+        'error',
+        { pattern: '.*\\.spec\\.[tj]sx?$' },
+      ],
+      // Mutually exclusive pair — we use explicit imports from 'vitest'
+      'vitest/no-importing-vitest-globals': 'off',
+      'vitest/prefer-importing-vitest-globals': 'off',
+      // Superseded by prefer-strict-boolean-matchers (stricter)
+      'vitest/prefer-to-be-truthy': 'off',
+      'vitest/prefer-to-be-falsy': 'off',
+      // Vitest handles timeouts via testTimeout config; per-test timeouts add noise
+      'vitest/require-test-timeout': 'off',
+      // Mutually exclusive pair — prefer-called-times (toHaveBeenCalledTimes(1)) wins
+      'vitest/prefer-called-once': 'off',
+      // toHaveBeenCalled() is valid when exact args aren't relevant to the test
+      'vitest/prefer-called-with': 'off',
+      // vi.mock(import('...')) causes TS errors with partial mock factories
+      'vitest/prefer-import-in-mock': 'off',
       '@typescript-eslint/explicit-function-return-type': 'off',
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/restrict-template-expressions': 'off',

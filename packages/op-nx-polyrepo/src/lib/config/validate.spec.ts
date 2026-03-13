@@ -1,10 +1,4 @@
 import { describe, it, expect, vi } from 'vitest';
-import {
-  validateConfig,
-  warnIfReposNotGitignored,
-  warnUnsyncedRepos,
-} from './validate';
-import type { PolyrepoConfig } from './schema';
 import type * as NodeFsPromises from 'node:fs/promises';
 import type * as NodeFs from 'node:fs';
 
@@ -13,7 +7,7 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 
   return {
     ...actual,
-    readFile: vi.fn(),
+    readFile: vi.fn<(path: string, options?: unknown) => Promise<string>>(),
   };
 });
 
@@ -22,18 +16,24 @@ vi.mock('node:fs', async (importOriginal) => {
 
   return {
     ...actual,
-    existsSync: vi.fn(),
+    existsSync: vi.fn<(path: string) => boolean>(),
   };
 });
 
 vi.mock('@nx/devkit', () => ({
   logger: {
-    warn: vi.fn(),
-    info: vi.fn(),
-    error: vi.fn(),
+    warn: vi.fn<(...args: unknown[]) => void>(),
+    info: vi.fn<(...args: unknown[]) => void>(),
+    error: vi.fn<(...args: unknown[]) => void>(),
   },
 }));
 
+import {
+  validateConfig,
+  warnIfReposNotGitignored,
+  warnUnsyncedRepos,
+} from './validate';
+import type { PolyrepoConfig } from './schema';
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { logger } from '@nx/devkit';
@@ -48,7 +48,7 @@ function setup() {
   return { mockedReadFile, mockedExistsSync, mockedLoggerWarn };
 }
 
-describe('validateConfig', () => {
+describe(validateConfig, () => {
   it('returns parsed config for valid input', () => {
     setup();
 
@@ -58,18 +58,20 @@ describe('validateConfig', () => {
 
     const result = validateConfig(input);
 
-    expect(result).toEqual(input);
+    expect(result).toStrictEqual(input);
   });
 
   it('throws with zod error details for invalid input', () => {
     setup();
 
-    expect(() => validateConfig({})).toThrow();
+    expect(() => validateConfig({})).toThrowError('Invalid @op-nx/polyrepo config');
   });
 });
 
-describe('warnIfReposNotGitignored', () => {
+describe(warnIfReposNotGitignored, () => {
   it('warns when .repos/ is not in .gitignore', async () => {
+    expect.hasAssertions();
+
     const { mockedReadFile, mockedLoggerWarn } = setup();
 
     mockedReadFile.mockResolvedValue('node_modules\ndist\n');
@@ -82,6 +84,8 @@ describe('warnIfReposNotGitignored', () => {
   });
 
   it('does not warn when .repos/ is in .gitignore', async () => {
+    expect.hasAssertions();
+
     const { mockedReadFile, mockedLoggerWarn } = setup();
 
     mockedReadFile.mockResolvedValue('node_modules\n.repos/\ndist\n');
@@ -92,7 +96,7 @@ describe('warnIfReposNotGitignored', () => {
   });
 });
 
-describe('warnUnsyncedRepos', () => {
+describe(warnUnsyncedRepos, () => {
   it('emits single grouped warning for one unsynced remote repo', () => {
     const { mockedExistsSync, mockedLoggerWarn } = setup();
 

@@ -1,56 +1,64 @@
 import { createHash } from 'node:crypto';
 import { describe, it, expect, vi } from 'vitest';
 import type { ExecutorContext } from '@nx/devkit';
+import type * as NodeChildProcess from 'node:child_process';
+import type * as NxDevkit from '@nx/devkit';
+import type * as ConfigValidate from '../../config/validate.js';
+import type * as ConfigSchema from '../../config/schema.js';
+import type * as GitCommands from '../../git/commands.js';
+import type * as GitDetect from '../../git/detect.js';
+import type * as FormatTable from '../../format/table.js';
 import { assertDefined } from '../../testing/asserts';
 
 // Mock dependencies before importing executor
 vi.mock('node:fs', () => ({
-  readFileSync: vi.fn(),
-  existsSync: vi.fn(),
-  writeFileSync: vi.fn(),
+  readFileSync: vi.fn<(path: string, options?: unknown) => string>(),
+  existsSync: vi.fn<(path: string) => boolean>(),
+  writeFileSync: vi.fn<(path: string, data: string) => void>(),
 }));
 
 vi.mock('node:child_process', () => ({
-  spawn: vi.fn(),
+  spawn: vi.fn<typeof NodeChildProcess.spawn>(),
 }));
 
 vi.mock('@nx/devkit', () => ({
   logger: {
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
+    info: vi.fn<typeof NxDevkit.logger.info>(),
+    warn: vi.fn<typeof NxDevkit.logger.warn>(),
+    error: vi.fn<typeof NxDevkit.logger.error>(),
   },
 }));
 
 vi.mock('../../config/validate', () => ({
-  validateConfig: vi.fn(),
+  validateConfig: vi.fn<typeof ConfigValidate.validateConfig>(),
 }));
 
 vi.mock('../../config/schema', () => ({
-  normalizeRepos: vi.fn(),
+  normalizeRepos: vi.fn<typeof ConfigSchema.normalizeRepos>(),
 }));
 
 vi.mock('../../git/commands', () => ({
-  gitClone: vi.fn(),
-  gitPull: vi.fn(),
-  gitFetch: vi.fn(),
-  gitPullRebase: vi.fn(),
-  gitPullFfOnly: vi.fn(),
-  gitFetchTag: vi.fn(),
-  gitCheckoutBranch: vi.fn(),
+  gitClone: vi.fn<typeof GitCommands.gitClone>(),
+  gitPull: vi.fn<typeof GitCommands.gitPull>(),
+  gitFetch: vi.fn<typeof GitCommands.gitFetch>(),
+  gitPullRebase: vi.fn<typeof GitCommands.gitPullRebase>(),
+  gitPullFfOnly: vi.fn<typeof GitCommands.gitPullFfOnly>(),
+  gitFetchTag: vi.fn<typeof GitCommands.gitFetchTag>(),
+  gitCheckoutBranch: vi.fn<typeof GitCommands.gitCheckoutBranch>(),
 }));
 
 vi.mock('../../git/detect', () => ({
-  detectRepoState: vi.fn(),
-  getWorkingTreeState: vi.fn(),
-  getCurrentBranch: vi.fn(),
-  getCurrentRef: vi.fn(),
-  isGitTag: vi.fn(),
+  detectRepoState: vi.fn<typeof GitDetect.detectRepoState>(),
+  getWorkingTreeState: vi.fn<typeof GitDetect.getWorkingTreeState>(),
+  getCurrentBranch: vi.fn<typeof GitDetect.getCurrentBranch>(),
+  getCurrentRef: vi.fn<typeof GitDetect.getCurrentRef>(),
+  isGitTag: vi.fn<typeof GitDetect.isGitTag>(),
 }));
 
 vi.mock('../../format/table', () => ({
-  formatAlignedTable: vi.fn((rows: Array<Array<{ value: string }>>) =>
-    rows.map((r) => r.map((c) => c.value).join(' | ')),
+  formatAlignedTable: vi.fn<typeof FormatTable.formatAlignedTable>(
+    (rows: Array<Array<{ value: string }>>) =>
+      rows.map((r) => r.map((c) => c.value).join(' | ')),
   ),
 }));
 
@@ -161,8 +169,10 @@ function setup(): void {
   mockSpawn.mockImplementation(() => createMockChildProcess(0));
 }
 
-describe('syncExecutor', () => {
+describe(syncExecutor, () => {
   it('clones remote repo when .repos/<alias> does not exist', async () => {
+    expect.hasAssertions();
+
     setup();
     setupPluginConfig([
       {
@@ -182,10 +192,12 @@ describe('syncExecutor', () => {
       expect.stringContaining('.repos'),
       expect.objectContaining({ depth: 1 }),
     );
-    expect(result).toEqual({ success: true });
+    expect(result).toStrictEqual({ success: true });
   });
 
   it('pulls remote repo when .repos/<alias> already exists and ref is a branch', async () => {
+    expect.hasAssertions();
+
     setup();
     setupPluginConfig([
       {
@@ -203,10 +215,12 @@ describe('syncExecutor', () => {
 
     expect(mockGitPull).toHaveBeenCalled();
     expect(mockGitClone).not.toHaveBeenCalled();
-    expect(result).toEqual({ success: true });
+    expect(result).toStrictEqual({ success: true });
   });
 
   it('re-fetches tag when .repos/<alias> already exists and ref looks like a tag', async () => {
+    expect.hasAssertions();
+
     setup();
     setupPluginConfig([
       {
@@ -230,10 +244,12 @@ describe('syncExecutor', () => {
       true,
     );
     expect(mockGitPull).not.toHaveBeenCalled();
-    expect(result).toEqual({ success: true });
+    expect(result).toStrictEqual({ success: true });
   });
 
   it('pulls local path repo when it is a git repo', async () => {
+    expect.hasAssertions();
+
     setup();
     setupPluginConfig([
       { type: 'local', alias: 'repo-b', path: 'D:/projects/repo-b' },
@@ -243,10 +259,12 @@ describe('syncExecutor', () => {
     const result = await syncExecutor({}, createTestContext());
 
     expect(mockGitPull).toHaveBeenCalledWith('D:/projects/repo-b', undefined);
-    expect(result).toEqual({ success: true });
+    expect(result).toStrictEqual({ success: true });
   });
 
   it('skips local path repo pull when path does not exist (warns)', async () => {
+    expect.hasAssertions();
+
     setup();
     setupPluginConfig([
       { type: 'local', alias: 'repo-b', path: 'D:/projects/repo-b' },
@@ -259,10 +277,12 @@ describe('syncExecutor', () => {
     expect(mockLoggerWarn).toHaveBeenCalledWith(
       expect.stringContaining('repo-b'),
     );
-    expect(result).toEqual({ success: true });
+    expect(result).toStrictEqual({ success: true });
   });
 
   it('uses configured depth for clone (depth:0 = full)', async () => {
+    expect.hasAssertions();
+
     setup();
     setupPluginConfig([
       {
@@ -285,6 +305,8 @@ describe('syncExecutor', () => {
   });
 
   it('uses configured ref as --branch during clone', async () => {
+    expect.hasAssertions();
+
     setup();
     setupPluginConfig([
       {
@@ -308,6 +330,8 @@ describe('syncExecutor', () => {
   });
 
   it('processes all repos in parallel (Promise.allSettled)', async () => {
+    expect.hasAssertions();
+
     setup();
     setupPluginConfig([
       {
@@ -333,10 +357,12 @@ describe('syncExecutor', () => {
     // All three repos processed
     expect(mockGitClone).toHaveBeenCalledTimes(2);
     expect(mockLoggerWarn).toHaveBeenCalled(); // local repo not found
-    expect(result).toEqual({ success: true });
+    expect(result).toStrictEqual({ success: true });
   });
 
   it('returns { success: true } when all repos succeed', async () => {
+    expect.hasAssertions();
+
     setup();
     setupPluginConfig([
       {
@@ -351,10 +377,12 @@ describe('syncExecutor', () => {
 
     const result = await syncExecutor({}, createTestContext());
 
-    expect(result).toEqual({ success: true });
+    expect(result).toStrictEqual({ success: true });
   });
 
   it('returns { success: false } when any repo fails', async () => {
+    expect.hasAssertions();
+
     setup();
     setupPluginConfig([
       {
@@ -379,10 +407,12 @@ describe('syncExecutor', () => {
 
     const result = await syncExecutor({}, createTestContext());
 
-    expect(result).toEqual({ success: false });
+    expect(result).toStrictEqual({ success: false });
   });
 
   it('logs per-repo results (cloning/pulling/done/failed)', async () => {
+    expect.hasAssertions();
+
     setup();
     setupPluginConfig([
       {
@@ -403,6 +433,8 @@ describe('syncExecutor', () => {
   });
 
   it('logs summary at end (N synced, M failed)', async () => {
+    expect.hasAssertions();
+
     setup();
     setupPluginConfig([
       {
@@ -434,6 +466,8 @@ describe('syncExecutor', () => {
     }
 
     it('runs npm install after cloning when package-lock.json detected', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         {
@@ -461,6 +495,8 @@ describe('syncExecutor', () => {
     });
 
     it('runs pnpm install after cloning when pnpm-lock.yaml detected', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         {
@@ -495,6 +531,8 @@ describe('syncExecutor', () => {
     });
 
     it('runs yarn after cloning when yarn.lock detected', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         {
@@ -529,6 +567,8 @@ describe('syncExecutor', () => {
     });
 
     it('runs install after pulling an existing remote repo', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         {
@@ -556,6 +596,8 @@ describe('syncExecutor', () => {
     });
 
     it('runs install for local path repos that are updated', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         { type: 'local', alias: 'repo-b', path: 'D:/projects/repo-b' },
@@ -577,6 +619,8 @@ describe('syncExecutor', () => {
     });
 
     it('uses corepack when package.json has packageManager field', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         {
@@ -623,6 +667,8 @@ describe('syncExecutor', () => {
     });
 
     it('uses corepack for yarn when package.json specifies yarn', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         {
@@ -666,6 +712,8 @@ describe('syncExecutor', () => {
     });
 
     it('falls back to lock file detection when no packageManager field', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         {
@@ -713,6 +761,8 @@ describe('syncExecutor', () => {
     });
 
     it('closes stdin to suppress interactive prompts and pipes stdout/stderr', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         {
@@ -741,6 +791,8 @@ describe('syncExecutor', () => {
     });
 
     it('install failure logs warning but does not fail the sync', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         {
@@ -760,12 +812,14 @@ describe('syncExecutor', () => {
       expect(mockLoggerWarn).toHaveBeenCalledWith(
         expect.stringContaining('repo-a'),
       );
-      expect(result).toEqual({ success: true });
+      expect(result).toStrictEqual({ success: true });
     });
   });
 
   describe('strategy option', () => {
     it('defaults to pull strategy', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         {
@@ -784,6 +838,8 @@ describe('syncExecutor', () => {
     });
 
     it('strategy "fetch" calls gitFetch instead of gitPull', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         {
@@ -803,6 +859,8 @@ describe('syncExecutor', () => {
     });
 
     it('strategy "rebase" calls gitPullRebase', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         {
@@ -822,6 +880,8 @@ describe('syncExecutor', () => {
     });
 
     it('strategy "ff-only" calls gitPullFfOnly', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         {
@@ -843,6 +903,8 @@ describe('syncExecutor', () => {
 
   describe('dry-run mode', () => {
     it('shows "would clone" for unsynced remote repos', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         {
@@ -867,6 +929,8 @@ describe('syncExecutor', () => {
     });
 
     it('shows "would pull" for synced remote repos with branch ref', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         {
@@ -892,6 +956,8 @@ describe('syncExecutor', () => {
     });
 
     it('shows "would sync to tag" for synced remote repos with tag ref', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         {
@@ -918,6 +984,8 @@ describe('syncExecutor', () => {
     });
 
     it('shows dirty warning in dry-run when working tree is dirty', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         {
@@ -949,6 +1017,8 @@ describe('syncExecutor', () => {
     });
 
     it('shows "would skip" for local repos that do not exist', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         { type: 'local', alias: 'repo-b', path: 'D:/projects/repo-b' },
@@ -966,6 +1036,8 @@ describe('syncExecutor', () => {
     });
 
     it('returns success:true in dry-run mode', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         {
@@ -980,10 +1052,12 @@ describe('syncExecutor', () => {
 
       const result = await syncExecutor({ dryRun: true }, createTestContext());
 
-      expect(result).toEqual({ success: true });
+      expect(result).toStrictEqual({ success: true });
     });
 
     it('shows [WARN: detached HEAD] in dry-run when repo has detached HEAD (non-tag)', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         {
@@ -1010,6 +1084,8 @@ describe('syncExecutor', () => {
     });
 
     it('shows [WARN: tag-pinned] in dry-run when repo is at a tag ref', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         {
@@ -1037,6 +1113,8 @@ describe('syncExecutor', () => {
     });
 
     it('shows both dirty and detached HEAD warnings in dry-run', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         {
@@ -1072,6 +1150,8 @@ describe('syncExecutor', () => {
     });
 
     it('shows both dirty and tag-pinned warnings in dry-run', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         {
@@ -1108,6 +1188,8 @@ describe('syncExecutor', () => {
     });
 
     it('does not call any git commands in dry-run mode', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         {
@@ -1142,6 +1224,8 @@ describe('syncExecutor', () => {
 
   describe('summary table', () => {
     it('prints aligned Results table after sync completes', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         {
@@ -1171,6 +1255,8 @@ describe('syncExecutor', () => {
     });
 
     it('shows [OK] for successful repos and [ERROR] for failed repos', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         {
@@ -1210,6 +1296,8 @@ describe('syncExecutor', () => {
     });
 
     it('summary table appears after streaming progress lines', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         {
@@ -1237,6 +1325,8 @@ describe('syncExecutor', () => {
     });
 
     it('summary line still shows N synced, M failed', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         {
@@ -1274,6 +1364,8 @@ describe('syncExecutor', () => {
 
   describe('disableHooks', () => {
     it('passes disableHooks=true to gitClone by default for remote repos', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         {
@@ -1296,6 +1388,8 @@ describe('syncExecutor', () => {
     });
 
     it('passes disableHooks=true to gitPull by default for synced remote repos', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         {
@@ -1317,6 +1411,8 @@ describe('syncExecutor', () => {
     });
 
     it('passes disableHooks=true to gitFetchTag for tag ref repos', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         {
@@ -1342,6 +1438,8 @@ describe('syncExecutor', () => {
     });
 
     it('does not pass disableHooks for local repos', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         { type: 'local', alias: 'repo-b', path: 'D:/projects/repo-b' },
@@ -1354,6 +1452,8 @@ describe('syncExecutor', () => {
     });
 
     it('passes disableHooks=false when explicitly set to false', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         {
@@ -1377,6 +1477,8 @@ describe('syncExecutor', () => {
 
   describe('branch transition (tag-to-branch, branch-to-branch)', () => {
     it('checks out target branch when repo is on detached HEAD (tag-to-branch)', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         {
@@ -1403,6 +1505,8 @@ describe('syncExecutor', () => {
     });
 
     it('checks out target branch when repo is on wrong branch', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         {
@@ -1429,6 +1533,8 @@ describe('syncExecutor', () => {
     });
 
     it('skips checkout when already on the correct branch', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         {
@@ -1451,6 +1557,8 @@ describe('syncExecutor', () => {
     });
 
     it('skips checkout when ref is undefined', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         {
@@ -1471,6 +1579,8 @@ describe('syncExecutor', () => {
     });
 
     it('dry-run shows "would switch to branch and pull" when on detached HEAD', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         {
@@ -1500,6 +1610,8 @@ describe('syncExecutor', () => {
     });
 
     it('logs switching message before checkout', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         {
@@ -1602,6 +1714,8 @@ describe('syncExecutor', () => {
     }
 
     it('skips install when lockfile hash matches stored hash (deps up to date)', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         {
@@ -1624,6 +1738,8 @@ describe('syncExecutor', () => {
     });
 
     it('installs when no stored hash exists (first install or failed previous)', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         {
@@ -1649,6 +1765,8 @@ describe('syncExecutor', () => {
     });
 
     it('installs after pull when no stored hash exists', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         {
@@ -1673,6 +1791,8 @@ describe('syncExecutor', () => {
     });
 
     it('skips install after pull when deps already installed', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         {
@@ -1694,6 +1814,8 @@ describe('syncExecutor', () => {
     });
 
     it('always installs after clone (new repo)', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         {
@@ -1716,6 +1838,8 @@ describe('syncExecutor', () => {
     });
 
     it('installs when no lockfile exists (cannot determine if deps changed)', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         {
@@ -1740,6 +1864,8 @@ describe('syncExecutor', () => {
     });
 
     it('retries install when previous install failed (no stored hash written)', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         {
@@ -1766,6 +1892,8 @@ describe('syncExecutor', () => {
     });
 
     it('writes stored hash after successful install', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         {
@@ -1789,6 +1917,8 @@ describe('syncExecutor', () => {
     });
 
     it('does not write stored hash when install fails', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         {
@@ -1813,6 +1943,8 @@ describe('syncExecutor', () => {
     });
 
     it('skips install for local repo when deps already installed', async () => {
+      expect.hasAssertions();
+
       setup();
       setupPluginConfig([
         { type: 'local', alias: 'repo-b', path: 'D:/projects/repo-b' },

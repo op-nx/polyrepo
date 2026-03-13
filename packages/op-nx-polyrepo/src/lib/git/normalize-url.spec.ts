@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { normalizeGitUrl } from './normalize-url';
 
-describe('normalizeGitUrl', () => {
+describe(normalizeGitUrl, () => {
   it('strips trailing .git suffix', () => {
     expect(normalizeGitUrl('https://github.com/org/repo.git')).toBe(
       'https://github.com/org/repo',

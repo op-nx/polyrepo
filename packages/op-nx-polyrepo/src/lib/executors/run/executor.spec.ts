@@ -3,7 +3,7 @@ import type { ExecutorContext } from '@nx/devkit';
 import { assertDefined } from '../../testing/asserts';
 
 vi.mock('nx/src/executors/run-commands/run-commands.impl', () => ({
-  default: vi.fn(),
+  default: vi.fn<(...args: unknown[]) => Promise<{ success: boolean; terminalOutput: string }>>(),
 }));
 
 import runExecutor from './executor';
@@ -31,8 +31,10 @@ function setup(): { context: ExecutorContext } {
   return { context: createTestContext() };
 }
 
-describe('runExecutor', () => {
+describe(runExecutor, () => {
   it('constructs correct nx run command with forward-slashed nxBin', async () => {
+    expect.hasAssertions();
+
     const { context } = setup();
     mockedRunCommandsImpl.mockResolvedValue({
       success: true,
@@ -63,6 +65,8 @@ describe('runExecutor', () => {
   });
 
   it('sets cwd to .repos/<repoAlias> joined with context.root', async () => {
+    expect.hasAssertions();
+
     const { context } = setup();
     mockedRunCommandsImpl.mockResolvedValue({
       success: true,
@@ -90,6 +94,8 @@ describe('runExecutor', () => {
   });
 
   it('passes __unparsed__ args through to runCommandsImpl', async () => {
+    expect.hasAssertions();
+
     const { context } = setup();
     mockedRunCommandsImpl.mockResolvedValue({
       success: true,
@@ -111,10 +117,12 @@ describe('runExecutor', () => {
 
     const options = callArgs[0];
 
-    expect(options.__unparsed__).toEqual(['--watch', '--verbose']);
+    expect(options.__unparsed__).toStrictEqual(['--watch', '--verbose']);
   });
 
   it('returns { success: true } when runCommandsImpl succeeds', async () => {
+    expect.hasAssertions();
+
     const { context } = setup();
     mockedRunCommandsImpl.mockResolvedValue({
       success: true,
@@ -130,10 +138,12 @@ describe('runExecutor', () => {
       context,
     );
 
-    expect(result).toEqual({ success: true });
+    expect(result).toStrictEqual({ success: true });
   });
 
   it('returns { success: false } when runCommandsImpl fails', async () => {
+    expect.hasAssertions();
+
     const { context } = setup();
     mockedRunCommandsImpl.mockResolvedValue({
       success: false,
@@ -149,10 +159,12 @@ describe('runExecutor', () => {
       context,
     );
 
-    expect(result).toEqual({ success: false });
+    expect(result).toStrictEqual({ success: false });
   });
 
   it('returns { success: false } when runCommandsImpl throws', async () => {
+    expect.hasAssertions();
+
     const { context } = setup();
     mockedRunCommandsImpl.mockRejectedValue(new Error('spawn failed'));
 
@@ -165,10 +177,12 @@ describe('runExecutor', () => {
       context,
     );
 
-    expect(result).toEqual({ success: false });
+    expect(result).toStrictEqual({ success: false });
   });
 
   it('uses forward slashes in paths for Windows compat', async () => {
+    expect.hasAssertions();
+
     setup();
     mockedRunCommandsImpl.mockResolvedValue({
       success: true,
@@ -198,6 +212,8 @@ describe('runExecutor', () => {
   });
 
   it('passes context through to runCommandsImpl', async () => {
+    expect.hasAssertions();
+
     const { context } = setup();
     mockedRunCommandsImpl.mockResolvedValue({
       success: true,
@@ -221,6 +237,8 @@ describe('runExecutor', () => {
   });
 
   it('defaults __unparsed__ to empty array when not provided', async () => {
+    expect.hasAssertions();
+
     const { context } = setup();
     mockedRunCommandsImpl.mockResolvedValue({
       success: true,
@@ -241,6 +259,6 @@ describe('runExecutor', () => {
 
     const options = callArgs[0];
 
-    expect(options.__unparsed__).toEqual([]);
+    expect(options.__unparsed__).toStrictEqual([]);
   });
 });

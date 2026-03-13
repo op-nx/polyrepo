@@ -3,11 +3,11 @@ import type { ChildProcess, ExecException } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 
 vi.mock('node:child_process', () => ({
-  exec: vi.fn(),
+  exec: vi.fn<(command: string, options: unknown, callback: unknown) => ChildProcess>(),
 }));
 
 import { exec } from 'node:child_process';
-import { extractGraphFromRepo } from './extract';
+import { extractGraphFromRepo } from './extract.js';
 
 /**
  * Create a minimal ChildProcess stub to satisfy the exec return type.
@@ -86,8 +86,10 @@ function setupExecFailure(errorMessage: string, stderr = '') {
   return { mockExec };
 }
 
-describe('extractGraphFromRepo', () => {
+describe(extractGraphFromRepo, () => {
   it('calls exec with command containing node_modules/.bin/nx and graph --print', async () => {
+    expect.hasAssertions();
+
     const { mockExec } = setupExecSuccess(
       JSON.stringify({ graph: { nodes: {}, dependencies: {} } }),
     );
@@ -102,6 +104,8 @@ describe('extractGraphFromRepo', () => {
   });
 
   it('sets cwd to repoPath', async () => {
+    expect.hasAssertions();
+
     const { mockExec } = setupExecSuccess(
       JSON.stringify({ graph: { nodes: {}, dependencies: {} } }),
     );
@@ -116,6 +120,8 @@ describe('extractGraphFromRepo', () => {
   });
 
   it('sets maxBuffer to LARGE_BUFFER (1GB)', async () => {
+    expect.hasAssertions();
+
     const { mockExec } = setupExecSuccess(
       JSON.stringify({ graph: { nodes: {}, dependencies: {} } }),
     );
@@ -130,6 +136,8 @@ describe('extractGraphFromRepo', () => {
   });
 
   it('sets env with NX_DAEMON, NX_VERBOSE_LOGGING, and NX_PERF_LOGGING all false', async () => {
+    expect.hasAssertions();
+
     const { mockExec } = setupExecSuccess(
       JSON.stringify({ graph: { nodes: {}, dependencies: {} } }),
     );
@@ -150,6 +158,8 @@ describe('extractGraphFromRepo', () => {
   });
 
   it('parses JSON when stdout has leading non-JSON lines', async () => {
+    expect.hasAssertions();
+
     const graphJson = { graph: { nodes: {}, dependencies: {} } };
     const contaminatedStdout =
       '[isolated-plugin] some log line\n' + JSON.stringify(graphJson);
@@ -158,18 +168,22 @@ describe('extractGraphFromRepo', () => {
 
     const result = await extractGraphFromRepo('/workspace/.repos/repo-a');
 
-    expect(result).toEqual(graphJson);
+    expect(result).toStrictEqual(graphJson);
   });
 
   it('rejects when stdout contains no valid JSON', async () => {
+    expect.hasAssertions();
+
     setupExecSuccess('[isolated-plugin] log only\nno json here');
 
     await expect(
       extractGraphFromRepo('/workspace/.repos/repo-a'),
-    ).rejects.toThrow('/workspace/.repos/repo-a');
+    ).rejects.toThrowError('/workspace/.repos/repo-a');
   });
 
   it('sets windowsHide=true', async () => {
+    expect.hasAssertions();
+
     const { mockExec } = setupExecSuccess(
       JSON.stringify({ graph: { nodes: {}, dependencies: {} } }),
     );
@@ -184,6 +198,8 @@ describe('extractGraphFromRepo', () => {
   });
 
   it('resolves with parsed JSON when child process succeeds', async () => {
+    expect.hasAssertions();
+
     const graphJson = {
       graph: {
         nodes: {
@@ -201,24 +217,28 @@ describe('extractGraphFromRepo', () => {
 
     const result = await extractGraphFromRepo('/workspace/.repos/repo-a');
 
-    expect(result).toEqual(graphJson);
+    expect(result).toStrictEqual(graphJson);
   });
 
   it('rejects with descriptive error including repoPath and stderr when child process fails', async () => {
-    setupExecFailure('Command failed', 'nx: command not found');
-
-    await expect(
-      extractGraphFromRepo('/workspace/.repos/repo-a'),
-    ).rejects.toThrow('/workspace/.repos/repo-a');
+    expect.hasAssertions();
 
     setupExecFailure('Command failed', 'nx: command not found');
 
     await expect(
       extractGraphFromRepo('/workspace/.repos/repo-a'),
-    ).rejects.toThrow('nx: command not found');
+    ).rejects.toThrowError('/workspace/.repos/repo-a');
+
+    setupExecFailure('Command failed', 'nx: command not found');
+
+    await expect(
+      extractGraphFromRepo('/workspace/.repos/repo-a'),
+    ).rejects.toThrowError('nx: command not found');
   });
 
   it('handles large stdout (1.4MB+ JSON) without truncation', async () => {
+    expect.hasAssertions();
+
     const largeNodes: Record<string, unknown> = {};
 
     for (let i = 0; i < 12000; i++) {
