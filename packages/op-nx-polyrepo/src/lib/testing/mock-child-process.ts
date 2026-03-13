@@ -41,6 +41,6 @@ export function createMockChildProcess(exitCode = 0): ChildProcess {
   // Emit close on next tick to simulate process exit
   process.nextTick(() => child.emit('close', exitCode));
 
-  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions, @typescript-eslint/no-unsafe-return -- sole bridging assertion: EventEmitter-to-ChildProcess, encapsulated in factory
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- sole bridging assertion: EventEmitter-to-ChildProcess, encapsulated in factory
   return child as unknown as ChildProcess;
 }

@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { describe, it, expect, vi } from 'vitest';
 import type { ExecutorContext } from '@nx/devkit';
+import { assertDefined } from '../../testing/asserts';
 
 // Mock dependencies before importing executor
 vi.mock('node:fs', () => ({
@@ -1194,7 +1195,9 @@ describe('syncExecutor', () => {
 
       await syncExecutor({}, createTestContext());
 
-      const tableCallArgs = mockFormatAlignedTable.mock.calls[0][0];
+      const tableCallArgs = mockFormatAlignedTable.mock.calls[0]?.[0];
+      assertDefined(tableCallArgs, 'formatAlignedTable was not called');
+
       const hasOk = tableCallArgs.some((row: Array<{ value: string }>) =>
         row.some((cell) => cell.value === '[OK]'),
       );

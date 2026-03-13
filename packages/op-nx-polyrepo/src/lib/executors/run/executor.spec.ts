@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { ExecutorContext } from '@nx/devkit';
+import { assertDefined } from '../../testing/asserts';
 
 vi.mock('nx/src/executors/run-commands/run-commands.impl', () => ({
   default: vi.fn(),
@@ -50,6 +51,8 @@ describe('runExecutor', () => {
     expect(mockedRunCommandsImpl).toHaveBeenCalledTimes(1);
 
     const callArgs = mockedRunCommandsImpl.mock.calls[0];
+    assertDefined(callArgs, 'runCommandsImpl was not called');
+
     const options = callArgs[0];
 
     expect(options.command).toContain('my-lib:build');
@@ -76,6 +79,8 @@ describe('runExecutor', () => {
     );
 
     const callArgs = mockedRunCommandsImpl.mock.calls[0];
+    assertDefined(callArgs, 'runCommandsImpl was not called');
+
     const options = callArgs[0];
 
     // cwd should use forward slashes and point to .repos/repo-a
@@ -102,6 +107,8 @@ describe('runExecutor', () => {
     );
 
     const callArgs = mockedRunCommandsImpl.mock.calls[0];
+    assertDefined(callArgs, 'runCommandsImpl was not called');
+
     const options = callArgs[0];
 
     expect(options.__unparsed__).toEqual(['--watch', '--verbose']);
@@ -182,6 +189,8 @@ describe('runExecutor', () => {
     );
 
     const callArgs = mockedRunCommandsImpl.mock.calls[0];
+    assertDefined(callArgs, 'runCommandsImpl was not called');
+
     const options = callArgs[0];
 
     expect(options.command).not.toContain('\\');
@@ -205,6 +214,7 @@ describe('runExecutor', () => {
     );
 
     const callArgs = mockedRunCommandsImpl.mock.calls[0];
+    assertDefined(callArgs, 'runCommandsImpl was not called');
     const passedContext = callArgs[1];
 
     expect(passedContext).toBe(context);
@@ -227,6 +237,8 @@ describe('runExecutor', () => {
     );
 
     const callArgs = mockedRunCommandsImpl.mock.calls[0];
+    assertDefined(callArgs, 'runCommandsImpl was not called');
+
     const options = callArgs[0];
 
     expect(options.__unparsed__).toEqual([]);

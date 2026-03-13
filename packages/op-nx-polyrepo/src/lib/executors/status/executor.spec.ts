@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { ExecutorContext } from '@nx/devkit';
+import { assertDefined } from '../../testing/asserts';
 
 // Mock dependencies before importing executor
 vi.mock('node:fs', () => ({
@@ -93,6 +94,21 @@ interface StubNode {
 
 function createStubNode(name: string): StubNode {
   return { name };
+}
+
+function getTableRows(): ColumnDef[][] {
+  const rows = mockFormatAlignedTable.mock.calls[0]?.[0];
+  assertDefined(rows, 'formatAlignedTable was not called');
+
+  return rows;
+}
+
+function getFirstRowValues(): string[] {
+  const rows = getTableRows();
+  const firstRow = rows[0];
+  assertDefined(firstRow, 'Table has no rows');
+
+  return firstRow.map((c: ColumnDef) => c.value);
 }
 
 const fakeConfig: PolyrepoConfig = {
@@ -197,11 +213,10 @@ describe('statusExecutor', () => {
 
     // formatAlignedTable should have been called with row data
     expect(mockFormatAlignedTable).toHaveBeenCalledTimes(1);
-    const rows = mockFormatAlignedTable.mock.calls[0][0];
+    const rows = getTableRows();
     expect(rows).toHaveLength(1);
 
-    const row = rows[0];
-    const values = row.map((c: ColumnDef) => c.value);
+    const values = getFirstRowValues();
     expect(values).toContain('main');
     expect(values).toContain('+0 -0');
     expect(values).toContain('clean');
@@ -230,8 +245,7 @@ describe('statusExecutor', () => {
 
     await statusExecutor({}, createTestContext());
 
-    const rows = mockFormatAlignedTable.mock.calls[0][0];
-    const dirtyCol = rows[0].map((c: ColumnDef) => c.value);
+    const dirtyCol = getFirstRowValues();
     expect(dirtyCol).toContain('3M 1A 2??');
   });
 
@@ -250,8 +264,7 @@ describe('statusExecutor', () => {
 
     await statusExecutor({}, createTestContext());
 
-    const rows = mockFormatAlignedTable.mock.calls[0][0];
-    const values = rows[0].map((c: ColumnDef) => c.value);
+    const values = getFirstRowValues();
     expect(values).toContain('[not synced]');
     expect(values).toContain('? projects');
   });
@@ -275,12 +288,15 @@ describe('statusExecutor', () => {
 
     await statusExecutor({}, createTestContext());
 
-    const rows = mockFormatAlignedTable.mock.calls[0][0];
-    const values = rows[0].map((c: ColumnDef) => c.value);
+    const rows = getTableRows();
+    const values = getFirstRowValues();
     // Tag name should be displayed
     expect(values).toContain('v2.1.0');
     // Ahead/behind column should be empty
-    const aheadBehindCol = rows[0][2];
+    const firstRow = rows[0];
+    assertDefined(firstRow, 'Table has no rows');
+    const aheadBehindCol = firstRow[2];
+    assertDefined(aheadBehindCol, 'Row has no third column');
     expect(aheadBehindCol.value).toBe('');
     // getAheadBehind should NOT have been called (tag-pinned)
     expect(mockGetAheadBehind).not.toHaveBeenCalled();
@@ -356,8 +372,7 @@ describe('statusExecutor', () => {
 
     await statusExecutor({}, createTestContext());
 
-    const rows = mockFormatAlignedTable.mock.calls[0][0];
-    const warningCol = rows[0].map((c: ColumnDef) => c.value);
+    const warningCol = getFirstRowValues();
     expect(warningCol).toEqual(
       expect.arrayContaining([
         expect.stringContaining('[WARN: dirty, sync may fail]'),
@@ -382,8 +397,7 @@ describe('statusExecutor', () => {
 
     await statusExecutor({}, createTestContext());
 
-    const rows = mockFormatAlignedTable.mock.calls[0][0];
-    const values = rows[0].map((c: ColumnDef) => c.value);
+    const values = getFirstRowValues();
     expect(values).toContain('(detached)');
     expect(values).toEqual(
       expect.arrayContaining([
@@ -414,8 +428,7 @@ describe('statusExecutor', () => {
 
     await statusExecutor({}, createTestContext());
 
-    const rows = mockFormatAlignedTable.mock.calls[0][0];
-    const warningValues = rows[0].map((c: ColumnDef) => c.value);
+    const warningValues = getFirstRowValues();
     expect(warningValues).toEqual(
       expect.arrayContaining([
         expect.stringContaining('[WARN: merge conflicts]'),
@@ -440,8 +453,7 @@ describe('statusExecutor', () => {
 
     await statusExecutor({}, createTestContext());
 
-    const rows = mockFormatAlignedTable.mock.calls[0][0];
-    const values = rows[0].map((c: ColumnDef) => c.value);
+    const values = getFirstRowValues();
 
     // Branch display should show expected ref
     expect(values).toEqual(
@@ -471,8 +483,7 @@ describe('statusExecutor', () => {
 
     await statusExecutor({}, createTestContext());
 
-    const rows = mockFormatAlignedTable.mock.calls[0][0];
-    const values = rows[0].map((c: ColumnDef) => c.value);
+    const values = getFirstRowValues();
     expect(values).toContain('? projects');
   });
 
@@ -626,8 +637,7 @@ describe('statusExecutor', () => {
 
     await statusExecutor({}, createTestContext());
 
-    const rows = mockFormatAlignedTable.mock.calls[0][0];
-    const values = rows[0].map((c: ColumnDef) => c.value);
+    const values = getFirstRowValues();
     expect(values).toContain('clean');
   });
 
@@ -654,8 +664,7 @@ describe('statusExecutor', () => {
 
     await statusExecutor({}, createTestContext());
 
-    const rows = mockFormatAlignedTable.mock.calls[0][0];
-    const values = rows[0].map((c: ColumnDef) => c.value);
+    const values = getFirstRowValues();
     expect(values).not.toContain('clean');
     expect(values).toContain('behind, ahead');
     expect(values).not.toContain('3 behind');
@@ -685,8 +694,7 @@ describe('statusExecutor', () => {
 
     await statusExecutor({}, createTestContext());
 
-    const rows = mockFormatAlignedTable.mock.calls[0][0];
-    const values = rows[0].map((c: ColumnDef) => c.value);
+    const values = getFirstRowValues();
     expect(values).toContain('behind');
     expect(values).not.toContain('5 behind');
   });
@@ -714,8 +722,7 @@ describe('statusExecutor', () => {
 
     await statusExecutor({}, createTestContext());
 
-    const rows = mockFormatAlignedTable.mock.calls[0][0];
-    const values = rows[0].map((c: ColumnDef) => c.value);
+    const values = getFirstRowValues();
     expect(values).toContain('ahead');
     expect(values).not.toContain('3 ahead');
   });
@@ -832,8 +839,7 @@ describe('statusExecutor', () => {
 
     await statusExecutor({}, createTestContext());
 
-    const rows = mockFormatAlignedTable.mock.calls[0][0];
-    const values = rows[0].map((c: ColumnDef) => c.value);
+    const values = getFirstRowValues();
     expect(values).toEqual(
       expect.arrayContaining([expect.stringContaining('[WARN: tag-pinned]')]),
     );
@@ -865,8 +871,7 @@ describe('statusExecutor', () => {
 
     await statusExecutor({}, createTestContext());
 
-    const rows = mockFormatAlignedTable.mock.calls[0][0];
-    const values = rows[0].map((c: ColumnDef) => c.value);
+    const values = getFirstRowValues();
     // Should have both warnings
     const warningsCell = values.find((v: string) => v.includes('[WARN:'));
     expect(warningsCell).toBeDefined();
