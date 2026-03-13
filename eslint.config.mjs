@@ -26,15 +26,6 @@ export default [
     ...tseslint.configs.disableTypeChecked,
   },
   {
-    files: ['**/*.spec.ts', '**/*.test.ts'],
-    ...vitest.configs.all,
-    rules: {
-      ...vitest.configs.all.rules,
-      'vitest/no-hooks': 'error',
-      '@typescript-eslint/explicit-function-return-type': 'off',
-    },
-  },
-  {
     files: ['**/*.ts', '**/*.tsx', '**/*.cts', '**/*.mts'],
     rules: {
       '@nx/enforce-module-boundaries': [
@@ -78,6 +69,17 @@ export default [
           allowHigherOrderFunctions: true,
         },
       ],
+    },
+  },
+  {
+    files: ['**/*.spec.ts', '**/*.test.ts'],
+    ...vitest.configs.all,
+    rules: {
+      ...vitest.configs.all.rules,
+      'vitest/no-hooks': 'error',
+      '@typescript-eslint/explicit-function-return-type': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/restrict-template-expressions': 'off',
     },
   },
 ];
