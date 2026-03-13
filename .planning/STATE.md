@@ -66,6 +66,7 @@ Progress: [██████████] 100% (23/23 plans)
 
 - Phase 4 added: Code cleanup (tech debt from v1.0 audit — hardcoded cache filename, duplicated config reading)
 - Phase 5 added: Maximum type safety (originally "Avoid type casting and prefer satisfies", scope expanded during discussion)
+- Phase 6 added: Add e2e container (prebaked Docker image with Nx workspace + local repo to cut e2e from ~3min to ~8s)
 
 ### Decisions
 

@@ -16,6 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: Unified Project Graph** - External projects in nx graph with namespacing and cached extraction (completed 2026-03-12)
 - [x] **Phase 3: Multi-Repo Git DX** - Combined status, bulk operations, per-repo output (completed 2026-03-11)
 - [x] **Phase 4: Code Cleanup** - Extract shared constants and deduplicate config reading (tech debt from v1.0 audit, completed 2026-03-12)
+- [ ] **Phase 6: Add e2e container** - Docker container with prebaked Nx workspace and repo for fast e2e tests
 
 ## Phase Details
 
@@ -88,7 +89,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -97,6 +98,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | 3. Multi-Repo Git DX | 9/9 | Complete | 2026-03-11 |
 | 4. Code Cleanup | 1/1 | Complete | 2026-03-12 |
 | 5. Maximum Type Safety | 6/6 | Complete | 2026-03-13 |
+| 6. Add e2e container | 0/? | Not Planned | |
 
 ### Phase 5: Maximum Type Safety
 
@@ -119,3 +121,24 @@ Plans:
 - [x] 05-04-PLAN.md -- Test refactoring: git/, graph/, config/, format/, index -- cast elimination + SIFERs
 - [x] 05-05-PLAN.md -- Test refactoring: executor tests -- ChildProcess mock factory, ExecutorContext factory, SIFERs
 - [x] 05-06-PLAN.md -- Final enforcement verification + project-local type safety skills + vitest rule enforcement
+
+### Phase 6: Add e2e container
+
+**Goal:** Run e2e tests in a Docker container with prebaked Nx workspace and git repo to eliminate scaffold and clone overhead, reducing e2e runtime from ~3 min to ~8s
+**Requirements**: None (DX improvement, no new features)
+**Depends on:** Phase 5
+**Key decisions:**
+  - Host runs build + Verdaccio publish; container runs consume + test (only the tarball crosses the boundary via HTTP)
+  - Prebake `create-nx-workspace` output in Docker image layer (rebuilds only on Nx version bump)
+  - Prebake `git clone --depth 1` of nrwl/nx to `/repos/nx` in image layer; e2e config references it as a local path repo instead of GitHub URL
+  - arm64-native `node:22-slim` image runs natively on Snapdragon X Elite via Docker Desktop (no QEMU)
+  - No bind mounts — all filesystem I/O stays on container's overlay2/ext4
+**Success Criteria** (what must be TRUE):
+  1. `npm run e2e` completes in under 30 seconds (down from ~3 minutes)
+  2. e2e tests pass with identical assertions as the current host-based tests
+  3. No network dependency during test execution (Verdaccio is localhost, repo is local path)
+  4. Docker image rebuilds only when Nx version or repo ref changes (layer cache)
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 6 to break down)
