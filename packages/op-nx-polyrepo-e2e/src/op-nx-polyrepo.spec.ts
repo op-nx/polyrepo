@@ -74,6 +74,7 @@ describe('@op-nx/polyrepo', () => {
 
     it('should report unsynced repos', () => {
       const output = runNx(projectDirectory, 'polyrepo-status');
+
       expect(output).toContain('[not synced]');
       expect(output).toContain('1 configured, 0 synced, 1 not synced');
     });
@@ -85,6 +86,7 @@ describe('@op-nx/polyrepo', () => {
         'show project @org/source --json',
       ).replace(/^[^{]*/, ''); // Strip any Nx warnings before JSON
       const project = JSON.parse(output);
+
       expect(project.targets['polyrepo-status']).toBeDefined();
       expect(project.targets['polyrepo-status'].executor).toBe(
         '@op-nx/polyrepo:status',
