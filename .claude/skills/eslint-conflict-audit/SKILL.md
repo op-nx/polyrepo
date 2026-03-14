@@ -1,13 +1,21 @@
 ---
 name: eslint-conflict-audit
 description: >
-  Check for conflicting, contradictory, or redundant ESLint rules. Audit ESLint flat config for rule conflicts, circular auto-fix loops, or superseded rules. Find mutually exclusive rules enabled by broad presets. Investigate why `eslint --fix` produces oscillating changes or why two rules demand opposite code patterns.
+  Detect conflicts between ESLint rules that are already enabled in the project's
+  flat config. Use when two active rules demand opposite code patterns, cause
+  circular auto-fix loops, or make each other redundant. Audit for mutually
+  exclusive rule pairs inherited from broad presets like `all`, `strict`, or
+  `stylistic`. Use this skill when: eslint errors cannot all be fixed because
+  rules contradict each other, CI keeps failing because two rules want different
+  things, `eslint --fix` oscillates or never converges, specific rule names seem
+  to conflict (e.g. prefer-to-be-truthy vs prefer-strict-boolean-matchers), or
+  import ordering rules fight each other.
 ---
 
 # Skill: ESLint conflict audit
 
 ## Trigger
-Check for conflicting, contradictory, or redundant ESLint rules. Audit ESLint flat config for rule conflicts, circular auto-fix loops, or superseded rules. Find mutually exclusive rules enabled by broad presets. Investigate why `eslint --fix` produces oscillating changes or why two rules demand opposite code patterns.
+Detect conflicts between ESLint rules that are already enabled in the project's flat config. Use when two active rules demand opposite code patterns, cause circular auto-fix loops, or make each other redundant. Audit for mutually exclusive rule pairs inherited from broad presets like `all`, `strict`, or `stylistic`. Use this skill when: eslint errors cannot all be fixed because rules contradict each other, CI keeps failing because two rules want different things, `eslint --fix` oscillates or never converges, specific rule names seem to conflict (e.g. prefer-to-be-truthy vs prefer-strict-boolean-matchers), or import ordering rules fight each other.
 
 ## Prompt
 
