@@ -82,13 +82,16 @@ export default [
           allowHigherOrderFunctions: true,
         },
       ],
+      // stylisticTypeCheckedOnly enables this, but its auto-fix produces x!
+      // which violates no-non-null-assertion, and consistent-type-assertions
+      // with assertionStyle: 'never' already bans all as-casts
+      '@typescript-eslint/non-nullable-type-assertion-style': 'off',
     },
   },
   {
     files: ['**/*.spec.ts', '**/*.test.ts'],
     ...vitest.configs.recommended,
     rules: {
-      // recommended preset: 16 correctness rules already at error
       ...vitest.configs.recommended.rules,
       // --- Promoted from warn to error (beyond recommended) ---
       'vitest/consistent-each-for': 'error',
@@ -106,15 +109,7 @@ export default [
       'vitest/no-restricted-vi-methods': 'error',
       'vitest/no-test-prefixes': 'error',
       'vitest/no-test-return-statement': 'error',
-      'vitest/padding-around-after-all-blocks': 'error',
-      'vitest/padding-around-after-each-blocks': 'error',
       'vitest/padding-around-all': 'error',
-      'vitest/padding-around-before-all-blocks': 'error',
-      'vitest/padding-around-before-each-blocks': 'error',
-      'vitest/padding-around-describe-blocks': 'error',
-      'vitest/padding-around-expect-groups': 'error',
-      'vitest/padding-around-test-blocks': 'error',
-      'vitest/prefer-called-times': 'error',
       'vitest/prefer-comparison-matcher': 'error',
       'vitest/prefer-describe-function-title': 'error',
       'vitest/prefer-each': 'error',
@@ -137,7 +132,6 @@ export default [
       'vitest/prefer-todo': 'error',
       'vitest/prefer-vi-mocked': 'error',
       'vitest/require-awaited-expect-poll': 'error',
-      'vitest/require-hook': 'error',
       'vitest/require-mock-type-parameters': 'error',
       'vitest/require-to-throw-message': 'error',
       'vitest/require-top-level-describe': 'error',
