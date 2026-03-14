@@ -140,21 +140,6 @@ export default [
         'error',
         { pattern: '.*\\.spec\\.[tj]sx?$' },
       ],
-      // --- Disabled rules ---
-      // Mutually exclusive pair — we use explicit imports from 'vitest'
-      'vitest/no-importing-vitest-globals': 'off',
-      'vitest/prefer-importing-vitest-globals': 'off',
-      // Superseded by prefer-strict-boolean-matchers (stricter)
-      'vitest/prefer-to-be-truthy': 'off',
-      'vitest/prefer-to-be-falsy': 'off',
-      // Vitest handles timeouts via testTimeout config; per-test timeouts add noise
-      'vitest/require-test-timeout': 'off',
-      // Mutually exclusive pair — prefer-called-times wins
-      'vitest/prefer-called-once': 'off',
-      // toHaveBeenCalled() is valid when exact args aren't relevant to the test
-      'vitest/prefer-called-with': 'off',
-      // vi.mock(import('...')) causes TS errors with partial mock factories
-      'vitest/prefer-import-in-mock': 'off',
       // --- TypeScript rule relaxations for test files ---
       '@typescript-eslint/explicit-function-return-type': 'off',
       '@typescript-eslint/no-unsafe-assignment': 'off',
