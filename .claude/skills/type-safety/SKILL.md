@@ -1,6 +1,6 @@
 ---
 name: type-safety
-description: "Project-specific alternatives to banned TypeScript constructs. Use this skill when encountering ESLint errors for: `as` type assertions (assertionStyle: 'never'), `any` type, non-null assertions (`!`), test hooks (beforeEach/afterEach), consistent-type-imports, or consistent-type-definitions. Also use when needing: `satisfies` vs type annotations, Zod `safeParse` for validating JSON.parse/API/file data, SIFERS test setup pattern replacing hooks, cast-free Vitest mock patterns with `vi.mocked()`, custom type guards for narrowing `unknown`, or `assertDefined()` for checked index access. Do not use for general TypeScript coding questions that don't involve these banned patterns or their alternatives."
+description: "Project-specific type safety patterns and alternatives to banned TypeScript constructs. Use this skill whenever writing or modifying TypeScript code in this project, especially when encountering ESLint errors for: `as` type assertions (assertionStyle: 'never'), `any` type, non-null assertions (`!`), test hooks (beforeEach/afterEach), or consistent-type-imports. Covers: `satisfies` vs type annotations, Zod `safeParse` at system boundaries, SIFERS test setup pattern replacing hooks, cast-free Vitest mock patterns with `vi.mocked()`, custom type guards for `unknown` narrowing, and `assertDefined()` for checked index access."
 ---
 
 # Type Safety Patterns
