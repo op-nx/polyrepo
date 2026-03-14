@@ -44,6 +44,9 @@ Thumbs.db
 .nx/cache
 .nx/workspace-data
 
+# skill eval workspaces
+.claude/skills/*-workspace
+
 .nx/polygraph
 vite.config.*.timestamp*
 vitest.config.*.timestamp*
