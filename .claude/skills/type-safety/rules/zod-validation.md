@@ -28,6 +28,7 @@ export type ExternalProjectNodeData = z.infer<typeof externalProjectNodeDataSche
 ```
 
 **Reference:** `src/lib/graph/types.ts` -- all graph types derived from Zod schemas.
+**Reference:** `src/lib/config/schema.ts` -- config schemas with `.strict()`, `.refine()`, `.check()`, and discriminated unions.
 
 ## Pattern: safeParse with Descriptive Errors
 
@@ -47,6 +48,7 @@ const graphData = result.data; // fully typed
 ```
 
 **Reference:** `src/lib/graph/extract.ts` -- graph JSON validation.
+**Reference:** `src/lib/config/validate.ts` -- config validation with descriptive errors.
 
 ## Pattern: Loose Schemas for Partial Validation
 

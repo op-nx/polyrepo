@@ -115,6 +115,35 @@ function getNode(name: string): TransformedNode {
 }
 ```
 
+## Pattern: Custom Type Guards for `unknown` Narrowing
+
+When dealing with unvalidated data (e.g., raw target configs from external graphs),
+use custom type guard functions instead of casts. This is the production-code
+equivalent of `assertDefined` — it narrows `unknown` safely at runtime.
+
+```typescript
+// GOOD: type guard narrows unknown without any casts
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isRecordOfRecords(
+  value: unknown,
+): value is Record<string, Record<string, unknown>> {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return Object.values(value).every((v) => isRecord(v));
+}
+
+// Usage: safely extract from unknown data
+const config = isRecord(rawTargetConfig) ? rawTargetConfig : {};
+const metadata = isRecord(config['metadata']) ? config['metadata'] : undefined;
+```
+
+**Reference:** `src/lib/graph/transform.ts` -- `isRecord`/`isRecordOfRecords` for target config extraction.
+
 ## What NOT to Do
 
 ```typescript
