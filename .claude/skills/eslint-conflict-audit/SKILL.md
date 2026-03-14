@@ -9,18 +9,20 @@ Read the project's ESLint flat config file(s) and produce a conflict report. A "
 
 ### Step 1: Extract the effective rule set
 
-Read every ESLint config file in the project (root + per-project overrides). Account for:
-- Spreads of plugin presets (`...tseslint.configs.strictTypeCheckedOnly`, `...vitest.configs.recommended`)
-- Named exports spread by downstream configs (e.g. `export const opNxE2e = [...]` imported and spread by project configs)
-- Later `rules` keys overwriting earlier ones from spreads
+Build an explicit inventory of every active rule. A rule is active only if it appears as a key in the final resolved `rules` object for a given scope with a severity other than `'off'` or `0`. Do not infer active rules from comments, git history, plugin documentation, or rule name patterns -- only from what the config actually enables.
 
-For each file-glob scope, resolve the final severity and options for every rule after all spreads and overrides are applied. Ignore rules set to `'off'` or `0`.
+Read every ESLint config file in the project (root + per-project overrides). For each file, trace the config array in order and resolve rules using ESLint flat config semantics:
 
-When scopes overlap (e.g. `**/*.ts` and `**/*.spec.ts`), a test file matches both. Merge both scopes' rules to get the effective set for that file, with later config objects winning. Two rules only conflict if both are active in the same effective scope after merging.
+1. **Identify spreads**: For each spread (`...plugin.configs.recommended`, `...tseslint.configs.strictTypeCheckedOnly`, etc.), determine which rules it contributes. Read the preset's `rules` object from the plugin source or `node_modules` if needed.
+2. **Apply overwrite order**: In flat config, when a config object has both a spread and an explicit `rules` key, the explicit `rules` completely replaces the spread's `rules` -- it does not merge. However, if the explicit `rules` re-spreads the preset (`...vitest.configs.recommended.rules`), those rules are included.
+3. **Named exports**: Check for named exports (e.g. `export const opNxE2e = [...]`) that downstream project configs import and spread. These create additional scopes.
+4. **Scope overlap**: When globs overlap (e.g. `**/*.ts` and `**/*.spec.ts`), a file matching both scopes receives rules from both config objects, with later objects winning. Merge both scopes' rules to get the effective set for that file type.
+
+Output: For each distinct effective scope, produce a flat list of `ruleName: severity/options` pairs. Only rules in this list are candidates for conflict checking. If a rule does not appear in any scope's list, it is not active and must not be reported as conflicting.
 
 ### Step 2: Identify conflicts
 
-Check every enabled rule against every other enabled rule in the same effective scope for these conflict types:
+Using only the active rules from Step 1, check every enabled rule against every other enabled rule in the same effective scope for these conflict types:
 
 **Type A -- Mutually exclusive advice**
 Two rules that demand opposite code patterns. Enabling both means every file violates at least one.
@@ -45,6 +47,8 @@ Detection -- static analysis: load the plugin and inspect `rule.meta.fixable` fo
 - One rule adds code that the other rule removes
 
 If static analysis is inconclusive, test empirically: create a minimal file that violates Rule A, run `eslint --fix --rule '{"ruleB":"off"}'`, then check if the output violates Rule B (and vice versa).
+
+A conflict can be both Type A and Type B (mutually exclusive rules that are also both auto-fixable). When this happens, classify as Type B -- the circular fix is the more severe symptom and the one that needs action. Note the mutual exclusivity in the Problem description.
 
 **Type C -- Superseded rules**
 A stricter rule makes a weaker rule redundant. Not a hard conflict, but enabling both adds noise (the weaker rule's violations are a subset of the stricter rule's).
@@ -84,6 +88,8 @@ Severity: <both severities>
 **Evidence**: <the specific code pattern that violates both, or the circular fix sequence>
 **Fix**: Disable `<rule-to-disable>` because <rationale>
 ```
+
+Use exactly one type label per finding (A, B, C, or D). Do not combine types (no "A+B"). If a conflict has aspects of multiple types, classify by the most severe: B > A > D > C.
 
 Sort conflicts by type (A first, then B, C, D), then alphabetically by rule name.
 
