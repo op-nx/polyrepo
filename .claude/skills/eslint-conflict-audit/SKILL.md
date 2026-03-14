@@ -1,7 +1,7 @@
 # Skill: ESLint conflict audit
 
 ## Trigger
-User asks to check for conflicting ESLint rules, audit ESLint config, or find rule conflicts.
+Check for conflicting, contradictory, or redundant ESLint rules. Audit ESLint flat config for rule conflicts, circular auto-fix loops, or superseded rules. Find mutually exclusive rules enabled by broad presets. Investigate why `eslint --fix` produces oscillating changes or why two rules demand opposite code patterns.
 
 ## Prompt
 
@@ -14,11 +14,15 @@ Build an explicit inventory of every active rule. A rule is active only if it ap
 Read every ESLint config file in the project (root + per-project overrides). For each file, trace the config array in order and resolve rules using ESLint flat config semantics:
 
 1. **Identify spreads**: For each spread (`...plugin.configs.recommended`, `...tseslint.configs.strictTypeCheckedOnly`, etc.), determine which rules it contributes. Read the preset's `rules` object from the plugin source or `node_modules` if needed.
-2. **Apply overwrite order**: In flat config, when a config object has both a spread and an explicit `rules` key, the explicit `rules` completely replaces the spread's `rules` -- it does not merge. However, if the explicit `rules` re-spreads the preset (`...vitest.configs.recommended.rules`), those rules are included.
+2. **Apply overwrite order**: Two distinct spreading patterns exist:
+   - **Object spread** (`{ ...preset, rules: { ... } }`): the explicit `rules` property replaces the spread's `rules` entirely (standard JS object semantics). If the explicit `rules` re-spreads the preset (`...vitest.configs.recommended.rules`), those rules are included.
+   - **Array spread** (`[...presetConfigs, { rules: { ... } }]`): each config object is a separate entry in the flat config array. ESLint merges rules across all matching objects, with later objects winning per-rule.
 3. **Named exports**: Check for named exports (e.g. `export const opNxE2e = [...]`) that downstream project configs import and spread. These create additional scopes.
 4. **Scope overlap**: When globs overlap (e.g. `**/*.ts` and `**/*.spec.ts`), a file matching both scopes receives rules from both config objects, with later objects winning. Merge both scopes' rules to get the effective set for that file type.
 
 Output: For each distinct effective scope, produce a flat list of `ruleName: severity/options` pairs. Only rules in this list are candidates for conflict checking. If a rule does not appear in any scope's list, it is not active and must not be reported as conflicting.
+
+To verify your manual resolution, you can run `npx eslint --print-config <file>` on a representative file for each scope (e.g. a `.ts` source file and a `.spec.ts` test file). This gives the ground-truth effective config for that file path.
 
 ### Step 2: Identify conflicts
 
@@ -46,7 +50,7 @@ Detection -- static analysis: load the plugin and inspect `rule.meta.fixable` fo
 - Both rules are fixable and target assertion/matcher expressions
 - One rule adds code that the other rule removes
 
-If static analysis is inconclusive, test empirically: create a minimal file that violates Rule A, run `eslint --fix --rule '{"ruleB":"off"}'`, then check if the output violates Rule B (and vice versa).
+For known conflict pairs, describe the circular fix sequence from static analysis. For uncertain pairs, verify empirically if feasible: create a minimal file that violates Rule A, run `eslint --fix --rule '{"ruleB":"off"}'`, then check if the output violates Rule B (and vice versa).
 
 A conflict can be both Type A and Type B (mutually exclusive rules that are also both auto-fixable). When this happens, classify as Type B -- the circular fix is the more severe symptom and the one that needs action. Note the mutual exclusivity in the Problem description.
 
@@ -91,7 +95,7 @@ Severity: <both severities>
 
 Use exactly one type label per finding (A, B, C, or D). Do not combine types (no "A+B"). If a conflict has aspects of multiple types, classify by the most severe: B > A > D > C.
 
-Sort conflicts by type (A first, then B, C, D), then alphabetically by rule name.
+Sort conflicts by severity (B first, then A, D, C), then alphabetically by rule name within each type.
 
 End with a summary:
 ```
@@ -99,8 +103,8 @@ End with a summary:
 
 | Type | Count | Action needed |
 |------|-------|---------------|
-| A -- Mutually exclusive | N | Must disable one side |
 | B -- Circular fix | N | Must disable one side |
-| C -- Superseded | N | Optional cleanup |
+| A -- Mutually exclusive | N | Must disable one side |
 | D -- Config impossibility | N | Must fix options |
+| C -- Superseded | N | Optional cleanup |
 ```
