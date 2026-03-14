@@ -3,6 +3,19 @@ import tseslint from 'typescript-eslint';
 import eslintComments from '@eslint-community/eslint-plugin-eslint-comments/configs';
 import vitest from '@vitest/eslint-plugin';
 
+export const opNxE2e = [
+  {
+    files: ['**/*.spec.ts'],
+    rules: {
+      'vitest/no-hooks': 'off',
+      'vitest/expect-expect': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+    },
+  },
+];
+
 export default [
   ...nx.configs['flat/base'],
   ...nx.configs['flat/typescript'],
