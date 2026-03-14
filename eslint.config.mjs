@@ -73,7 +73,7 @@ export default [
   },
   {
     files: ['**/*.spec.ts', '**/*.test.ts'],
-    ...vitest.configs.all,
+    ...vitest.configs.recommended,
     rules: {
       // recommended preset: 16 correctness rules already at error
       ...vitest.configs.recommended.rules,
