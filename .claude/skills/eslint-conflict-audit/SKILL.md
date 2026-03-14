@@ -1,3 +1,9 @@
+---
+name: eslint-conflict-audit
+description: >
+  Check for conflicting, contradictory, or redundant ESLint rules. Audit ESLint flat config for rule conflicts, circular auto-fix loops, or superseded rules. Find mutually exclusive rules enabled by broad presets. Investigate why `eslint --fix` produces oscillating changes or why two rules demand opposite code patterns.
+---
+
 # Skill: ESLint conflict audit
 
 ## Trigger
