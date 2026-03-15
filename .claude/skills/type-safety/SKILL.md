@@ -23,6 +23,52 @@ This project enforces maximum type safety via ESLint and tsconfig rules. Every `
 - **`vitest/no-hooks`** -- `beforeEach`, `afterEach`, `beforeAll`, `afterAll` are banned in tests
 - **`eslint-comments/require-description`** -- every `eslint-disable` comment must explain why
 
+## Critical: Test File Requirements
+
+When writing `*.spec.ts` files, you MUST follow ALL of these rules. Violations produce lint errors that block the build.
+
+### No hooks -- use SIFERS setup() function
+
+`vitest/no-hooks` is enforced at error severity. NEVER use `beforeEach`, `afterEach`, `beforeAll`, or `afterAll`. Instead, create a `setup()` function inside each `describe` block:
+
+```typescript
+describe('myModule', () => {
+  function setup(options: { exitCode?: number } = {}) {
+    vi.clearAllMocks(); // ALWAYS first line
+
+    const mockExec = vi.mocked(exec);
+    const mockChild = createMockChildProcess(options.exitCode ?? 0);
+    mockExec.mockReturnValue(mockChild);
+
+    return { mockExec, mockChild };
+  }
+
+  it('should succeed', () => {
+    const { mockExec } = setup();
+    // ... test
+  });
+});
+```
+
+### Required test factories -- do NOT hand-roll
+
+Import these project utilities instead of writing your own stubs:
+
+- **`createTestContext(overrides?)`** from `../testing/mock-child-process.ts` or define locally -- creates a valid `ExecutorContext` without `{} as ExecutorContext` casts
+- **`createMockChildProcess(exitCode?)`** from `../../testing/mock-child-process` -- creates a typed `ChildProcess` mock (the SOLE place a type assertion is allowed)
+- **`assertDefined(value, message)`** from `../../testing/asserts` -- narrows `T | undefined` to `T` for index access
+
+### Use vi.mocked() -- NEVER cast vi.fn()
+
+```typescript
+// GOOD
+vi.mock('node:child_process', () => ({ exec: vi.fn() }));
+const mockExec = vi.mocked(exec); // type-safe, no cast
+
+// BAD -- produces lint error
+const mockExec = vi.fn() as unknown as typeof exec;
+```
+
 ## Rule Index
 
 | Rule File | What It Teaches | When to Use |
