@@ -8,6 +8,9 @@ export const opNxE2e = [
     files: ['**/*.spec.ts'],
     rules: {
       'vitest/no-hooks': 'off',
+      'vitest/no-duplicate-hooks': 'error',
+      'vitest/prefer-hooks-in-order': 'error',
+      'vitest/prefer-hooks-on-top': 'error',
       'vitest/expect-expect': 'off',
       '@typescript-eslint/no-unsafe-argument': 'off',
       '@typescript-eslint/no-unsafe-member-access': 'off',
@@ -103,7 +106,7 @@ export default [
       'vitest/no-conditional-in-test': 'error',
       'vitest/no-conditional-tests': 'error',
       'vitest/no-disabled-tests': 'error',
-      'vitest/no-duplicate-hooks': 'error',
+      'vitest/no-duplicate-hooks': 'off', // superseded by no-hooks; re-enabled in opNxE2e
       'vitest/no-large-snapshots': 'error',
       'vitest/no-restricted-matchers': 'error',
       'vitest/no-restricted-vi-methods': 'error',
@@ -116,8 +119,8 @@ export default [
       'vitest/prefer-equality-matcher': 'error',
       'vitest/prefer-expect-resolves': 'error',
       'vitest/prefer-expect-type-of': 'error',
-      'vitest/prefer-hooks-in-order': 'error',
-      'vitest/prefer-hooks-on-top': 'error',
+      'vitest/prefer-hooks-in-order': 'off', // superseded by no-hooks; re-enabled in opNxE2e
+      'vitest/prefer-hooks-on-top': 'off', // superseded by no-hooks; re-enabled in opNxE2e
       'vitest/prefer-lowercase-title': 'error',
       'vitest/prefer-mock-promise-shorthand': 'error',
       'vitest/prefer-snapshot-hint': 'error',
