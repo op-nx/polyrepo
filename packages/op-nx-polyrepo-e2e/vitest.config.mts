@@ -10,10 +10,9 @@ export default defineConfig(() => ({
     environment: 'node',
     include: ['{src,tests}/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
     reporters: ['default'],
-    testTimeout: 300_000,
-    hookTimeout: 300_000,
-    globalSetup: ['../../tools/scripts/start-local-registry.ts'],
-    globalTeardown: ['../../tools/scripts/stop-local-registry.ts'],
+    testTimeout: 60_000,
+    hookTimeout: 120_000,
+    globalSetup: ['./src/setup/global-setup.ts'],
     pool: 'forks',
     maxWorkers: 1,
     coverage: {

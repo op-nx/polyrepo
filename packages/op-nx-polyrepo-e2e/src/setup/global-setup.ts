@@ -48,7 +48,7 @@ export default async function setup(project: TestProject) {
       .start();
 
     const registryPort = verdaccio.getMappedPort(4873);
-    const registryUrl = `http://localhost:${registryPort}`;
+    const registryUrl = `http://localhost:${String(registryPort)}`;
 
     // 4. Publish plugin to Verdaccio (on host via mapped port)
     console.log(`[e2e] Publishing plugin to Verdaccio at ${registryUrl}...`);
