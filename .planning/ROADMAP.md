@@ -98,7 +98,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 | 3. Multi-Repo Git DX | 9/9 | Complete | 2026-03-11 |
 | 4. Code Cleanup | 1/1 | Complete | 2026-03-12 |
 | 5. Maximum Type Safety | 6/6 | Complete | 2026-03-13 |
-| 6. Add e2e container | 0/? | Not Planned | |
+| 6. Add e2e container | 0/2 | Planned | |
 
 ### Phase 5: Maximum Type Safety
 
@@ -132,13 +132,14 @@ Plans:
   - Prebake `create-nx-workspace` output in Docker image layer (rebuilds only on Nx version bump)
   - Prebake `git clone --depth 1` of nrwl/nx to `/repos/nx` in image layer; e2e config references it as a local path repo instead of GitHub URL
   - arm64-native `node:22-slim` image runs natively on Snapdragon X Elite via Docker Desktop (no QEMU)
-  - No bind mounts — all filesystem I/O stays on container's overlay2/ext4
+  - No bind mounts -- all filesystem I/O stays on container's overlay2/ext4
 **Success Criteria** (what must be TRUE):
   1. `npm run e2e` completes in under 30 seconds (down from ~3 minutes)
   2. e2e tests pass with identical assertions as the current host-based tests
   3. No network dependency during test execution (Verdaccio is localhost, repo is local path)
   4. Docker image rebuilds only when Nx version or repo ref changes (layer cache)
-**Plans:** 0 plans
+**Plans:** 2 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 6 to break down)
+- [ ] 06-01-PLAN.md -- Dockerfile, testcontainers dependency, ProvidedContext types, global setup with testcontainers lifecycle
+- [ ] 06-02-PLAN.md -- Rewrite e2e spec to use container.exec(), update Vitest config, end-to-end verification
