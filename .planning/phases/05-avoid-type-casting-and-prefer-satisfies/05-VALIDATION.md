@@ -1,10 +1,11 @@
 ---
 phase: 5
 slug: avoid-type-casting-and-prefer-satisfies
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: validated
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-03-12
+validated: 2026-03-16
 ---
 
 # Phase 5 — Validation Strategy
@@ -38,14 +39,14 @@ created: 2026-03-12
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 05-01-01 | 01 | 1 | ESLint strict presets | lint | `npm exec nx lint @op-nx/polyrepo` | N/A (config) | pending |
-| 05-01-02 | 01 | 1 | TSConfig hardening | typecheck | `npm exec nx typecheck @op-nx/polyrepo` | N/A (config) | pending |
-| 05-01-03 | 01 | 1 | Install @vitest/eslint-plugin | lint | `npm exec nx lint @op-nx/polyrepo` | N/A (dep) | pending |
-| 05-02-01 | 02 | 2 | Mock cast elimination | unit | `npm exec nx test @op-nx/polyrepo` | Yes (8 files) | pending |
-| 05-02-02 | 02 | 2 | Zod JSON.parse validation | unit | `npm exec nx test @op-nx/polyrepo` | Yes (existing) | pending |
-| 05-02-03 | 02 | 2 | Zero eslint-disable comments | lint | `npm exec nx lint @op-nx/polyrepo` | N/A | pending |
-| 05-03-01 | 03 | 3 | SIFER test refactoring | unit | `npm exec nx test @op-nx/polyrepo` | Yes (8 files) | pending |
-| 05-04-01 | 04 | 4 | Enforcement skills created | manual | Skill files exist in `.claude/skills/` | No (new) | pending |
+| 05-01-01 | 01 | 1 | ESLint strict presets | lint | `npm exec nx lint @op-nx/polyrepo` | N/A (config) | green |
+| 05-01-02 | 01 | 1 | TSConfig hardening | typecheck | `npm exec nx typecheck @op-nx/polyrepo` | N/A (config) | green |
+| 05-01-03 | 01 | 1 | Install @vitest/eslint-plugin | lint | `npm exec nx lint @op-nx/polyrepo` | N/A (dep) | green |
+| 05-02-01 | 02 | 2 | Mock cast elimination | unit | `npm exec nx test @op-nx/polyrepo` | Yes (14 files) | green |
+| 05-02-02 | 02 | 2 | Zod JSON.parse validation | unit | `npm exec nx test @op-nx/polyrepo` | Yes (extract.spec.ts) | green |
+| 05-02-03 | 02 | 2 | Zero eslint-disable comments | lint | `npm exec nx lint @op-nx/polyrepo` | N/A | green |
+| 05-03-01 | 03 | 3 | SIFERS test refactoring | unit | `npm exec nx test @op-nx/polyrepo` | Yes (14 files) | green |
+| 05-04-01 | 04 | 4 | Enforcement skills created | manual | Skill files exist in `.claude/skills/` | Yes (5 files) | green |
 
 *Status: pending / green / red / flaky*
 
@@ -53,10 +54,10 @@ created: 2026-03-12
 
 ## Wave 0 Requirements
 
-- [ ] `@vitest/eslint-plugin` — install before ESLint config update
-- [ ] `parserOptions.projectService: true` — configure before type-checked rules activate
+- [x] `@vitest/eslint-plugin` — install before ESLint config update
+- [x] `parserOptions.projectService: true` — configure before type-checked rules activate
 
-*Existing infrastructure covers all test requirements.*
+*All Wave 0 prerequisites satisfied.*
 
 ---
 
@@ -71,11 +72,23 @@ created: 2026-03-12
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 30s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 30s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** approved 2026-03-16
+
+---
+
+## Validation Audit 2026-03-16
+
+| Metric | Count |
+|--------|-------|
+| Gaps found | 1 |
+| Resolved | 1 |
+| Escalated | 0 |
+
+**Gap resolved:** Added Zod schema rejection test to `extract.spec.ts` — validates that structurally-invalid JSON (valid parse, failed safeParse) rejects with descriptive error. 272 tests now pass.
