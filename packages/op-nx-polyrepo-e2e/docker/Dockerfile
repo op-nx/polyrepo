@@ -19,10 +19,11 @@ ARG NX_VERSION=22.5.4
 RUN npx --yes create-nx-workspace@${NX_VERSION} workspace \
     --preset=apps --interactive=false --nxCloud=skip
 
-# Prebake git clone of nrwl/nx at pinned ref
-# This layer rebuilds only when NX_REF changes
-ARG NX_REF=master
-RUN git clone --depth 1 --branch ${NX_REF} https://github.com/nrwl/nx.git /repos/nx
+# Prebake synthetic test repo (tiny 2-3 project Nx workspace)
+# This layer rebuilds only when NX_VERSION or the script changes
+COPY create-test-repo.sh /tmp/create-test-repo.sh
+ARG NX_VERSION
+RUN chmod +x /tmp/create-test-repo.sh && NX_VERSION=${NX_VERSION} /tmp/create-test-repo.sh
 
 WORKDIR /workspace
 
