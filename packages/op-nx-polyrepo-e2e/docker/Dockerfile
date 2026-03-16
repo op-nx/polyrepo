@@ -25,7 +25,7 @@ RUN npx --yes create-nx-workspace@${NX_VERSION} workspace \
 
 # Prebake git clone of nrwl/nx at pinned ref
 # This layer rebuilds only when NX_REF changes
-ARG NX_REF=master
+ARG NX_REF=${NX_VERSION}
 RUN git clone --depth 1 --branch ${NX_REF} https://github.com/nrwl/nx.git /repos/nx
 
 # Prebake pnpm install for nrwl/nx to warm pnpm content-addressable store.

@@ -1,3 +1,5 @@
+import { createRequire } from 'node:module';
+
 import { describe, it, expect, beforeAll, afterAll, inject } from 'vitest';
 import {
   GenericContainer,
@@ -5,6 +7,9 @@ import {
 } from 'testcontainers';
 
 import './setup/provided-context.js';
+
+const require = createRequire(import.meta.url);
+const nxVersion: string = require('nx/package.json').version;
 
 describe('@op-nx/polyrepo', () => {
   let container: StartedTestContainer;
@@ -44,7 +49,7 @@ describe('@op-nx/polyrepo', () => {
               plugin: '@op-nx/polyrepo',
               options: {
                 repos: {
-                  nx: { url: 'file:///repos/nx', depth: 1, ref: 'master' },
+                  nx: { url: 'file:///repos/nx', depth: 1, ref: nxVersion },
                 },
               },
             },
