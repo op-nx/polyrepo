@@ -17,7 +17,6 @@ vi.mock('node:child_process', async () => {
 import { existsSync } from 'node:fs';
 import { execFile } from 'node:child_process';
 import {
-  isGitUrl,
   detectRepoState,
   getCurrentBranch,
   getCurrentRef,
@@ -107,40 +106,6 @@ function setup(stdout: string, stderr = '') {
 
   return { mockExistsSync, mockExecFile };
 }
-
-describe(isGitUrl, () => {
-  it('returns true for git@ URLs', () => {
-    expect(isGitUrl('git@github.com:org/repo.git')).toBe(true);
-  });
-
-  it('returns true for https:// URLs', () => {
-    expect(isGitUrl('https://github.com/org/repo.git')).toBe(true);
-  });
-
-  it('returns true for http:// URLs', () => {
-    expect(isGitUrl('http://github.com/org/repo.git')).toBe(true);
-  });
-
-  it('returns true for ssh:// URLs', () => {
-    expect(isGitUrl('ssh://git@github.com/org/repo.git')).toBe(true);
-  });
-
-  it('returns true for file:// URLs', () => {
-    expect(isGitUrl('file:///path/to/repo')).toBe(true);
-  });
-
-  it('returns false for Windows absolute path', () => {
-    expect(isGitUrl('D:/projects/repo')).toBe(false);
-  });
-
-  it('returns false for relative path', () => {
-    expect(isGitUrl('../repo')).toBe(false);
-  });
-
-  it('returns false for Unix absolute path', () => {
-    expect(isGitUrl('/home/user/repo')).toBe(false);
-  });
-});
 
 describe(detectRepoState, () => {
   it('returns "cloned" when .repos/<alias>/.git exists for remote repo', () => {

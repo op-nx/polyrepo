@@ -43,7 +43,6 @@ vi.mock('nx/src/devkit-internals', () => ({
 
 vi.mock('./lib/graph/cache', () => ({
   populateGraphReport: vi.fn<typeof populateGraphReport>(),
-  getCurrentGraphReport: vi.fn<typeof getCurrentGraphReport>(),
 }));
 
 import { createNodesV2, createDependencies } from './index';
@@ -52,7 +51,6 @@ import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { hashObject } from 'nx/src/devkit-internals';
 import { populateGraphReport } from './lib/graph/cache';
-import type { getCurrentGraphReport } from './lib/graph/cache';
 import type { PolyrepoGraphReport } from './lib/graph/types';
 import { assertDefined } from './lib/testing/asserts';
 

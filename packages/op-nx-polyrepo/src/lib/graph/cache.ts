@@ -153,19 +153,3 @@ export async function populateGraphReport(
 
   return report;
 }
-
-/**
- * Return the current module-level graph report.
- *
- * Throws if `populateGraphReport` has not been called yet, which indicates
- * `createDependencies` ran before `createNodesV2`.
- */
-export function getCurrentGraphReport(): PolyrepoGraphReport {
-  if (graphReport === undefined) {
-    throw new Error(
-      'Expected cached polyrepo graph report. Ensure createNodesV2 ran first.',
-    );
-  }
-
-  return graphReport;
-}

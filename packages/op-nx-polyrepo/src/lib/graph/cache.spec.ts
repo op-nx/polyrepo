@@ -268,23 +268,6 @@ describe('cache', () => {
       );
     });
 
-    it('stores result in module-level variable accessible via getCurrentGraphReport', async () => {
-      expect.hasAssertions();
-
-      await setup();
-      const { populateGraphReport, getCurrentGraphReport } =
-        await loadCacheModule();
-
-      const populated = await populateGraphReport(
-        testConfig,
-        '/workspace',
-        'opts-hash',
-      );
-      const current = getCurrentGraphReport();
-
-      expect(current).toBe(populated);
-    });
-
     it('persists cache to disk via writeJsonFile', async () => {
       expect.hasAssertions();
 
@@ -296,36 +279,6 @@ describe('cache', () => {
       expect(mocks.writeJsonFile).toHaveBeenCalledWith(
         expect.stringContaining('.repos'),
         expect.objectContaining({ hash: expect.any(String) }),
-      );
-    });
-  });
-
-  describe('getCurrentGraphReport', () => {
-    it('returns the module-level graph report when populated', async () => {
-      expect.hasAssertions();
-
-      await setup();
-      const { populateGraphReport, getCurrentGraphReport } =
-        await loadCacheModule();
-
-      const report = await populateGraphReport(
-        testConfig,
-        '/workspace',
-        'opts-hash',
-      );
-      const current = getCurrentGraphReport();
-
-      expect(current).toStrictEqual(report);
-    });
-
-    it('throws descriptive error when report is not yet populated', async () => {
-      expect.hasAssertions();
-
-      await setup();
-      const { getCurrentGraphReport } = await loadCacheModule();
-
-      expect(() => getCurrentGraphReport()).toThrowError(
-        'Expected cached polyrepo graph report',
       );
     });
   });

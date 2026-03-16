@@ -125,7 +125,6 @@ export default async function setup(project: TestProject) {
 
     // 7. Provide to test files via Vitest inject()
     project.provide('snapshotImage', snapshotImage);
-    project.provide('networkName', network.getName());
 
     // Stop the setup workspace (tests use snapshot, not this container)
     console.log('[e2e] Stopping setup workspace container...');

@@ -14,7 +14,5 @@ declare module 'vitest' {
   export interface ProvidedContext {
     /** Committed Docker image name for test containers (e.g., 'op-nx-e2e-snapshot:latest') */
     snapshotImage: string;
-    /** testcontainers network name for re-attachment if needed */
-    networkName: string;
   }
 }
