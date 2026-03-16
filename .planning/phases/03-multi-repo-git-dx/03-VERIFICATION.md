@@ -46,7 +46,7 @@ The initial VERIFICATION.md (pre-UAT) was written before UAT execution revealed 
 | 3 | Git operations display clear per-repo output showing which repo succeeded and which failed | VERIFIED | Status: one aligned row per repo with branch/dirty/warnings; Sync: streaming progress + `Results:` table with `[OK]` / `[ERROR]` per repo |
 | 4 | Summary line shows count of repos behind and repos ahead | VERIFIED | `reposBehind` and `reposAhead` aggregated from `rawAheadBehind` at lines 297-315 of `status/executor.ts`; conditionally appended to summary parts |
 | 5 | Status shows `[WARN: tag-pinned]` for repos pinned to a tag | VERIFIED | `if (isTagPinned) { warnings.push('[WARN: tag-pinned]') }` at line 232-234 of `status/executor.ts`; distinct from `[WARN: detached HEAD]` guard at line 228 |
-| 6 | Sync dry-run shows detached HEAD and tag-pinned warnings, multiple per repo | VERIFIED | `executeDryRun` uses `warnings: string[]` array (line 234 of `sync/executor.ts`); calls `getCurrentBranch` at line 248, `getCurrentRef` at line 252; `isTagRef` check at line 254; `warnings.join(' ')` at line 271 |
+| 6 | Sync dry-run shows detached HEAD and tag-pinned warnings, multiple per repo | VERIFIED | `executeDryRun` uses `warnings: string[]` array (line 234 of `sync/executor.ts`); calls `getCurrentBranch` at line 248, `getCurrentRef` at line 252; `isGitTag` check at line 254; `warnings.join(' ')` at line 271 |
 
 **Score:** 6/6 truths verified
 
@@ -63,7 +63,7 @@ The initial VERIFICATION.md (pre-UAT) was written before UAT execution revealed 
 
 | Artifact | Expected | Status | Details |
 |----------|----------|--------|---------|
-| `packages/op-nx-polyrepo/src/lib/executors/sync/executor.ts` | `executeDryRun` with detached HEAD detection and warnings array | VERIFIED | `const warnings: string[] = []` at line 234; `getCurrentBranch` import and call at lines 16/248; `getCurrentRef` import and call at lines 16/252; `isTagRef` check at line 254; `[WARN: detached HEAD]` at line 257; `[WARN: tag-pinned]` at line 255; `warnings.join(' ')` at line 271 |
+| `packages/op-nx-polyrepo/src/lib/executors/sync/executor.ts` | `executeDryRun` with detached HEAD detection and warnings array | VERIFIED | `const warnings: string[] = []` at line 234; `getCurrentBranch` import and call at lines 16/248; `getCurrentRef` import and call at lines 16/252; `isGitTag` check at line 254; `[WARN: detached HEAD]` at line 257; `[WARN: tag-pinned]` at line 255; `warnings.join(' ')` at line 271 |
 | `packages/op-nx-polyrepo/src/lib/executors/sync/executor.spec.ts` | 4 new tests for detached HEAD and tag-pinned in dry-run, plus getCurrentBranch/getCurrentRef mocks | VERIFIED | 40 total test cases; mocks for `getCurrentBranch` and `getCurrentRef` added to `vi.mock('../../git/detect')` at line 39-44; default `mockGetCurrentBranch.mockResolvedValue('main')` in `beforeEach` at line 127; 4 new dry-run tests at lines 915-1027 |
 
 ## Key Link Verification

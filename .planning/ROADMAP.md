@@ -18,7 +18,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 4: Code Cleanup** - Extract shared constants and deduplicate config reading (tech debt from v1.0 audit, completed 2026-03-12)
 - [x] **Phase 5: Maximum Type Safety** - Eliminate all `as` assertions and `any`, adopt strictest ESLint/tsconfig, establish `satisfies`/Zod/SIFER patterns (completed 2026-03-13)
 - [x] **Phase 6: Add e2e container** - Docker container with prebaked Nx workspace and repo for fast e2e tests (completed 2026-03-16)
-- [ ] **Phase 7: v1.0 Tech Debt Cleanup** - Remove dead exports, add sync->status e2e test, fix planning docs (gap closure from v1.0 audit)
+- [x] **Phase 7: v1.0 Tech Debt Cleanup** - Remove dead exports, add sync->status e2e test, fix planning docs (gap closure from v1.0 audit, completed 2026-03-16)
 
 ## Phase Details
 
@@ -101,7 +101,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 | 4. Code Cleanup | 1/1 | Complete | 2026-03-12 |
 | 5. Maximum Type Safety | 6/6 | Complete | 2026-03-13 |
 | 6. Add e2e container | 2/2 | Complete   | 2026-03-16 |
-| 7. v1.0 Tech Debt Cleanup | 1/2 | In Progress|  |
+| 7. v1.0 Tech Debt Cleanup | 2/2 | Complete | 2026-03-16 |
 
 ### Phase 5: Maximum Type Safety
 
@@ -158,8 +158,8 @@ Plans:
   3. E2e test exercises full sync -> cache -> status-with-project-counts flow
   4. REQUIREMENTS.md traceability table includes all 9 SAFE-* requirement IDs
   5. SUMMARY frontmatter requirements_completed updated for SAFE-CASTS and SAFE-SIFER
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans executed
 
 Plans:
-- [ ] 07-01-PLAN.md -- Remove dead exports (isGitUrl, getCurrentGraphReport), remove unused networkName, add sync->status e2e test
-- [ ] 07-02-PLAN.md -- Verify REQUIREMENTS.md traceability and SUMMARY frontmatter documentation gaps
+- [x] 07-01-PLAN.md -- Remove dead exports (isGitUrl, getCurrentGraphReport), remove unused networkName, add sync->status e2e test
+- [x] 07-02-PLAN.md -- Verify REQUIREMENTS.md traceability and SUMMARY frontmatter documentation gaps

@@ -8,7 +8,7 @@
  * 4. Publish plugin to Verdaccio (on host)
  * 5. Start workspace container and install plugin
  * 6. Commit snapshot image
- * 7. Provide snapshot image and network name to test files
+ * 7. Provide snapshot image to test files
  * 8. Return teardown function
  */
 import './provided-context.js';
