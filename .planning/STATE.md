@@ -5,7 +5,7 @@ milestone_name: Tech Debt Cleanup
 status: executing
 stopped_at: Completed 07-01-PLAN.md
 last_updated: "2026-03-16T10:57:47.344Z"
-last_activity: "2026-03-16 - Completed plan 07-02: Documentation gap verification"
+last_activity: "2026-03-16 - Completed gap closure plan 06-03: Fix e2e sync test timeout"
 progress:
   total_phases: 7
   completed_phases: 7
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-03-10)
 Phase: 7 of 7 (v1.0 Tech Debt Cleanup)
 Plan: 2 of 2 complete in current phase
 Status: In Progress
-Last activity: 2026-03-16 - Completed plan 07-02: Documentation gap verification
+Last activity: 2026-03-16 - Completed gap closure plan 06-03: Fix e2e sync test timeout
 
 Progress: [██████████] 100% (27/27 plans)
 
@@ -48,10 +48,11 @@ Progress: [██████████] 100% (27/27 plans)
 | 03-multi-repo-git-dx | 9/9 | ~35 min | ~3.9 min |
 | 04-code-cleanup | 1/1 | 2 min | 2 min |
 | 05-avoid-type-casting-and-prefer-satisfies | 6/6 | ~65 min | ~11 min |
-| 06-add-e2e-container | 2/2 | 14 min | 7 min |
+| 06-add-e2e-container | 3/3 | 104 min | 35 min |
 | 07-v1-tech-debt-cleanup | 2/2 | 4 min | 2 min |
 
 *Updated after each plan completion*
+| Phase 06-add-e2e-container P03 | ~90min | 3 tasks | 5 files |
 | Phase 07-v1-tech-debt P01 | 3min | 2 tasks | 8 files |
 | Phase 07-v1-tech-debt P02 | 1min | 1 tasks | 0 files |
 | Phase 06-add-e2e-container P02 | 8min | 2 tasks | 5 files |
@@ -122,6 +123,10 @@ Recent decisions affecting current work:
 - [Phase 06-02]: Switched to Docker CLI build from fromDockerfile() due to Windows path issues with testcontainers
 - [Phase 06-02]: Used RegExp#exec() for JSON extraction from nx show output (more robust than replace)
 - [Phase 07-02]: No changes needed -- all SAFE-* documentation gaps from v1.0 audit already resolved
+- [Phase 06-03]: Keep nrwl/nx as e2e fixture -- plugin built for scalability, nrwl/nx is a good medium-sized reference repo
+- [Phase 06-03]: ENV CI=true in Dockerfile bypasses nrwl/nx preinstall Rust check (contributor-environment gate, not needed for running Nx)
+- [Phase 06-03]: tmpfs for .repos/ eliminates OverlayFS copy-up overhead during pnpm install linking (130s -> 37s)
+- [Phase 06-03]: Windows testcontainers paths need replaceAll('\\', '/') for fromDockerfile() and withCopyFilesToContainer()
 
 ### Pending Todos
 
