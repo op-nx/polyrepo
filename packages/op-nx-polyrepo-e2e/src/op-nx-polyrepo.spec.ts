@@ -41,7 +41,7 @@ describe('@op-nx/polyrepo', () => {
               plugin: '@op-nx/polyrepo',
               options: {
                 repos: {
-                  nx: { url: '/repos/nx', depth: 1, ref: 'master' },
+                  nx: { url: 'file:///repos/nx', depth: 1, ref: 'master' },
                 },
               },
             },
@@ -81,13 +81,18 @@ describe('@op-nx/polyrepo', () => {
       expect.assertions(2);
 
       const { stdout } = await container.exec(
-        ['npx', 'nx', 'show', 'project', '@org/source', '--json'],
+        ['npx', 'nx', 'show', 'project', '@workspace/source', '--json'],
         { workingDir: '/workspace' },
       );
 
-      // Strip any Nx warnings before JSON
-      const jsonStr = stdout.replace(/^[^{]*/, '');
-      const project = JSON.parse(jsonStr);
+      // Extract JSON object from stdout (strip Nx warnings before/after)
+      const jsonMatch = stdout.match(/\{[\s\S]*\}/);
+
+      if (!jsonMatch) {
+        throw new Error(`No JSON found in nx show project output:\n${stdout}`);
+      }
+
+      const project = JSON.parse(jsonMatch[0]);
 
       expect(project.targets['polyrepo-status']).toBeDefined();
       expect(project.targets['polyrepo-status'].executor).toBe(

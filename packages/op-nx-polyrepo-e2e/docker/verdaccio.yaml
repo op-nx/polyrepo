@@ -1,0 +1,23 @@
+# Verdaccio config for e2e container testing
+# Allows anonymous publish (no auth required from Verdaccio side)
+storage: /verdaccio/storage/data
+
+uplinks:
+  npmjs:
+    url: https://registry.npmjs.org/
+    maxage: 60m
+
+packages:
+  '**':
+    access: $all
+    publish: $all
+    unpublish: $all
+    proxy: npmjs
+
+log:
+  type: stdout
+  format: pretty
+  level: warn
+
+publish:
+  allow_offline: true

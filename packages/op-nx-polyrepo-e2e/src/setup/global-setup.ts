@@ -40,13 +40,16 @@ export default async function setup(project: TestProject) {
     console.log('[e2e] Creating shared network...');
     network = await new Network().start();
 
-    // 3. Start Verdaccio on the shared network
+    // 3. Start Verdaccio on the shared network with permissive config
+    // (default hertzg/verdaccio config requires auth for publish)
     console.log('[e2e] Starting Verdaccio registry...');
+    const verdaccioConfig = resolve(__dirname, '../../docker/verdaccio.yaml');
     verdaccio = await new GenericContainer('hertzg/verdaccio')
       .withNetwork(network)
       .withNetworkAliases('verdaccio')
       .withExposedPorts(4873)
       .withName('op-nx-polyrepo-e2e-verdaccio')
+      .withCopyFilesToContainer([{ source: verdaccioConfig, target: '/verdaccio/conf/config.yaml' }])
       .withWaitStrategy(Wait.forListeningPorts())
       .start();
 
@@ -54,9 +57,15 @@ export default async function setup(project: TestProject) {
     const registryUrl = `http://localhost:${String(registryPort)}`;
 
     // 4. Publish plugin to Verdaccio (on host via mapped port)
+    // Set auth token — Verdaccio accepts any token when publish: $all,
+    // but npm CLI requires one to be configured
     console.log(`[e2e] Publishing plugin to Verdaccio at ${registryUrl}...`);
     const originalRegistry = process.env['npm_config_registry'];
     process.env['npm_config_registry'] = registryUrl;
+    execSync(
+      `npm config set //localhost:${String(registryPort)}/:_authToken "secretVerdaccioToken" --ws=false`,
+      { stdio: 'inherit', windowsHide: true },
+    );
 
     try {
       await releaseVersion({
@@ -75,7 +84,12 @@ export default async function setup(project: TestProject) {
         firstRelease: true,
       });
     } finally {
-      // Restore original registry env var
+      // Clean up auth token and restore registry
+      execSync(
+        `npm config delete //localhost:${String(registryPort)}/:_authToken --ws=false`,
+        { stdio: 'ignore', windowsHide: true },
+      );
+
       if (originalRegistry === undefined) {
         delete process.env['npm_config_registry'];
       } else {
