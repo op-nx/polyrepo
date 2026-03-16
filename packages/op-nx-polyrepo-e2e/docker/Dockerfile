@@ -7,14 +7,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends git ca-certific
 # Disable Nx daemon inside container (prevents file locks and timeouts)
 ENV NX_DAEMON=false
 
+# Configure git identity for create-nx-workspace initial commit
+RUN git config --global user.email "e2e@test.local" && \
+    git config --global user.name "e2e"
+
 # Prebake create-nx-workspace output
 # This layer rebuilds only when NX_VERSION changes
-# create-nx-workspace creates /workspace directly (default WORKDIR is /)
-# git init and CI workflow steps may fail in Docker — non-critical
+# --nxCloud=skip: skip CI workflow generation (--ci is an alias for --nxCloud,
+#   passing both produces "skip,skip" which fails schema validation)
 ARG NX_VERSION=22.5.4
 RUN npx --yes create-nx-workspace@${NX_VERSION} workspace \
-    --preset=apps --interactive=false --nxCloud=skip \
-    || test -d /workspace
+    --preset=apps --interactive=false --nxCloud=skip
 
 # Prebake git clone of nrwl/nx at pinned ref
 # This layer rebuilds only when NX_REF changes
