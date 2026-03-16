@@ -50,6 +50,7 @@ patterns-established:
   - "Typed Record helpers: getNode(name)/getTarget(name) with assertDefined guard for noUncheckedIndexedAccess"
   - "ChildProcess stub: satisfies Partial<ChildProcess> for exec/execFile return types"
 
+requirements-completed: [SAFE-CASTS, SAFE-SIFER]
 open-items: []
 ---
 

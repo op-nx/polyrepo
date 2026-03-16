@@ -18,6 +18,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 4: Code Cleanup** - Extract shared constants and deduplicate config reading (tech debt from v1.0 audit, completed 2026-03-12)
 - [x] **Phase 5: Maximum Type Safety** - Eliminate all `as` assertions and `any`, adopt strictest ESLint/tsconfig, establish `satisfies`/Zod/SIFER patterns (completed 2026-03-13)
 - [x] **Phase 6: Add e2e container** - Docker container with prebaked Nx workspace and repo for fast e2e tests (completed 2026-03-16)
+- [ ] **Phase 7: v1.0 Tech Debt Cleanup** - Remove dead exports, add sync->status e2e test, fix planning docs (gap closure from v1.0 audit)
 
 ## Phase Details
 
@@ -90,7 +91,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -100,6 +101,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 | 4. Code Cleanup | 1/1 | Complete | 2026-03-12 |
 | 5. Maximum Type Safety | 6/6 | Complete | 2026-03-13 |
 | 6. Add e2e container | 2/2 | Complete   | 2026-03-16 |
+| 7. v1.0 Tech Debt Cleanup | 0/2 | Pending | -- |
 
 ### Phase 5: Maximum Type Safety
 
@@ -144,3 +146,16 @@ Plans:
 Plans:
 - [x] 06-01-PLAN.md -- Dockerfile, testcontainers dependency, ProvidedContext types, global setup with testcontainers lifecycle
 - [x] 06-02-PLAN.md -- Rewrite e2e spec to use container.exec(), update Vitest config, end-to-end verification
+
+### Phase 7: v1.0 Tech Debt Cleanup
+**Goal:** Close all accumulated tech debt from v1.0 milestone audit -- remove dead exports, add sync->status e2e test, fix planning documentation gaps
+**Requirements**: None (tech debt, no new requirements)
+**Depends on:** Phase 6
+**Gap Closure:** Closes all tech_debt items from v1.0-MILESTONE-AUDIT.md
+**Success Criteria** (what must be TRUE):
+  1. Zero dead exports in production code (isGitUrl, getCurrentGraphReport removed)
+  2. Unused networkName ProvidedContext key removed from e2e setup
+  3. E2e test exercises full sync -> cache -> status-with-project-counts flow
+  4. REQUIREMENTS.md traceability table includes all 9 SAFE-* requirement IDs
+  5. SUMMARY frontmatter requirements_completed updated for SAFE-CASTS and SAFE-SIFER
+**Plans:** 0/2 plans

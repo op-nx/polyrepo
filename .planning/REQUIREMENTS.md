@@ -27,6 +27,18 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **GITX-02**: User can pull/fetch all synced repos with one command
 - [x] **GITX-03**: Git operations show clear per-repo output (which repo succeeded/failed)
 
+### Type Safety
+
+- [x] **SAFE-ESLINT**: ESLint uses strict-type-checked preset with all warn rules promoted to error
+- [x] **SAFE-TSCONFIG**: TSConfig has noUncheckedIndexedAccess and noPropertyAccessFromIndexSignature enabled
+- [x] **SAFE-ZOD**: All JSON.parse sites use Zod safeParse for runtime validation
+- [x] **SAFE-ANY**: Zero `any` type annotations in production code
+- [x] **SAFE-TYPES**: Type annotation patterns use `satisfies` and value types
+- [x] **SAFE-CASTS**: Zero `as` type assertions in production code
+- [x] **SAFE-SIFER**: All test files use SIFERS pattern (zero beforeEach/afterEach hooks)
+- [x] **SAFE-ENFORCE**: ESLint rules enforce type safety constraints at lint time
+- [x] **SAFE-SKILLS**: Project-local skills teach AI agents the approved type safety patterns
+
 ## v2 Requirements
 
 Deferred to future release. Tracked but not in current roadmap.
@@ -84,12 +96,21 @@ Which phases cover which requirements. Updated during roadmap creation.
 | GITX-01 | Phase 3 | Complete |
 | GITX-02 | Phase 3 | Complete |
 | GITX-03 | Phase 3 | Complete |
+| SAFE-ESLINT | Phase 5 | Complete |
+| SAFE-TSCONFIG | Phase 5 | Complete |
+| SAFE-ZOD | Phase 5 | Complete |
+| SAFE-ANY | Phase 5 | Complete |
+| SAFE-TYPES | Phase 5 | Complete |
+| SAFE-CASTS | Phase 5 | Complete |
+| SAFE-SIFER | Phase 5 | Complete |
+| SAFE-ENFORCE | Phase 5 | Complete |
+| SAFE-SKILLS | Phase 5 | Complete |
 
 **Coverage:**
-- v1 requirements: 11 total
-- Mapped to phases: 11
+- v1 requirements: 20 total
+- Mapped to phases: 20
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-10*
-*Last updated: 2026-03-10 after roadmap creation*
+*Last updated: 2026-03-16 after gap closure planning*
