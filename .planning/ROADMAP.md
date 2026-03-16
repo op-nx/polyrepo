@@ -101,7 +101,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 | 4. Code Cleanup | 1/1 | Complete | 2026-03-12 |
 | 5. Maximum Type Safety | 6/6 | Complete | 2026-03-13 |
 | 6. Add e2e container | 2/2 | Complete   | 2026-03-16 |
-| 7. v1.0 Tech Debt Cleanup | 0/2 | Pending | -- |
+| 7. v1.0 Tech Debt Cleanup | 1/2 | In Progress|  |
 
 ### Phase 5: Maximum Type Safety
 
@@ -158,7 +158,7 @@ Plans:
   3. E2e test exercises full sync -> cache -> status-with-project-counts flow
   4. REQUIREMENTS.md traceability table includes all 9 SAFE-* requirement IDs
   5. SUMMARY frontmatter requirements_completed updated for SAFE-CASTS and SAFE-SIFER
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
 - [ ] 07-01-PLAN.md -- Remove dead exports (isGitUrl, getCurrentGraphReport), remove unused networkName, add sync->status e2e test
