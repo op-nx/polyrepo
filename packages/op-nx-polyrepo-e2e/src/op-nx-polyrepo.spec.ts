@@ -94,5 +94,29 @@ describe('@op-nx/polyrepo', () => {
         '@op-nx/polyrepo:status',
       );
     });
+
+    it('should show project counts after sync', async () => {
+      expect.assertions(2);
+
+      // Run sync -- clones from file:///repos/nx to /workspace/.repos/nx/
+      // and extracts graph cache
+      const syncResult = await container.exec(
+        ['npx', 'nx', 'polyrepo-sync'],
+        { workingDir: '/workspace' },
+      );
+
+      if (syncResult.exitCode !== 0) {
+        throw new Error(`Sync failed: ${syncResult.output}`);
+      }
+
+      // Run status -- should now show project counts from cached graph
+      const statusResult = await container.exec(
+        ['npx', 'nx', 'polyrepo-status'],
+        { workingDir: '/workspace' },
+      );
+
+      expect(statusResult.stdout).toContain('projects');
+      expect(statusResult.stdout).not.toContain('[not synced]');
+    }, 120_000);
   });
 });
