@@ -158,4 +158,8 @@ Plans:
   3. E2e test exercises full sync -> cache -> status-with-project-counts flow
   4. REQUIREMENTS.md traceability table includes all 9 SAFE-* requirement IDs
   5. SUMMARY frontmatter requirements_completed updated for SAFE-CASTS and SAFE-SIFER
-**Plans:** 0/2 plans
+**Plans:** 2 plans
+
+Plans:
+- [ ] 07-01-PLAN.md -- Remove dead exports (isGitUrl, getCurrentGraphReport), remove unused networkName, add sync->status e2e test
+- [ ] 07-02-PLAN.md -- Verify REQUIREMENTS.md traceability and SUMMARY frontmatter documentation gaps
