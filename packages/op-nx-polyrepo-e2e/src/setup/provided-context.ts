@@ -7,6 +7,9 @@
  * Import this file as a side-effect in global-setup.ts to ensure
  * the type augmentation is active.
  */
+// Empty export to make this file a module (required for module augmentation)
+export {};
+
 declare module 'vitest' {
   export interface ProvidedContext {
     /** Committed Docker image name for test containers (e.g., 'op-nx-e2e-snapshot:latest') */
