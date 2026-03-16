@@ -27,14 +27,12 @@ export default async function setup(project: TestProject) {
   let workspace: StartedTestContainer | undefined;
 
   try {
-    // 1. Build the prebaked workspace image via Docker CLI
-    // (fromDockerfile() has path issues on Windows where Docker runs in WSL2)
+    // 1. Build the prebaked workspace image using testcontainers API
     console.log('[e2e] Building prebaked workspace Docker image...');
     const dockerfilePath = resolve(__dirname, '../../docker');
-    execSync(`docker build -t op-nx-e2e-workspace:latest "${dockerfilePath}"`, {
-      stdio: 'inherit',
-      windowsHide: true,
-    });
+    const workspaceImage = await GenericContainer.fromDockerfile(dockerfilePath)
+      .withCache(true)
+      .build('op-nx-e2e-workspace', { deleteOnExit: false });
 
     // 2. Create shared network
     console.log('[e2e] Creating shared network...');
@@ -99,7 +97,7 @@ export default async function setup(project: TestProject) {
 
     // 5. Start workspace container and install plugin
     console.log('[e2e] Starting workspace container...');
-    workspace = await new GenericContainer('op-nx-e2e-workspace:latest')
+    workspace = await workspaceImage
       .withNetwork(network)
       .withName('op-nx-polyrepo-e2e-workspace')
       .withCommand(['sleep', 'infinity'])
