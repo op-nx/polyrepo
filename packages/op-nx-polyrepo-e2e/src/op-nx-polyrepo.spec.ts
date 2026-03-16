@@ -86,13 +86,8 @@ describe('@op-nx/polyrepo', () => {
       );
 
       // Extract JSON object from stdout (strip Nx warnings before/after)
-      const jsonMatch = stdout.match(/\{[\s\S]*\}/);
-
-      if (!jsonMatch) {
-        throw new Error(`No JSON found in nx show project output:\n${stdout}`);
-      }
-
-      const project = JSON.parse(jsonMatch[0]);
+      const jsonMatch = /\{[\s\S]*\}/.exec(stdout);
+      const project = JSON.parse(jsonMatch?.[0] ?? '{}');
 
       expect(project.targets['polyrepo-status']).toBeDefined();
       expect(project.targets['polyrepo-status'].executor).toBe(
