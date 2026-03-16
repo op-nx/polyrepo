@@ -12,6 +12,9 @@ describe('@op-nx/polyrepo', () => {
   beforeAll(async () => {
     const snapshotImage = inject('snapshotImage');
     container = await new GenericContainer(snapshotImage)
+      // tmpfs for .repos/ eliminates OverlayFS copy-up overhead during
+      // pnpm install linking (130s on overlay2 → 37s on tmpfs)
+      .withTmpFs({ '/workspace/.repos': 'rw,exec,size=4g' })
       .withCommand(['sleep', 'infinity'])
       .start();
   });
@@ -96,7 +99,7 @@ describe('@op-nx/polyrepo', () => {
     });
 
     it('should show project counts after sync', async () => {
-      expect.assertions(2);
+      expect.assertions(3);
 
       // Run sync -- clones from file:///repos/nx to /workspace/.repos/nx/
       // and extracts graph cache
@@ -105,9 +108,7 @@ describe('@op-nx/polyrepo', () => {
         { workingDir: '/workspace' },
       );
 
-      if (syncResult.exitCode !== 0) {
-        throw new Error(`Sync failed: ${syncResult.output}`);
-      }
+      expect(syncResult.exitCode).toBe(0);
 
       // Run status -- should now show project counts from cached graph
       const statusResult = await container.exec(

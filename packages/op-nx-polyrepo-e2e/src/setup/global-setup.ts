@@ -29,7 +29,7 @@ export default async function setup(project: TestProject) {
   try {
     // 1. Build the prebaked workspace image using testcontainers API
     console.log('[e2e] Building prebaked workspace Docker image...');
-    const dockerfilePath = resolve(__dirname, '../../docker');
+    const dockerfilePath = resolve(__dirname, '../../docker').replaceAll('\\', '/');
     const workspaceImage = await GenericContainer.fromDockerfile(dockerfilePath)
       .withCache(true)
       .build('op-nx-e2e-workspace', { deleteOnExit: false });
@@ -41,7 +41,7 @@ export default async function setup(project: TestProject) {
     // 3. Start Verdaccio on the shared network with permissive config
     // (default hertzg/verdaccio config requires auth for publish)
     console.log('[e2e] Starting Verdaccio registry...');
-    const verdaccioConfig = resolve(__dirname, '../../docker/verdaccio.yaml');
+    const verdaccioConfig = resolve(__dirname, '../../docker/verdaccio.yaml').replaceAll('\\', '/');
     verdaccio = await new GenericContainer('hertzg/verdaccio')
       .withNetwork(network)
       .withNetworkAliases('verdaccio')

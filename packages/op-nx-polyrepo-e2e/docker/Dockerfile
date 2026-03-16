@@ -5,7 +5,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends git ca-certific
     rm -rf /var/lib/apt/lists/*
 
 # Disable Nx daemon inside container (prevents file locks and timeouts)
-ENV NX_DAEMON=false
+# CI=true bypasses nrwl/nx preinstall script that requires Rust compiler.
+# The preinstall is a contributor-environment gate (scripts/preinstall.js),
+# not needed for running Nx. Must be ENV (not inline) so the sync executor's
+# `corepack pnpm install` inherits it at test time.
+ENV NX_DAEMON=false CI=true
 
 # Configure git identity for create-nx-workspace initial commit
 RUN git config --global user.email "e2e@test.local" && \
@@ -19,11 +23,16 @@ ARG NX_VERSION=22.5.4
 RUN npx --yes create-nx-workspace@${NX_VERSION} workspace \
     --preset=apps --interactive=false --nxCloud=skip
 
-# Prebake synthetic test repo (tiny 2-3 project Nx workspace)
-# This layer rebuilds only when NX_VERSION or the script changes
-COPY create-test-repo.sh /tmp/create-test-repo.sh
-ARG NX_VERSION
-RUN chmod +x /tmp/create-test-repo.sh && NX_VERSION=${NX_VERSION} /tmp/create-test-repo.sh
+# Prebake git clone of nrwl/nx at pinned ref
+# This layer rebuilds only when NX_REF changes
+ARG NX_REF=master
+RUN git clone --depth 1 --branch ${NX_REF} https://github.com/nrwl/nx.git /repos/nx
+
+# Prebake pnpm install for nrwl/nx to warm pnpm content-addressable store.
+# The sync executor runs `corepack pnpm install` after cloning into the workspace,
+# but git clone does not carry node_modules. With a warm pnpm store, the install
+# resolves from cache via hardlinks instead of downloading packages.
+RUN cd /repos/nx && corepack enable && CI=true COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack pnpm install --frozen-lockfile
 
 WORKDIR /workspace
 
