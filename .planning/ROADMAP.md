@@ -16,7 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: Unified Project Graph** - External projects in nx graph with namespacing and cached extraction (completed 2026-03-12)
 - [x] **Phase 3: Multi-Repo Git DX** - Combined status, bulk operations, per-repo output (completed 2026-03-11)
 - [x] **Phase 4: Code Cleanup** - Extract shared constants and deduplicate config reading (tech debt from v1.0 audit, completed 2026-03-12)
-- [ ] **Phase 6: Add e2e container** - Docker container with prebaked Nx workspace and repo for fast e2e tests
+- [x] **Phase 6: Add e2e container** - Docker container with prebaked Nx workspace and repo for fast e2e tests (completed 2026-03-16)
 
 ## Phase Details
 
@@ -98,7 +98,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 | 3. Multi-Repo Git DX | 9/9 | Complete | 2026-03-11 |
 | 4. Code Cleanup | 1/1 | Complete | 2026-03-12 |
 | 5. Maximum Type Safety | 6/6 | Complete | 2026-03-13 |
-| 6. Add e2e container | 1/2 | In Progress|  |
+| 6. Add e2e container | 2/2 | Complete   | 2026-03-16 |
 
 ### Phase 5: Maximum Type Safety
 
@@ -138,7 +138,7 @@ Plans:
   2. e2e tests pass with identical assertions as the current host-based tests
   3. No network dependency during test execution (Verdaccio is localhost, repo is local path)
   4. Docker image rebuilds only when Nx version or repo ref changes (layer cache)
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
 - [ ] 06-01-PLAN.md -- Dockerfile, testcontainers dependency, ProvidedContext types, global setup with testcontainers lifecycle

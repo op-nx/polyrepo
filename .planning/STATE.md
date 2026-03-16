@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: in-progress
-stopped_at: Completed 06-01-PLAN.md
-last_updated: "2026-03-16T06:51:31Z"
-last_activity: "2026-03-16 - Completed plan 06-01: Docker image and testcontainers global setup"
+stopped_at: Completed 06-02-PLAN.md
+last_updated: "2026-03-16T07:30:00Z"
+last_activity: "2026-03-16 - Completed plan 06-02: Rewrite e2e tests to use testcontainers"
 progress:
   total_phases: 6
   completed_phases: 5
-  total_plans: 24
-  completed_plans: 24
+  total_plans: 25
+  completed_plans: 25
   percent: 100
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-03-10)
 ## Current Position
 
 Phase: 6 of 6 (Add e2e container)
-Plan: 1 of 1 complete in current phase
-Status: In Progress
-Last activity: 2026-03-16 - Completed plan 06-01: Docker image and testcontainers global setup
+Plan: 2 of 2 complete in current phase
+Status: Complete
+Last activity: 2026-03-16 - Completed plan 06-02: Rewrite e2e tests to use testcontainers
 
-Progress: [██████████] 100% (24/24 plans)
+Progress: [██████████] 100% (25/25 plans)
 
 ## Performance Metrics
 
@@ -48,9 +48,10 @@ Progress: [██████████] 100% (24/24 plans)
 | 03-multi-repo-git-dx | 9/9 | ~35 min | ~3.9 min |
 | 04-code-cleanup | 1/1 | 2 min | 2 min |
 | 05-avoid-type-casting-and-prefer-satisfies | 6/6 | ~65 min | ~11 min |
-| 06-add-e2e-container | 1/? | 6 min | 6 min |
+| 06-add-e2e-container | 2/2 | 14 min | 7 min |
 
 *Updated after each plan completion*
+| Phase 06-add-e2e-container P02 | 8min | 2 tasks | 5 files |
 | Phase 06-add-e2e-container P01 | 6min | 2 tasks | 6 files |
 | Phase 05-avoid-type-casting P05 | ~20min | 2 tasks | 5 files |
 | Phase 05-avoid-type-casting P04 | ~20min | 2 tasks | 14 files |
@@ -113,6 +114,9 @@ Recent decisions affecting current work:
 - [Phase 05]: Skills teach alternatives rather than adding rules to AGENTS.md
 - [Phase 06-01]: Used GenericContainer.fromDockerfile() with cache instead of shelling out to docker build CLI
 - [Phase 06-01]: Empty export in provided-context.ts required for module augmentation (script vs module scope)
+- [Phase 06-02]: Used file:///repos/nx URL scheme for local repo reference (schema validation requires URL format)
+- [Phase 06-02]: Switched to Docker CLI build from fromDockerfile() due to Windows path issues with testcontainers
+- [Phase 06-02]: Used RegExp#exec() for JSON extraction from nx show output (more robust than replace)
 
 ### Pending Todos
 
@@ -139,6 +143,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-03-16T06:51:31Z
-Stopped at: Completed 06-01-PLAN.md
-Resume file: .planning/phases/06-add-e2e-container/06-01-SUMMARY.md
+Last session: 2026-03-16T07:30:00Z
+Stopped at: Completed 06-02-PLAN.md
+Resume file: .planning/phases/06-add-e2e-container/06-02-SUMMARY.md
