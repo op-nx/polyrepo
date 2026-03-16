@@ -98,7 +98,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 | 3. Multi-Repo Git DX | 9/9 | Complete | 2026-03-11 |
 | 4. Code Cleanup | 1/1 | Complete | 2026-03-12 |
 | 5. Maximum Type Safety | 6/6 | Complete | 2026-03-13 |
-| 6. Add e2e container | 0/2 | Planned | |
+| 6. Add e2e container | 1/2 | In Progress|  |
 
 ### Phase 5: Maximum Type Safety
 
@@ -138,7 +138,7 @@ Plans:
   2. e2e tests pass with identical assertions as the current host-based tests
   3. No network dependency during test execution (Verdaccio is localhost, repo is local path)
   4. Docker image rebuilds only when Nx version or repo ref changes (layer cache)
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
 - [ ] 06-01-PLAN.md -- Dockerfile, testcontainers dependency, ProvidedContext types, global setup with testcontainers lifecycle
