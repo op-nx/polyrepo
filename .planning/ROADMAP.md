@@ -17,7 +17,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3: Multi-Repo Git DX** - Combined status, bulk operations, per-repo output (completed 2026-03-11)
 - [x] **Phase 4: Code Cleanup** - Extract shared constants and deduplicate config reading (tech debt from v1.0 audit, completed 2026-03-12)
 - [x] **Phase 5: Maximum Type Safety** - Eliminate all `as` assertions and `any`, adopt strictest ESLint/tsconfig, establish `satisfies`/Zod/SIFER patterns (completed 2026-03-13)
-- [x] **Phase 6: Add e2e container** - Docker container with prebaked Nx workspace and repo for fast e2e tests (completed 2026-03-16)
+- [ ] **Phase 6: Add e2e container** - Docker container with prebaked Nx workspace and repo for fast e2e tests (gap closure in progress)
 - [x] **Phase 7: v1.0 Tech Debt Cleanup** - Remove dead exports, add sync->status e2e test, fix planning docs (gap closure from v1.0 audit, completed 2026-03-16)
 
 ## Phase Details
@@ -100,7 +100,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 | 3. Multi-Repo Git DX | 9/9 | Complete | 2026-03-11 |
 | 4. Code Cleanup | 1/1 | Complete | 2026-03-12 |
 | 5. Maximum Type Safety | 6/6 | Complete | 2026-03-13 |
-| 6. Add e2e container | 2/2 | Complete   | 2026-03-16 |
+| 6. Add e2e container | 2/3 | Gap Closure | - |
 | 7. v1.0 Tech Debt Cleanup | 2/2 | Complete | 2026-03-16 |
 
 ### Phase 5: Maximum Type Safety
@@ -133,7 +133,7 @@ Plans:
 **Key decisions:**
   - Host runs build + Verdaccio publish; container runs consume + test (only the tarball crosses the boundary via HTTP)
   - Prebake `create-nx-workspace` output in Docker image layer (rebuilds only on Nx version bump)
-  - Prebake `git clone --depth 1` of nrwl/nx to `/repos/nx` in image layer; e2e config references it as a local path repo instead of GitHub URL
+  - Prebake synthetic test repo (2-3 projects) in Docker image layer instead of nrwl/nx monorepo (too slow for container)
   - arm64-native `node:22-slim` image runs natively on Snapdragon X Elite via Docker Desktop (no QEMU)
   - No bind mounts -- all filesystem I/O stays on container's overlay2/ext4
 **Success Criteria** (what must be TRUE):
@@ -141,11 +141,12 @@ Plans:
   2. e2e tests pass with identical assertions as the current host-based tests
   3. No network dependency during test execution (Verdaccio is localhost, repo is local path)
   4. Docker image rebuilds only when Nx version or repo ref changes (layer cache)
-**Plans:** 2/2 plans complete
+**Plans:** 3 plans
 
 Plans:
 - [x] 06-01-PLAN.md -- Dockerfile, testcontainers dependency, ProvidedContext types, global setup with testcontainers lifecycle
 - [x] 06-02-PLAN.md -- Rewrite e2e spec to use container.exec(), update Vitest config, end-to-end verification
+- [ ] 06-03-PLAN.md -- Gap closure: replace nrwl/nx fixture with synthetic test repo to fix sync test timeout
 
 ### Phase 7: v1.0 Tech Debt Cleanup
 **Goal:** Close all accumulated tech debt from v1.0 milestone audit -- remove dead exports, add sync->status e2e test, fix planning documentation gaps
