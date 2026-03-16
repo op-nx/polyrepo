@@ -181,6 +181,16 @@ describe(extractGraphFromRepo, () => {
     ).rejects.toThrowError('/workspace/.repos/repo-a');
   });
 
+  it('rejects when stdout is valid JSON but fails Zod schema validation', async () => {
+    expect.hasAssertions();
+
+    setupExecSuccess(JSON.stringify({ notAGraph: true }));
+
+    await expect(
+      extractGraphFromRepo('/workspace/.repos/repo-a'),
+    ).rejects.toThrowError('/workspace/.repos/repo-a');
+  });
+
   it('sets windowsHide=true', async () => {
     expect.hasAssertions();
 
