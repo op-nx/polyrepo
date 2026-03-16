@@ -1,5 +1,5 @@
 ---
-status: complete
+status: diagnosed
 phase: 06-add-e2e-container
 source: [06-01-SUMMARY.md, 06-02-SUMMARY.md]
 started: 2026-03-16T08:00:00Z
@@ -48,7 +48,17 @@ skipped: 1
   reason: "User reported: 3 of 4 tests pass but 'should show project counts after sync' timed out at 120s. Error: Test timed out in 120000ms at src/op-nx-polyrepo.spec.ts:98:5. Total duration 233.44s."
   severity: blocker
   test: 1
-  root_cause: ""
-  artifacts: []
-  missing: []
-  debug_session: ""
+  root_cause: "Test syncs nrwl/nx monorepo (600+ projects) inside Docker container. polyrepo-sync triggers tryInstallDeps() (pnpm install for massive repo) then createNodesV2 triggers extractGraphFromRepo() which spawns nx graph --print on the full nrwl/nx workspace. These operations collectively exceed 120s timeout."
+  artifacts:
+    - path: "packages/op-nx-polyrepo/src/lib/executors/sync/executor.ts"
+      issue: "tryInstallDeps() runs pnpm install on nrwl/nx monorepo in container"
+    - path: "packages/op-nx-polyrepo/src/lib/graph/extract.ts"
+      issue: "extractGraphFromRepo() spawns nx graph --print on 600+ project repo"
+    - path: "packages/op-nx-polyrepo/src/index.ts"
+      issue: "createNodesV2 triggers populateGraphReport() on every Nx command after sync"
+    - path: "packages/op-nx-polyrepo-e2e/src/op-nx-polyrepo.spec.ts"
+      issue: "Test uses nrwl/nx as fixture — oversized for what it needs to verify"
+  missing:
+    - "Replace nrwl/nx fixture with a tiny synthetic Nx workspace (2-3 projects) prebaked into Docker image"
+    - "Or prebake graph cache + lockfile hash so neither installDeps nor extractGraphFromRepo runs during test"
+  debug_session: ".planning/debug/e2e-sync-test-timeout.md"
