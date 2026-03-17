@@ -7,11 +7,23 @@ const externalDependencySchema = z.object({
   type: z.string(),
 });
 
+const metadataSchema = z
+  .object({
+    js: z
+      .object({
+        packageName: z.string().optional(),
+      })
+      .passthrough()
+      .optional(),
+  })
+  .passthrough()
+  .optional();
+
 const externalProjectNodeDataSchema = z.object({
   root: z.string(),
   targets: z.record(z.string(), z.unknown()).optional(),
   tags: z.array(z.string()).optional(),
-  metadata: z.record(z.string(), z.unknown()).optional(),
+  metadata: metadataSchema,
   sourceRoot: z.string().optional(),
   projectType: z.string().optional(),
 });
@@ -39,6 +51,10 @@ export interface TransformedNode {
   targets: Record<string, TargetConfiguration>;
   tags: string[];
   metadata?: Record<string, unknown>;
+  packageName?: string;
+  dependencies?: string[];
+  devDependencies?: string[];
+  peerDependencies?: string[];
 }
 
 export interface PolyrepoGraphReport {
