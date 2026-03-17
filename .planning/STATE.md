@@ -4,8 +4,8 @@ milestone: v1.1
 milestone_name: Cross-repo Dependencies
 status: planning
 stopped_at: Completed 08-01-PLAN.md
-last_updated: "2026-03-17T20:01:32.295Z"
-last_activity: 2026-03-17 --- Roadmap created for v1.1
+last_updated: "2026-03-17T20:12:24.262Z"
+last_activity: 2026-03-17 --- Completed Phase 8 Plan 1 (schema extension and graph enrichment)
 progress:
   total_phases: 3
   completed_phases: 1
