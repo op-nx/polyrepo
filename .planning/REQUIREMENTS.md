@@ -56,22 +56,22 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DETECT-01 | — | Pending |
-| DETECT-02 | — | Pending |
-| DETECT-03 | — | Pending |
-| DETECT-04 | — | Pending |
-| DETECT-05 | — | Pending |
-| DETECT-06 | — | Pending |
-| DETECT-07 | — | Pending |
-| OVRD-01 | — | Pending |
-| OVRD-02 | — | Pending |
-| OVRD-03 | — | Pending |
+| DETECT-01 | Phase 9 | Pending |
+| DETECT-02 | Phase 9 | Pending |
+| DETECT-03 | Phase 9 | Pending |
+| DETECT-04 | Phase 9 | Pending |
+| DETECT-05 | Phase 8 | Pending |
+| DETECT-06 | Phase 10 | Pending |
+| DETECT-07 | Phase 10 | Pending |
+| OVRD-01 | Phase 9 | Pending |
+| OVRD-02 | Phase 9 | Pending |
+| OVRD-03 | Phase 9 | Pending |
 
 **Coverage:**
 - v1.1 requirements: 10 total
-- Mapped to phases: 0
-- Unmapped: 10
+- Mapped to phases: 10
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-17*
-*Last updated: 2026-03-17 after initial definition*
+*Last updated: 2026-03-17 after roadmap creation*
