@@ -21,12 +21,15 @@ An open-source Nx plugin for synthetic monorepos. Merges project graphs from mul
 - [x] Graph extraction cached (two-layer: memory + disk) -- v1.0
 - [x] Maximum type safety: zero `as`/`any`, strict ESLint, Zod at boundaries, SIFERS -- v1.0
 - [x] Container-based e2e via testcontainers -- v1.0
+- [x] Pin repos to specific branch, tag, or commit SHA -- v1.0
 
 ### Active
 
 - [ ] Cross-repo dependency auto-detection from package.json
 - [ ] Explicit cross-repo dependency overrides (manual wiring)
-- [ ] Pin repos to specific branch, tag, or commit SHA
+
+### Future
+
 - [ ] Selective assembly via profiles/groups
 - [ ] `init` generator for first-time setup
 - [ ] `add-repo` generator for interactive repo addition
@@ -40,6 +43,14 @@ An open-source Nx plugin for synthetic monorepos. Merges project graphs from mul
 - Watch mode across repos -- high complexity, unclear value without cross-repo deps
 - GUI/web dashboard -- CLI-first approach; `nx graph` provides visualization
 - Mobile app -- web-first, CLI-first
+
+## Current Milestone: v1.1 Cross-repo Dependencies
+
+**Goal:** Auto-detect and manually wire cross-repo dependency edges so `nx affected`, `nx graph`, and task orchestration work across repo boundaries.
+
+**Target features:**
+- Cross-repo dependency auto-detection from package.json
+- Explicit cross-repo dependency overrides (manual wiring in config)
 
 ## Context
 
@@ -79,4 +90,4 @@ Known issues:
 | Sanitize stdout by slicing from first '{' | Handles unknown contamination sources in nx output | [x] Good -- robust |
 
 ---
-*Last updated: 2026-03-16 after v1.0 milestone*
+*Last updated: 2026-03-17 after milestone v1.1 started*
