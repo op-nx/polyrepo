@@ -13,10 +13,10 @@ const metadataSchema = z
       .object({
         packageName: z.string().optional(),
       })
-      .passthrough()
+      .loose()
       .optional(),
   })
-  .passthrough()
+  .loose()
   .optional();
 
 const externalProjectNodeDataSchema = z.object({
