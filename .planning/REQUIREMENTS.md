@@ -9,9 +9,9 @@ Requirements for cross-repo dependency detection. Each maps to roadmap phases.
 
 ### Auto-detection
 
-- [ ] **DETECT-01**: Plugin auto-detects cross-repo dependency edges from package.json `dependencies` fields
-- [ ] **DETECT-02**: Plugin auto-detects cross-repo dependency edges from package.json `devDependencies` fields
-- [ ] **DETECT-03**: Plugin auto-detects cross-repo dependency edges from package.json `peerDependencies` fields
+- [x] **DETECT-01**: Plugin auto-detects cross-repo dependency edges from package.json `dependencies` fields
+- [x] **DETECT-02**: Plugin auto-detects cross-repo dependency edges from package.json `devDependencies` fields
+- [x] **DETECT-03**: Plugin auto-detects cross-repo dependency edges from package.json `peerDependencies` fields
 - [ ] **DETECT-04**: Plugin auto-detects cross-repo dependency edges from tsconfig path mappings (`tsconfig.base.json`/`tsconfig.json` `paths`)
 - [x] **DETECT-05**: Plugin builds a name-to-namespaced-project lookup from package.json names and tsconfig paths, covering both host and external projects
 - [ ] **DETECT-06**: Cross-repo edges appear in `nx graph` visualization
@@ -56,9 +56,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DETECT-01 | Phase 9 | Pending |
-| DETECT-02 | Phase 9 | Pending |
-| DETECT-03 | Phase 9 | Pending |
+| DETECT-01 | Phase 9 | Complete |
+| DETECT-02 | Phase 9 | Complete |
+| DETECT-03 | Phase 9 | Complete |
 | DETECT-04 | Phase 9 | Pending |
 | DETECT-05 | Phase 8 | Complete |
 | DETECT-06 | Phase 10 | Pending |

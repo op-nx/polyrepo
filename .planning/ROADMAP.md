@@ -81,7 +81,7 @@ Phases execute in numeric order: 8 -> 9 -> 10
 | 6. Add e2e Container | v1.0 | 3/3 | Complete | 2026-03-16 |
 | 7. v1.0 Tech Debt Cleanup | v1.0 | 2/2 | Complete | 2026-03-16 |
 | 8. Schema Extension and Data Extraction | v1.1 | 1/1 | Complete | 2026-03-17 |
-| 9. Cross-repo Dependency Detection | v1.1 | 0/2 | Not started | - |
+| 9. Cross-repo Dependency Detection | 1/2 | In Progress|  | - |
 | 10. Integration and End-to-End Validation | v1.1 | 0/0 | Not started | - |
 
 ---

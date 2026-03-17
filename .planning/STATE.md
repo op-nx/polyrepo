@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Cross-repo Dependencies
 status: planning
-stopped_at: Phase 9 context gathered
-last_updated: "2026-03-17T21:37:33.816Z"
+stopped_at: Completed 09-cross-repo-dependency-detection-01-PLAN.md
+last_updated: "2026-03-17T22:04:08.405Z"
 last_activity: 2026-03-17 --- Completed Phase 8 Plan 1 (schema extension and graph enrichment)
 progress:
   total_phases: 3
   completed_phases: 1
-  total_plans: 1
-  completed_plans: 1
+  total_plans: 3
+  completed_plans: 2
   percent: 33
 ---
 
@@ -50,6 +50,9 @@ Recent decisions affecting current work:
 - [v1.1 roadmap]: DETECT-05 (lookup map) assigned to Phase 8 as foundational data prerequisite for detection
 - [Phase 08]: implicitDependencies validated as Record<string,string[]> at schema level; glob semantics deferred to Phase 9 where full project graph is available
 - [Phase 08]: package.json path constructed from original node.data.root to avoid double-path pitfall (.repos/<alias> + original root)
+- [Phase 09-cross-repo-dependency-detection]: External TransformedNode.packageName wins over host project packageName on collision in lookup map
+- [Phase 09-cross-repo-dependency-detection]: DependencyType.static used for all dep-list edges regardless of dev/prod field distinction
+- [Phase 09-cross-repo-dependency-detection]: __host__ sentinel string used as repo alias for host projects in cross-repo guard
 
 ### Pending Todos
 
@@ -64,6 +67,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-03-17T21:37:33.813Z
-Stopped at: Phase 9 context gathered
+Last session: 2026-03-17T22:04:08.403Z
+Stopped at: Completed 09-cross-repo-dependency-detection-01-PLAN.md
 Resume: /gsd:plan-phase 9
