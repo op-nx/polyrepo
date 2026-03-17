@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
+import { minimatch } from 'minimatch';
 import { DependencyType } from '@nx/devkit';
 import type { RawProjectGraphDependency, CreateDependenciesContext } from '@nx/devkit';
 import type { PolyrepoConfig } from '../config/schema';
@@ -185,7 +186,7 @@ function extractRepoAlias(namespacedName: string): string | undefined {
  */
 export function detectCrossRepoDependencies(
   report: PolyrepoGraphReport,
-  _config: PolyrepoConfig,
+  config: PolyrepoConfig,
   context: CreateDependenciesContext,
 ): RawProjectGraphDependency[] {
   const { workspaceRoot } = context;
@@ -293,6 +294,51 @@ export function detectCrossRepoDependencies(
   }
 
   // -------------------------------------------------------------------------
+  // Step 2b: Build complete project name set (external + host) for override validation
+  // -------------------------------------------------------------------------
+
+  const allProjectNames: string[] = [];
+
+  for (const repoData of Object.values(report.repos)) {
+    for (const nodeName of Object.keys(repoData.nodes)) {
+      allProjectNames.push(nodeName);
+    }
+  }
+
+  for (const projectName of Object.keys(context.projects)) {
+    allProjectNames.push(projectName);
+  }
+
+  // -------------------------------------------------------------------------
+  // Step 2c: Override validation (OVRD-03) — validate all implicitDependencies patterns
+  // -------------------------------------------------------------------------
+
+  if (config.implicitDependencies !== undefined) {
+    const unknowns: string[] = [];
+
+    for (const [keyPattern, targets] of Object.entries(config.implicitDependencies)) {
+      const keyMatches = allProjectNames.some((name) => minimatch(name, keyPattern));
+
+      if (!keyMatches) {
+        unknowns.push(keyPattern);
+      }
+
+      for (const target of targets) {
+        const stripped = target.startsWith('!') ? target.slice(1) : target;
+        const targetMatches = allProjectNames.some((name) => minimatch(name, stripped));
+
+        if (!targetMatches) {
+          unknowns.push(stripped);
+        }
+      }
+    }
+
+    if (unknowns.length > 0) {
+      throw new Error(`Unknown projects in implicitDependencies: ${unknowns.join(', ')}`);
+    }
+  }
+
+  // -------------------------------------------------------------------------
   // Step 3: Emit cross-repo edges
   // -------------------------------------------------------------------------
 
@@ -389,5 +435,80 @@ export function detectCrossRepoDependencies(
     }
   }
 
-  return edges;
+  // -------------------------------------------------------------------------
+  // Step 4: Process overrides (negation suppression + override edge emission)
+  // -------------------------------------------------------------------------
+
+  if (config.implicitDependencies === undefined) {
+    return edges;
+  }
+
+  // Step 4a: Build negation set — "source::target" pairs to suppress
+  const negationSet = new Set<string>();
+
+  for (const [keyPattern, targets] of Object.entries(config.implicitDependencies)) {
+    const matchedSources = allProjectNames.filter((name) => minimatch(name, keyPattern));
+
+    for (const target of targets) {
+      if (!target.startsWith('!')) {
+        continue;
+      }
+
+      const stripped = target.slice(1);
+      const matchedTargets = allProjectNames.filter((name) => minimatch(name, stripped));
+
+      for (const source of matchedSources) {
+        for (const tgt of matchedTargets) {
+          negationSet.add(`${source}::${tgt}`);
+        }
+      }
+    }
+  }
+
+  // Step 4b: Filter auto-detected edges using negation set
+  const filteredEdges = edges.filter((edge) => {
+    const key = `${edge.source}::${edge.target}`;
+
+    return !negationSet.has(key);
+  });
+
+  // Step 4c: Emit override implicit edges (positive targets only)
+  const overrideEmitted = new Set<string>();
+
+  for (const edge of filteredEdges) {
+    overrideEmitted.add(`${edge.source}::${edge.target}`);
+  }
+
+  const overrideEdges: RawProjectGraphDependency[] = [];
+
+  for (const [keyPattern, targets] of Object.entries(config.implicitDependencies)) {
+    const matchedSources = allProjectNames.filter((name) => minimatch(name, keyPattern));
+
+    for (const target of targets) {
+      if (target.startsWith('!')) {
+        continue;
+      }
+
+      const matchedTargets = allProjectNames.filter((name) => minimatch(name, target));
+
+      for (const source of matchedSources) {
+        for (const tgt of matchedTargets) {
+          const key = `${source}::${tgt}`;
+
+          if (overrideEmitted.has(key)) {
+            continue;
+          }
+
+          overrideEmitted.add(key);
+          overrideEdges.push({
+            source,
+            target: tgt,
+            type: DependencyType.implicit,
+          });
+        }
+      }
+    }
+  }
+
+  return [...filteredEdges, ...overrideEdges];
 }
