@@ -730,4 +730,445 @@ describe('detectCrossRepoDependencies', () => {
     });
   });
 
+  // -------------------------------------------------------------------------
+  // DETECT-04: tsconfig path alias expansion — lookup map enrichment
+  // -------------------------------------------------------------------------
+
+  describe('DETECT-04 — tsconfig path alias expansion', () => {
+    it('tsconfig.base.json path alias with matching node root expands lookup map and emits edge', () => {
+      function setup() {
+        vi.clearAllMocks();
+
+        // readFileSync call map:
+        // - .repos/repo-b/tsconfig.base.json -> tsconfig with @acme/core alias
+        // - anything else (host package.json) -> '{}'
+        vi.mocked(readFileSync).mockImplementation((path) => {
+          const p = String(path);
+
+          if (p.endsWith('repo-b/tsconfig.base.json')) {
+            return JSON.stringify({
+              compilerOptions: {
+                paths: {
+                  '@acme/core': ['libs/core/src/index.ts'],
+                },
+              },
+            });
+          }
+
+          return '{}';
+        });
+
+        const report = makeReport({
+          'repo-a': {
+            nodes: {
+              'repo-a/my-app': makeExternalNode({
+                name: 'repo-a/my-app',
+                root: '.repos/repo-a/apps/my-app',
+                dependencies: ['@acme/core'],
+              }),
+            },
+            dependencies: [],
+          },
+          'repo-b': {
+            nodes: {
+              'repo-b/core': makeExternalNode({
+                name: 'repo-b/core',
+                root: '.repos/repo-b/libs/core',
+                // no packageName — must be discovered via tsconfig alias
+              }),
+            },
+            dependencies: [],
+          },
+        });
+
+        const config = makeConfig();
+        const context = makeContext();
+
+        return { report, config, context };
+      }
+
+      const { report, config, context } = setup();
+      const edges = detectCrossRepoDependencies(report, config, context);
+
+      expect(edges).toHaveLength(1);
+      expect(edges[0]).toMatchObject({
+        source: 'repo-a/my-app',
+        target: 'repo-b/core',
+        type: DependencyType.static,
+      });
+    });
+
+    it('packageName takes precedence over tsconfig alias when both map to the same key', () => {
+      function setup() {
+        vi.clearAllMocks();
+
+        vi.mocked(readFileSync).mockImplementation((path) => {
+          const p = String(path);
+
+          if (p.endsWith('repo-b/tsconfig.base.json')) {
+            return JSON.stringify({
+              compilerOptions: {
+                paths: {
+                  '@acme/core': ['libs/core/src/index.ts'],
+                },
+              },
+            });
+          }
+
+          return '{}';
+        });
+
+        const report = makeReport({
+          'repo-a': {
+            nodes: {
+              'repo-a/my-app': makeExternalNode({
+                name: 'repo-a/my-app',
+                root: '.repos/repo-a/apps/my-app',
+                dependencies: ['@acme/core'],
+              }),
+            },
+            dependencies: [],
+          },
+          'repo-b': {
+            nodes: {
+              // packageName already claims '@acme/core'
+              'repo-b/core': makeExternalNode({
+                name: 'repo-b/core',
+                root: '.repos/repo-b/libs/core',
+                packageName: '@acme/core',
+              }),
+            },
+            dependencies: [],
+          },
+        });
+
+        const config = makeConfig();
+        const context = makeContext();
+
+        return { report, config, context };
+      }
+
+      const { report, config, context } = setup();
+      const edges = detectCrossRepoDependencies(report, config, context);
+
+      // Should still emit exactly 1 edge (not duplicated)
+      expect(edges).toHaveLength(1);
+      expect(edges[0]).toMatchObject({
+        source: 'repo-a/my-app',
+        target: 'repo-b/core',
+        type: DependencyType.static,
+      });
+    });
+
+    it('falls back to tsconfig.json when tsconfig.base.json is absent', () => {
+      function setup() {
+        vi.clearAllMocks();
+
+        vi.mocked(readFileSync).mockImplementation((path) => {
+          const p = String(path);
+
+          if (p.endsWith('repo-b/tsconfig.base.json')) {
+            throw new Error('ENOENT');
+          }
+
+          if (p.endsWith('repo-b/tsconfig.json')) {
+            return JSON.stringify({
+              compilerOptions: {
+                paths: {
+                  '@acme/utils': ['libs/utils/src/index.ts'],
+                },
+              },
+            });
+          }
+
+          return '{}';
+        });
+
+        const report = makeReport({
+          'repo-a': {
+            nodes: {
+              'repo-a/my-app': makeExternalNode({
+                name: 'repo-a/my-app',
+                root: '.repos/repo-a/apps/my-app',
+                dependencies: ['@acme/utils'],
+              }),
+            },
+            dependencies: [],
+          },
+          'repo-b': {
+            nodes: {
+              'repo-b/utils': makeExternalNode({
+                name: 'repo-b/utils',
+                root: '.repos/repo-b/libs/utils',
+              }),
+            },
+            dependencies: [],
+          },
+        });
+
+        const config = makeConfig();
+        const context = makeContext();
+
+        return { report, config, context };
+      }
+
+      const { report, config, context } = setup();
+      const edges = detectCrossRepoDependencies(report, config, context);
+
+      expect(edges).toHaveLength(1);
+      expect(edges[0]).toMatchObject({
+        source: 'repo-a/my-app',
+        target: 'repo-b/utils',
+        type: DependencyType.static,
+      });
+    });
+
+    it('repo with neither tsconfig.base.json nor tsconfig.json is silently skipped — no error', () => {
+      function setup() {
+        vi.clearAllMocks();
+
+        vi.mocked(readFileSync).mockImplementation((path) => {
+          const p = String(path);
+
+          if (p.includes('tsconfig')) {
+            throw new Error('ENOENT');
+          }
+
+          return '{}';
+        });
+
+        const report = makeReport({
+          'repo-b': {
+            nodes: {
+              'repo-b/core': makeExternalNode({
+                name: 'repo-b/core',
+                root: '.repos/repo-b/libs/core',
+              }),
+            },
+            dependencies: [],
+          },
+        });
+
+        const config = makeConfig();
+        const context = makeContext();
+
+        return { report, config, context };
+      }
+
+      const { report, config, context } = setup();
+
+      expect(() => detectCrossRepoDependencies(report, config, context)).not.toThrow();
+    });
+
+    it('alias value with filename strips filename and walks up segments to find matching root', () => {
+      function setup() {
+        vi.clearAllMocks();
+
+        // alias value 'libs/core/src/index.ts' -> strip filename -> 'libs/core/src'
+        // walk up: 'libs/core/src' no match, 'libs/core' matches node root 'libs/core'
+        vi.mocked(readFileSync).mockImplementation((path) => {
+          const p = String(path);
+
+          if (p.endsWith('repo-b/tsconfig.base.json')) {
+            return JSON.stringify({
+              compilerOptions: {
+                paths: {
+                  '@acme/core': ['libs/core/src/index.ts'],
+                },
+              },
+            });
+          }
+
+          return '{}';
+        });
+
+        const report = makeReport({
+          'repo-a': {
+            nodes: {
+              'repo-a/my-app': makeExternalNode({
+                name: 'repo-a/my-app',
+                root: '.repos/repo-a/apps/my-app',
+                dependencies: ['@acme/core'],
+              }),
+            },
+            dependencies: [],
+          },
+          'repo-b': {
+            nodes: {
+              'repo-b/core': makeExternalNode({
+                name: 'repo-b/core',
+                root: '.repos/repo-b/libs/core',
+              }),
+            },
+            dependencies: [],
+          },
+        });
+
+        const config = makeConfig();
+        const context = makeContext();
+
+        return { report, config, context };
+      }
+
+      const { report, config, context } = setup();
+      const edges = detectCrossRepoDependencies(report, config, context);
+
+      expect(edges).toHaveLength(1);
+      expect(edges[0]).toMatchObject({
+        source: 'repo-a/my-app',
+        target: 'repo-b/core',
+        type: DependencyType.static,
+      });
+    });
+
+    it('alias value whose path matches no project root is silently ignored', () => {
+      function setup() {
+        vi.clearAllMocks();
+
+        vi.mocked(readFileSync).mockImplementation((path) => {
+          const p = String(path);
+
+          if (p.endsWith('repo-b/tsconfig.base.json')) {
+            return JSON.stringify({
+              compilerOptions: {
+                paths: {
+                  '@acme/ghost': ['libs/ghost/src/index.ts'],
+                },
+              },
+            });
+          }
+
+          return '{}';
+        });
+
+        const report = makeReport({
+          'repo-b': {
+            nodes: {
+              'repo-b/core': makeExternalNode({
+                name: 'repo-b/core',
+                root: '.repos/repo-b/libs/core',
+              }),
+            },
+            dependencies: [],
+          },
+        });
+
+        const config = makeConfig();
+        const context = makeContext();
+
+        return { report, config, context };
+      }
+
+      const { report, config, context } = setup();
+
+      expect(() => detectCrossRepoDependencies(report, config, context)).not.toThrow();
+      const edges = detectCrossRepoDependencies(report, config, context);
+      expect(edges).toHaveLength(0);
+    });
+
+    it('host workspace tsconfig.base.json path alias expands lookup map with host project', () => {
+      function setup() {
+        vi.clearAllMocks();
+
+        vi.mocked(readFileSync).mockImplementation((path) => {
+          const p = String(path);
+
+          // Host workspace tsconfig.base.json at workspace root
+          if (p === '/workspace/tsconfig.base.json') {
+            return JSON.stringify({
+              compilerOptions: {
+                paths: {
+                  '@host/utils': ['libs/utils/src/index.ts'],
+                },
+              },
+            });
+          }
+
+          // Host project package.json — no deps
+          if (p === '/workspace/apps/host-app/package.json') {
+            return '{}';
+          }
+
+          // External tsconfig — not present
+          if (p.includes('tsconfig')) {
+            throw new Error('ENOENT');
+          }
+
+          return '{}';
+        });
+
+        const report = makeReport({
+          'repo-b': {
+            nodes: {
+              'repo-b/my-app': makeExternalNode({
+                name: 'repo-b/my-app',
+                root: '.repos/repo-b/apps/my-app',
+                dependencies: ['@host/utils'],
+              }),
+            },
+            dependencies: [],
+          },
+        });
+
+        const config = makeConfig();
+        const context = makeContext(
+          {
+            'host-app': { root: 'apps/host-app' },
+            'host-utils': { root: 'libs/utils' },
+          },
+          '/workspace',
+        );
+
+        return { report, config, context };
+      }
+
+      const { report, config, context } = setup();
+      const edges = detectCrossRepoDependencies(report, config, context);
+
+      expect(edges).toHaveLength(1);
+      expect(edges[0]).toMatchObject({
+        source: 'repo-b/my-app',
+        target: 'host-utils',
+        type: DependencyType.static,
+      });
+    });
+
+    it('invalid tsconfig JSON is silently skipped — no error', () => {
+      function setup() {
+        vi.clearAllMocks();
+
+        vi.mocked(readFileSync).mockImplementation((path) => {
+          const p = String(path);
+
+          if (p.endsWith('repo-b/tsconfig.base.json')) {
+            return 'not-valid-json{{{';
+          }
+
+          return '{}';
+        });
+
+        const report = makeReport({
+          'repo-b': {
+            nodes: {
+              'repo-b/core': makeExternalNode({
+                name: 'repo-b/core',
+                root: '.repos/repo-b/libs/core',
+              }),
+            },
+            dependencies: [],
+          },
+        });
+
+        const config = makeConfig();
+        const context = makeContext();
+
+        return { report, config, context };
+      }
+
+      const { report, config, context } = setup();
+
+      expect(() => detectCrossRepoDependencies(report, config, context)).not.toThrow();
+    });
+  });
+
 });
