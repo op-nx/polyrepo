@@ -34,10 +34,12 @@
 **Requirements**: DETECT-05
 **Success Criteria** (what must be TRUE):
   1. A v1.0 config (repos-only, no overrides) parses successfully through the v1.1 schema with no validation errors
-  2. User can add an optional `dependencyOverrides` array to plugin config with `source`/`target` project pairs (and optional `negate` flag), validated by Zod at load time
-  3. After graph extraction, every project in the graph report has its npm package name resolved from its package.json and stored in a lookup map covering both host and external projects
-  4. After graph extraction, every project's package.json dependency fields (dependencies, devDependencies, peerDependencies) are read and stored in the graph report, cached by the existing two-layer cache
-**Plans**: TBD
+  2. User can add an optional `implicitDependencies` record to plugin config (keyed by source project name or minimatch glob, values are arrays of target project names/globs), validated by Zod at load time
+  3. After graph extraction, every external project in the graph report has its npm package name resolved from `metadata.js.packageName` and stored on its `TransformedNode`
+  4. After graph extraction, every external project's package.json dependency fields (dependencies, devDependencies, peerDependencies) are read from disk and stored on its `TransformedNode`, cached by the existing two-layer cache
+**Plans**: 1 plan
+Plans:
+- [ ] 08-01-PLAN.md -- Extend config schema, graph types, and transform with package name extraction and dependency list reading
 
 ### Phase 9: Cross-repo Dependency Detection
 **Goal**: A pure function correctly identifies cross-repo dependency edges from package.json declarations, applies user overrides and negations, and handles edge cases (cycles, scoped packages, namespace mismatches)
@@ -75,7 +77,7 @@ Phases execute in numeric order: 8 -> 9 -> 10
 | 5. Maximum Type Safety | v1.0 | 6/6 | Complete | 2026-03-13 |
 | 6. Add e2e Container | v1.0 | 3/3 | Complete | 2026-03-16 |
 | 7. v1.0 Tech Debt Cleanup | v1.0 | 2/2 | Complete | 2026-03-16 |
-| 8. Schema Extension and Data Extraction | v1.1 | 0/0 | Not started | - |
+| 8. Schema Extension and Data Extraction | v1.1 | 0/1 | In progress | - |
 | 9. Cross-repo Dependency Detection | v1.1 | 0/0 | Not started | - |
 | 10. Integration and End-to-End Validation | v1.1 | 0/0 | Not started | - |
 
