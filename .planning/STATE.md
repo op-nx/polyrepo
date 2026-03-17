@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Cross-repo Dependencies
-status: planning
-stopped_at: Completed 09-cross-repo-dependency-detection-01-PLAN.md
-last_updated: "2026-03-17T22:04:08.405Z"
-last_activity: 2026-03-17 --- Completed Phase 8 Plan 1 (schema extension and graph enrichment)
+status: in-progress
+stopped_at: Completed 09-cross-repo-dependency-detection-02-PLAN.md
+last_updated: "2026-03-17T22:12:42.555Z"
+last_activity: 2026-03-17 --- Completed Phase 9 Plan 2 (tsconfig aliases + override processing)
 progress:
   total_phases: 3
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 3
-  completed_plans: 2
-  percent: 33
+  completed_plans: 3
+  percent: 100
 ---
 
 # Project State
@@ -21,23 +21,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-17)
 
 **Core value:** `nx graph` displays projects from all synced repos with cross-repo dependency edges, and all relevant Nx CLI commands output projects from multiple repos
-**Current focus:** Phase 8 -- Schema Extension and Data Extraction
+**Current focus:** Phase 9 -- Cross-Repo Dependency Detection
 
 ## Current Position
 
-Phase: 8 of 10 (Schema Extension and Data Extraction)
-Plan: 1 of 1 in Phase 8 (complete)
-Status: Phase 8 complete, ready to plan Phase 9
-Last activity: 2026-03-17 --- Completed Phase 8 Plan 1 (schema extension and graph enrichment)
+Phase: 9 of 10 (Cross-Repo Dependency Detection)
+Plan: 2 of 2 in Phase 9 (complete)
+Status: Phase 9 complete, ready to plan Phase 10
+Last activity: 2026-03-17 --- Completed Phase 9 Plan 2 (tsconfig aliases + override processing)
 
-Progress: [###.......] 33%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 1 (v1.1)
-- Average duration: ~4 minutes
-- Total execution time: ~4 minutes
+- Total plans completed: 3 (v1.1)
+- Average duration: ~5 minutes
+- Total execution time: ~15 minutes
 
 ## Accumulated Context
 
@@ -53,6 +53,9 @@ Recent decisions affecting current work:
 - [Phase 09-cross-repo-dependency-detection]: External TransformedNode.packageName wins over host project packageName on collision in lookup map
 - [Phase 09-cross-repo-dependency-detection]: DependencyType.static used for all dep-list edges regardless of dev/prod field distinction
 - [Phase 09-cross-repo-dependency-detection]: __host__ sentinel string used as repo alias for host projects in cross-repo guard
+- [Phase 09-cross-repo-dependency-detection]: Provider-side tsconfig path aliases expand lookup map for repos without packageName on nodes
+- [Phase 09-cross-repo-dependency-detection]: Negation suppression applied as post-filter after full auto-detection accumulation (not inline skip)
+- [Phase 09-cross-repo-dependency-detection]: Override validation uses allProjectNames (external + host) to support patterns targeting host projects
 
 ### Pending Todos
 
@@ -67,6 +70,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-03-17T22:04:08.403Z
-Stopped at: Completed 09-cross-repo-dependency-detection-01-PLAN.md
+Last session: 2026-03-17T22:12:42.553Z
+Stopped at: Completed 09-cross-repo-dependency-detection-02-PLAN.md
 Resume: /gsd:plan-phase 9
