@@ -1,196 +1,155 @@
 # Pitfalls Research
 
-**Domain:** Nx plugin for synthetic monorepo / polyrepo graph merging
-**Researched:** 2026-03-10
-**Confidence:** MEDIUM-HIGH (verified against Nx docs + GitHub issues, some areas extrapolated from related projects)
+**Domain:** Cross-repo dependency detection and manual overrides for Nx polyrepo plugin (v1.1)
+**Researched:** 2026-03-17
+**Confidence:** HIGH (verified against Nx 22.x type definitions in node_modules and existing plugin source)
 
 ## Critical Pitfalls
 
-### Pitfall 1: Project Name Collisions Across Repos Silently Merge Instead of Erroring
+### Pitfall 1: Using DependencyType.implicit for package.json-derived dependencies
 
 **What goes wrong:**
-Nx identifies project nodes as "the same project" when they share the same root path. But in a synthetic monorepo, projects from different repos will have different roots. The real collision risk is project **names** -- if two repos both have a project called `shared-utils`, Nx will treat them as separate projects (different roots) but commands referencing `shared-utils` by name become ambiguous. Nx uses the first match, silently ignoring the second. Users run `nx build shared-utils` and get the wrong project built with no warning.
+The existing `createDependencies` emits all intra-repo edges as `DependencyType.implicit`. If cross-repo package.json dependencies are also emitted as implicit, Nx recomputes every dependency on every graph construction because implicit dependencies have no file association. This makes `nx affected` slow and defeats incremental analysis. The Nx type `ImplicitDependency` has no `sourceFile` field at all -- it only has `source`, `target`, and `type`.
 
 **Why it happens:**
-Nx's project graph is keyed by root path internally, but CLI resolution uses project names. The plugin author assumes root-path uniqueness prevents conflicts, forgetting that name-based resolution is what users interact with.
+The v1.0 code uses `DependencyType.implicit` for intra-repo edges (line 127 of `index.ts`). The natural tendency is to follow the same pattern for cross-repo edges. But package.json-derived edges CAN be associated with a file, and should be.
 
 **How to avoid:**
-Namespace all external repo projects with a repo-name prefix (e.g., `repo-a/shared-utils`, `repo-b/shared-utils`). The PROJECT.md already specifies this, but implementation must be watertight: apply prefixing at `createNodesV2` time before projects enter the graph, not as a post-processing step. Validate uniqueness and emit a clear error with both project locations when collisions occur.
+Use `DependencyType.static` with a `sourceFile` pointing to the package.json that declares the dependency. The `StaticDependency` type requires `source`, `target`, `type: DependencyType.static`, and a `sourceFile` (MUST be present unless source is a `ProjectGraphExternalNode`). Since our namespaced projects are regular project nodes, always provide `sourceFile`. Example: `sourceFile: '.repos/frontend/libs/shared/package.json'`. Verified in `node_modules/nx/src/project-graph/project-graph-builder.d.ts`.
 
 **Warning signs:**
-- `nx show projects` shows fewer projects than expected
-- Running a target on a project builds files from an unexpected repo
-- Users report "my changes aren't being picked up" when the wrong project is resolved
+- `nx affected` always reports all cross-repo dependents as affected even when nothing changed
+- `createDependencies` takes noticeably longer than expected on repeat invocations
+- No file-level caching benefit visible in profiling
 
 **Phase to address:**
-Phase 1 (core graph plugin) -- namespacing must be built into the graph merging from day one, not bolted on later.
+Phase 1 (auto-detection) -- foundational design decision that affects all subsequent work.
 
 ---
 
-### Pitfall 2: Plugin Execution Performance Kills Developer Experience
+### Pitfall 2: Namespace mismatch between npm package names and Nx project names
 
 **What goes wrong:**
-`createNodesV2` is called during every graph computation. If the plugin shells out to child Nx workspaces (running `nx graph --json` in each repo) synchronously, graph computation can take 30-120+ seconds. The Nx daemon has a 10-minute timeout for plugin execution ([GitHub #32788](https://github.com/nrwl/nx/issues/32788)), but even 10 seconds destroys DX since `nx affected`, `nx graph`, and every task run depend on the graph.
+A project in repo `backend` might have npm package name `@myorg/shared-utils` in its package.json but be registered in the host Nx graph as `backend/shared-utils` (namespaced by repo alias). The Nx project name in the child repo might be yet another value, like `shared-utils`. If the detection logic matches package.json dependency names against namespaced Nx project names, it will never find a match. If it matches against un-namespaced names, it may produce ambiguous matches when two repos have identically-named packages.
 
 **Why it happens:**
-The naive implementation is: for each synced repo, spawn `nx graph` or `nx show projects --json`, parse the result, merge. Each spawn bootstraps Node.js, loads Nx, reads that repo's `nx.json`, runs its plugins, and computes its graph. This is inherently expensive, multiplied by repo count.
+Three name spaces are in play: (1) npm package names from package.json `name` field, (2) Nx project names from the child repo's project.json/project graph, and (3) namespaced project names in the host graph (`alias/projectName`). The current `transformGraphForRepo` in `transform.ts` does not store the npm package name anywhere in the `TransformedNode`.
 
 **How to avoid:**
-- Cache synced repo graphs aggressively. Use file hashes (lockfile + nx.json + project.json files) as cache keys. Only recompute a repo's graph when its files change.
-- Consider reading the Nx project graph cache file (`.nx/cache/d/file-map.json` or similar) from each repo rather than spawning a full `nx graph` process.
-- Process repos in parallel, not sequentially.
-- Set `NX_PERF_LOGGING=true` during development to measure plugin time contribution.
+Build an explicit lookup table during graph transformation. For each external project, read its package.json `name` field and store it. During dependency detection, match package.json dependency names against this lookup table, then emit edges using the namespaced Nx project names. The lookup must handle: (a) projects without a package.json, (b) projects whose npm name differs from the Nx project name, (c) scoped packages (`@scope/name`), (d) multiple projects publishing the same npm package name across repos (emit warning, pick none).
 
 **Warning signs:**
-- `NX_PERF_LOGGING=true` shows your plugin taking >2 seconds
-- Users disable the plugin during normal development
-- CI times spike after adding the plugin
+- Zero cross-repo dependencies detected despite obvious package.json references
+- Dependencies detected in one direction but not the other
+- Duplicate match warnings in logs
 
 **Phase to address:**
-Phase 1 (core graph plugin) -- performance architecture must be baked in from the start. Retrofitting caching into a naive implementation is a rewrite.
+Phase 1 (auto-detection) -- the lookup table design must be settled before any matching logic is written.
 
 ---
 
-### Pitfall 3: External Node (npm dependency) Conflicts Across Repos with Different Versions
+### Pitfall 3: Reading package.json from wrong scope (host root, child repo root, or project root)
 
 **What goes wrong:**
-Each Nx workspace has its own `externalNodes` representing npm packages. When merging graphs, repo-a may have `npm:react@18.2.0` and repo-b may have `npm:react@19.0.0`. External nodes with the same name are **overwritten, not merged** -- the last plugin to register the node wins. This silently breaks dependency edges for the repo whose version was overwritten, and can cause `nx affected` to miss projects or produce incorrect dependency chains.
+Package.json files exist at multiple levels: the host workspace root, the child repo root (`.repos/alias/package.json`), and individual project roots within child repos (`.repos/alias/libs/foo/package.json`). Reading the wrong one produces incorrect dependency edges. The host root package.json lists the host's own toolchain deps (Nx, TypeScript). The child repo root package.json lists the repo's toolchain deps. Only project-level package.json files declare project-to-project dependencies.
 
 **Why it happens:**
-Nx's documented behavior: "External nodes are identified by a unique name, and if plugins identify an external node with the same name, the external node will be overwritten." Most plugin authors don't think about this because within a single workspace, npm packages have one resolved version.
+The `CreateDependenciesContext` provides `context.projects` with project roots relative to the host workspace. It is tempting to glob for all package.json files, which captures the wrong ones. Additionally, `context.fileMap` and `context.filesToProcess` may not include files under `.repos/` since that directory is gitignored -- the host workspace file tracking does not cover gitignored paths.
 
 **How to avoid:**
-- Scope external nodes per repo: instead of `npm:react`, register `npm:repo-a/react@18.2.0` and `npm:repo-b/react@19.0.0`.
-- Alternatively, if the goal is to show cross-repo dependency edges via shared npm packages, detect version mismatches and emit a warning but pick the union (keep both as separate external nodes with version-qualified names).
-- Document the version-mismatch behavior clearly so users understand what the graph shows.
+For each external project (identifiable by `polyrepo:external` tag or `.repos/` root prefix), resolve package.json as `join(workspaceRoot, project.root, 'package.json')`. Read from disk directly, not from `context.fileMap`. Skip projects without a package.json. Never read the child repo root package.json as a project dependency source. Never read the host root package.json.
 
 **Warning signs:**
-- `nx graph` shows fewer external dependency nodes than expected
-- Dependency edges disappear when a second repo is added
-- `nx affected` misses projects that should be affected by a package update
+- Spurious dependency edges to npm toolchain packages like `typescript`, `nx`, or `eslint`
+- Every external project appears to depend on every other
+- Dependencies appear from host workspace projects to external projects
 
 **Phase to address:**
-Phase 1 (core graph plugin) -- external node handling is part of graph merging fundamentals.
+Phase 1 (auto-detection) -- file resolution logic is core to the detection algorithm.
 
 ---
 
-### Pitfall 4: Nx Version Incompatibility Between Repos
+### Pitfall 4: Circular cross-repo dependencies crashing task orchestration
 
 **What goes wrong:**
-The plugin runs inside the host workspace's Nx runtime (v22.x). Synced repos may run Nx 20, 21, or a future 23. The project graph JSON format, plugin API, and even the project configuration schema can differ across major versions. Attempting to load or parse a repo's graph that was computed with a different Nx version produces cryptic errors or silently wrong data.
+If repo A's project depends on repo B's project via package.json, and repo B's project depends back on repo A's project, Nx may enter an infinite loop during task graph construction or fail with an opaque error. Nx GitHub issue [#7546](https://github.com/nrwl/nx/issues/7546) confirms that **circular dependencies are not always caught for nodes added to the graph via plugins**. The built-in cycle detection runs on edges from Nx's own analysis, not from plugin-contributed edges.
 
 **Why it happens:**
-The `createNodesV2` API itself changed between Nx 19 and 22. Project configuration fields, target defaults behavior, and graph cache formats evolve with each major version. The plugin author tests against their own Nx version and doesn't encounter the mismatch.
+Intra-repo circular deps are caught by Nx's built-in JS/TS analysis. Plugin-added nodes use a different code path for cycle detection. If the polyrepo plugin introduces a cycle, Nx may not flag it, and `nx run-many` or task pipelines will hang or error out with "maximum call stack" or similar.
 
 **How to avoid:**
-- Don't import or require Nx internals from synced repos. Instead, invoke the repo's own `nx` binary (from its `node_modules/.bin/nx`) to produce a graph JSON, which is a more stable public API surface.
-- Detect each repo's Nx version early (read `nx` version from `node_modules/nx/package.json`). Define a supported version range (e.g., Nx >=20 <24). Emit a clear error for unsupported versions.
-- For graph JSON format differences, maintain lightweight adapters per major version that normalize the output into a common internal format.
+Validate the dependency graph for cycles before returning edges from `createDependencies`. Build a topological sort or DFS cycle detector over the cross-repo edges. If a cycle is detected, log a clear warning naming the projects involved and omit the cycle-creating edge(s). Do not silently swallow cycles -- the warning must be actionable.
 
 **Warning signs:**
-- Tests pass with all repos on the same Nx version but fail when mixing versions
-- Users report "plugin stopped working after upgrading one repo"
-- JSON parsing errors referencing unexpected fields
+- `nx build` hangs indefinitely when cross-repo deps exist
+- `nx graph` shows bidirectional arrows between repos
+- Task orchestration errors mentioning "maximum call stack" or "cycle"
 
 **Phase to address:**
-Phase 1 (core graph plugin) -- version detection and validation should be the first thing the plugin does when processing a repo. Adapter layer can be minimal initially (support only Nx 22.x) but the abstraction must exist.
+Phase 1 (auto-detection) -- cycle detection must be in place before any edges are emitted, because the first auto-detected cycle could break the entire workspace.
 
 ---
 
-### Pitfall 5: Git Operations Fail Silently on Windows Due to Path Length and Permission Issues
+### Pitfall 5: Manual overrides conflicting with or duplicating auto-detected edges
 
 **What goes wrong:**
-Windows has a 260-character MAX_PATH limit. Cloning repos into a subdirectory of the workspace (e.g., `.nx-openpolyrepo/repos/my-long-org-name/my-long-repo-name/packages/deeply-nested-lib/src/components/`) easily exceeds this. Git operations fail with cryptic "filename too long" errors. Additionally, some Windows environments require administrator privileges for symlinks, which some Nx operations use.
+When a user configures an explicit dependency override (e.g., `frontend/app -> backend/api`) and auto-detection also discovers the same edge from package.json, the system has duplicate edges. While Nx deduplicates internally, the real problem is when an override is meant to SUPPRESS a false-positive auto-detected edge. Without clear precedence rules and negative override support, the system is unpredictable.
 
 **Why it happens:**
-The developer builds and tests on macOS/Linux where path lengths are effectively unlimited. Windows is an afterthought, tested only in CI if at all.
+Auto-detection and manual overrides are independent code paths. Without explicit precedence logic, they both emit edges into the same `RawProjectGraphDependency[]` array. Users expect overrides to have final say, but without negative overrides (`dependsOn: false`), there is no way to remove an incorrect auto-detected edge.
 
 **How to avoid:**
-- Clone repos into a short base path (e.g., `.repos/` at workspace root, with short directory names derived from repo config key, not full URL).
-- Automatically set `core.longpaths=true` on cloned repos.
-- Detect platform at startup and warn if the workspace root path is already deep (>100 chars).
-- Never use symlinks for repo assembly -- use direct paths. The PROJECT.md already decided on git clone/pull, which is correct.
-- Test on Windows in CI from day one.
+Define clear precedence: manual overrides always win. Collect auto-detected edges first, then apply overrides as a patch layer. Overrides can: (a) add edges that auto-detection missed, (b) suppress edges that auto-detection found incorrectly (negative overrides). Deduplicate by `source+target` key before returning. Support `false` as an override value to mean "remove this edge."
 
 **Warning signs:**
-- "filename too long" errors only on Windows
-- CI passes on Linux but fails on Windows
-- Users report issues only when workspace is in a deep directory
+- Users report that removing a package.json dependency does not remove the graph edge
+- Users cannot suppress a false-positive auto-detected dependency
+- Confusion about which edges are auto-detected vs manually configured
 
 **Phase to address:**
-Phase 1 (repo assembly) -- path strategy is a foundational design decision. Changing clone locations later breaks all existing user setups.
+Phase 2 (manual overrides) -- but auto-detection must be designed with override integration points from the start.
 
 ---
 
-### Pitfall 6: Stale Repo State Produces Incorrect Graphs
+### Pitfall 6: Cache invalidation not accounting for package.json changes
 
 **What goes wrong:**
-Synced repos are cloned/pulled at some point in time. If the user doesn't re-pull, the local clone diverges from the remote. The project graph shows stale projects, missing new projects, or incorrect dependency edges. Worse, `nx affected` may miss affected projects because it compares against a stale baseline.
+The existing two-layer cache in `cache.ts` computes a hash from `pluginOptionsHash + HEAD SHA + dirty files` per repo. If cross-repo dependency detection is folded INTO the cached graph report, and a package.json change is committed (HEAD SHA changes), the cache invalidates correctly. But if package.json is modified but not committed (dirty), the `getDirtyFiles()` output changes and the cache also invalidates. The REAL risk is if cross-repo detection is added as a separate cached layer with its own hash that does NOT include package.json content.
 
 **Why it happens:**
-The plugin clones repos during initial setup but has no mechanism to keep them fresh. Users forget to run the sync command, or don't realize their graph is stale.
+The existing cache works well for graph extraction (nodes + intra-repo edges). Adding a new data source (package.json content for cross-repo edges) requires either folding it into the existing hash or managing a separate cache.
 
 **How to avoid:**
-- Implement an Nx sync generator that checks repo freshness (compare local HEAD with remote HEAD via `git fetch --dry-run` or `git remote show origin`).
-- Display repo staleness in `nx graph` visualization or CLI output.
-- Support a `--fetch` flag on graph computation that does a quick `git fetch` for all repos before graph merging.
-- Never auto-pull without user consent -- force-pulling can discard local changes in synced repos.
+Run cross-repo dependency detection inside `createDependencies`, NOT as part of the cached extraction pipeline. The detection reads package.json files at graph construction time, using the already-cached project graph report for the node/lookup data. This way: (a) the existing cache handles node extraction (invalidated by HEAD SHA + dirty files, which covers package.json changes), (b) dependency detection runs fresh against current package.json files each time `createDependencies` is called, (c) no additional cache layer needed for the MVP.
 
 **Warning signs:**
-- Users say "I added a new project in repo-b but it doesn't show up"
-- `nx affected` misses projects that changed in remote repos
-- Graph visualization looks different on different developers' machines
+- After adding a cross-repo dependency to package.json, `nx graph` does not show the edge until `nx reset`
+- Removing a dependency still shows the edge
+- `nx affected` includes/excludes wrong projects after package.json changes
 
 **Phase to address:**
-Phase 2 (repo assembly DX) -- initial clone happens in Phase 1, but freshness checking is a DX concern for Phase 2.
+Phase 1 (auto-detection) -- cache integration must be decided at the architecture level.
 
 ---
 
-### Pitfall 7: createNodesV2 Daemon Caching Masks Plugin Bugs During Development
+### Pitfall 7: Zod schema breaks backward compatibility when adding override config fields
 
 **What goes wrong:**
-The Nx daemon caches plugin code and the project graph. During development, changes to plugin source code are not reflected until the daemon restarts. The developer thinks their code change had no effect, adds more changes, then when the daemon finally restarts everything breaks in confusing ways.
+Adding a new `dependencies` or `overrides` field to `polyrepoConfigSchema` with required validation breaks existing users who upgrade to v1.1 without updating their nx.json config. Their repos-only config fails Zod validation at plugin load time (`validateConfig`), and ALL Nx commands break immediately with a Zod error.
 
 **Why it happens:**
-Nx caches aggressively for performance. The daemon watches workspace files but may not watch plugin source files from `node_modules` or linked packages.
+The existing schema uses `.strict()` on repo entry objects. If the top-level config schema gains new required fields, or if `.strict()` prevents unknown keys, any nx.json that doesn't include the new fields fails validation.
 
 **How to avoid:**
-- Document `NX_DAEMON=false` as **required** during plugin development in CONTRIBUTING.md.
-- Add a development script: `NX_DAEMON=false NX_CACHE_PROJECT_GRAPH=false nx graph`.
-- Consider adding `NX_DAEMON=false` to the workspace `.env` during development and removing it for release testing.
-- Add integration tests that run with daemon disabled to catch issues early.
+Make all new config fields optional with sensible defaults. Use `.optional()` for the overrides field -- absence means no overrides. Write a backward compatibility test: parse a v1.0-era config shape (only `repos`, no other fields) through the v1.1 schema and assert it succeeds. The existing `schema.spec.ts` tests should serve as the baseline.
 
 **Warning signs:**
-- "It works sometimes" / inconsistent behavior
-- Plugin changes seem to have no effect
-- Running `nx reset` fixes the problem temporarily
+- Existing e2e tests fail after schema changes (good -- tests catch it)
+- Users report "plugin crashed" errors immediately after upgrading
+- Zod validation errors mentioning "unrecognized key" or "required"
 
 **Phase to address:**
-Phase 1 (initial plugin development) -- this is a development workflow concern, not a runtime concern. Establish the pattern immediately.
-
----
-
-### Pitfall 8: Cross-Repo Dependency Detection Produces False Positives and Negatives
-
-**What goes wrong:**
-Auto-detecting cross-repo dependencies via `package.json` imports sounds simple but has edge cases: (1) A package name in repo-a's `package.json` matches a project in repo-b, but it's actually an npm package with the same name, not the repo-b project. (2) Repo-a imports repo-b code via TypeScript path aliases or custom resolution, but there's no `package.json` dependency, so the edge is missed. (3) A repo depends on a published version of another repo's package, not the source -- should this be a graph edge or not?
-
-**Why it happens:**
-Package names are not globally unique in the context of private packages. The plugin uses string matching without understanding the full dependency resolution chain.
-
-**How to avoid:**
-- Use a multi-signal approach: `package.json` dependencies + optional explicit overrides in plugin config.
-- For auto-detection, require that cross-repo dependencies match both the package name AND that the package is not found in the npm registry (or is found but matches the repo's package). This is complex -- start with explicit config and add auto-detection as an enhancement.
-- Always allow manual override: `crossRepoDependencies: { "project-a": ["repo-b/project-c"] }` in plugin options.
-- Emit warnings for ambiguous matches rather than silently creating edges.
-
-**Warning signs:**
-- `nx graph` shows dependency edges that don't exist in reality
-- `nx affected` rebuilds too many or too few projects
-- Users are confused about why projects are linked
-
-**Phase to address:**
-Phase 2 (dependency detection) -- basic explicit wiring in Phase 1, auto-detection with disambiguation in Phase 2.
+Phase 2 (manual overrides) -- schema extension is the first thing to implement, with backward compat verified immediately.
 
 ---
 
@@ -198,100 +157,92 @@ Phase 2 (dependency detection) -- basic explicit wiring in Phase 1, auto-detecti
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
-| Shell out to `nx graph` per repo instead of reading graph cache | Simple implementation, uses stable CLI API | 5-30 seconds per repo per graph computation, unusable at scale | MVP only, must be replaced before release |
-| Skip external node deduplication | Fewer edge cases to handle | Incorrect dependency edges, broken `affected` command | Never -- at minimum, log warnings on conflicts |
-| Hardcode Nx 22.x graph format | Faster initial development | Plugin breaks when any synced repo upgrades to Nx 23 | MVP only, with version detection that errors on unsupported versions |
-| Clone full repos instead of shallow/sparse | Simpler git operations | Disk space explosion with large repos, slow initial setup | Acceptable for v1 with an option to enable shallow clone later |
-| Synchronous repo processing | Simpler control flow | Graph computation time scales linearly with repo count | Never -- parallel processing is straightforward with `Promise.all` |
+| Keep all edges as `DependencyType.implicit` | No sourceFile resolution needed | No incremental caching by Nx, recomputed every invocation | Never -- performance compounds with scale |
+| Hardcode npm package name = Nx project name | Skip lookup table | Breaks for scoped packages, custom project names -- both very common | Never -- too fragile for real-world repos |
+| Skip negative overrides (only additive) | Simpler override schema and logic | Users cannot suppress false-positive auto-detected edges | MVP only -- plan the data model to support it from day one |
+| Read package.json synchronously in a loop | Simpler code flow | Blocks event loop during graph construction for workspaces with many projects | Never -- async patterns already established in codebase |
+| Store override config in a separate file | Avoids nx.json complexity | Users manage two config files, easy to forget | Never -- nx.json plugin options is the established pattern |
 
 ## Integration Gotchas
 
 | Integration | Common Mistake | Correct Approach |
 |-------------|----------------|------------------|
-| Nx daemon | Testing with daemon enabled, masking stale cache | Always develop with `NX_DAEMON=false` |
-| Nx built-in plugins | Custom plugin settings overwritten by built-in plugins (they run last) | Understand plugin ordering: user plugins run first, built-in plugins can overwrite |
-| Nx sync generators | Blocking task execution with expensive sync checks | Make sync generator check lightweight (compare hashes, not full graph recomputation) |
-| Git operations | Using `child_process.execSync` for git commands | Use `child_process.execFile` or `execa` with proper error handling, timeout, and signal handling |
-| npm/yarn/pnpm lockfiles | Assuming one lockfile format across all repos | Detect package manager per repo (`packageManager` field in `package.json` or lockfile presence) |
-| Nx project graph cache | Reading internal `.nx/` cache files whose format is undocumented | Prefer `nx graph --file=output.json` CLI output which is a more stable API surface |
+| `context.projects` | Assuming all projects are external | Filter by `polyrepo:external` tag or `.repos/` root prefix before scanning package.json |
+| `context.fileMap` | Using fileMap to find package.json files in synced repos | fileMap may exclude gitignored paths (`.repos/`); read from disk using resolved project root paths |
+| `validateDependency` | Not using it during development | Call `validateDependency(dep, context)` in debug/development builds to catch malformed edges early |
+| Existing intra-repo edge loop | Mixing intra-repo and cross-repo edges in the same code path | Keep the existing intra-repo edge loop (lines 120-131 in `index.ts`) separate from cross-repo detection; they have different data sources |
+| Two-layer cache | Adding cross-repo dependency data to the cached `PolyrepoGraphReport` | Compute cross-repo deps in `createDependencies` outside the cache; the report provides node data, detection runs live |
+| `context.projects[dep.source]` guard | Assuming cross-repo edge targets always exist in `context.projects` | Target project might be in an unsynced repo; guard both source and target existence (already done for intra-repo edges) |
 
 ## Performance Traps
 
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|----------------|
-| Spawning `nx graph` per repo on every graph computation | 5-30s per repo, every Nx command slow | Cache repo graphs, invalidate on file changes only | >2 repos |
-| Scanning all files in synced repos for dependency detection | Plugin takes minutes in large repos | Use `package.json` only, not source file scanning | >1000 files per repo |
-| Cloning full git history | Initial setup takes minutes per repo | Default to `--depth=1` shallow clone, with option for full history | Repos with >10k commits |
-| Re-fetching repos on every graph computation | Network I/O on every Nx command | Fetch only on explicit sync command or when cache is stale | Always, even with fast network |
-| Not parallelizing repo processing | Linear scaling: 5 repos = 5x time | `Promise.all` for independent repo operations | >1 repo |
-| Reading all project files into memory | Memory pressure with large repos | Stream/iterate, only load project.json and package.json | >50 projects per repo |
-
-## Security Mistakes
-
-| Mistake | Risk | Prevention |
-|---------|------|------------|
-| Storing git credentials in plugin config | Credential exposure in committed nx.json | Use git credential helpers, SSH keys, or environment variables. Plugin config should only reference repo URLs, not credentials |
-| Cloning arbitrary repos specified in config | Supply chain attack -- malicious repo could contain Nx plugins that execute code during graph computation | Validate repo URLs against an allowlist, warn on first clone of new repos, never auto-install dependencies in synced repos |
-| Running synced repo's Nx plugins in the host process | Malicious plugin code execution in the host workspace | Run graph computation for synced repos in isolated processes (consider `NX_ISOLATE_PLUGINS=true` behavior) |
+| Reading every package.json on every `createDependencies` call | Graph construction adds 100-300ms per repo | Cache the npm-name-to-project lookup table in module-level state, invalidate with the existing hash | 10+ repos with 50+ projects each |
+| N^2 matching: for each project, scan all other projects' deps | Quadratic time complexity visible as graph size grows | Build `Map<npmName, namespacedProjectName>` first, then single-pass each package.json against the map | 500+ projects total |
+| Not deduplicating edges before returning | Nx handles it but wastes allocation and merge time | Use `Map<string, RawProjectGraphDependency>` keyed by `${source}\0${target}` | 1000+ dependency edges |
+| Parsing package.json with `JSON.parse` without caching | Re-reading and re-parsing the same file across multiple detection passes | Use `readJsonFile` from `@nx/devkit` (has its own caching) or cache parsed results in a `Map` | 200+ package.json files |
 
 ## UX Pitfalls
 
 | Pitfall | User Impact | Better Approach |
 |---------|-------------|-----------------|
-| No progress feedback during repo clone/fetch | User thinks tool is frozen during multi-minute clone | Show per-repo progress with streaming git output |
-| Cryptic Nx error when synced repo has broken graph | User sees internal Nx error, doesn't know which repo caused it | Catch errors per-repo, report "Repo X failed graph computation: [reason]" |
-| Requiring manual `nx reset` after config changes | Breaks developer flow, erodes trust in the tool | Detect config changes and auto-invalidate graph cache |
-| Silent fallback when a repo URL is unreachable | User doesn't notice a repo is missing from the graph | Error by default, with `--skip-unavailable` flag for CI resilience |
-| Namespace prefixes make project names long and awkward | `my-org-repo-a/shared-utils` is verbose for daily use | Allow short aliases in config: `{ "repo": "...", "prefix": "a" }` |
+| Silent skip when package.json has no `name` field | User sees no cross-repo deps, doesn't know why | Log verbose warning: "Project X has no package.json name field, skipping cross-repo dependency detection" |
+| No way to see which deps are auto-detected vs manual | Confusing when debugging unexpected `nx affected` results | Log at verbose level distinguishing auto vs override edges; consider metadata on edges |
+| Override typo in project name silently ignored | User thinks override is active but it does nothing | Validate override source/target against known project names at config validation time; warn on unknown names |
+| Cross-repo dep detection runs on unsynced repos | Error or empty results for repos not yet cloned | Skip unsynced repos gracefully (already done for extraction); log that deps for unsynced repos are unavailable |
+| No explanation of WHY a cross-repo edge exists | User sees edge in `nx graph` but doesn't understand the source | In verbose mode, log "Cross-repo dependency: frontend/app -> backend/api (via package.json `@myorg/api` in .repos/frontend/apps/app/package.json)" |
 
 ## "Looks Done But Isn't" Checklist
 
-- [ ] **Graph merging:** Often missing external node conflict resolution -- verify that two repos with different React versions produce a correct graph
-- [ ] **Repo assembly:** Often missing cleanup of repos removed from config -- verify that removing a repo from config also removes its projects from the graph
-- [ ] **Cross-repo dependencies:** Often missing bidirectional edge support -- verify that circular cross-repo dependencies don't crash the graph
-- [ ] **Windows support:** Often missing long path handling -- verify cloning into a deep workspace directory on Windows works
-- [ ] **Error messages:** Often missing repo context in errors -- verify that every error message identifies which synced repo caused it
-- [ ] **Nx affected:** Often missing cross-repo change detection -- verify that a change in repo-b triggers affected projects in repo-a that depend on it
-- [ ] **Plugin options schema:** Often missing JSON schema validation -- verify that invalid config in nx.json produces a helpful error, not a runtime crash
+- [ ] **Auto-detection:** Often missing handling for projects without package.json -- verify detection skips gracefully with a unit test
+- [ ] **Auto-detection:** Often missing scoped npm package names (`@scope/name`) -- verify lookup handles scopes correctly
+- [ ] **Auto-detection:** Often missing devDependencies vs dependencies distinction -- verify only `dependencies` (and optionally `peerDependencies`) are scanned, not `devDependencies`
+- [ ] **Auto-detection:** Often missing the case where an npm dependency name matches an external project but is actually a public npm package -- verify disambiguation logic exists
+- [ ] **Manual overrides:** Often missing validation of project names in overrides -- verify typos produce warnings at config load time
+- [ ] **Manual overrides:** Often missing backward compatibility -- verify a v1.0 config (repos only, no overrides) still parses successfully through v1.1 schema
+- [ ] **Cache:** Often missing cache invalidation for new data sources -- verify that adding a dep to package.json and running `nx graph` shows the new edge without `nx reset`
+- [ ] **Graph:** Often missing cycle detection for plugin-added nodes -- verify that a circular cross-repo dep logs a warning and does not hang Nx
+- [ ] **Edge type:** Often using implicit when static is correct -- verify emitted edges have `type: DependencyType.static` and `sourceFile` set
 
 ## Recovery Strategies
 
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| Project name collision | LOW | Add namespacing, re-run graph computation. No data loss. |
-| Performance regression | MEDIUM | Requires architectural change to add caching layer. May need to change how repo graphs are obtained. |
-| External node version conflict | LOW | Add version-scoped external node names. Requires graph recomputation. |
-| Nx version incompatibility | MEDIUM | Add version adapter layer. Requires understanding both graph formats. |
-| Windows path length failure | LOW | Shorten clone paths, enable `core.longpaths`. May require users to re-clone. |
-| Stale repo graph | LOW | Run sync/fetch. No code changes needed if sync mechanism exists. |
-| False dependency edges | MEDIUM | Requires redesigning detection heuristic. May break users' existing explicit overrides. |
+| Wrong DependencyType (implicit instead of static) | LOW | Change type enum, add sourceFile resolution; no data migration needed |
+| Namespace mismatch (no lookup table) | MEDIUM | Retrofit lookup table into transform pipeline; add `npmName` to `TransformedNode` or build separate index; update tests |
+| Wrong package.json scope | LOW | Fix file path resolution; no architectural change |
+| Circular dependency hangs | LOW | Add cycle detector as a pure function; wrap `createDependencies` output |
+| Cache serving stale deps | LOW | Move detection to `createDependencies` outside cache; add integration test |
+| Schema breaks backward compat | HIGH if released | Patch release with `.optional()` on new fields; cannot un-break already-published versions |
+| Override/auto-detect conflict | MEDIUM | Add dedup logic and precedence rules; requires data flow redesign if not planned upfront |
 
 ## Pitfall-to-Phase Mapping
 
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
-| Project name collisions | Phase 1: Core graph plugin | `nx show projects` shows all projects with unique names from all repos |
-| Plugin performance | Phase 1: Core graph plugin | `NX_PERF_LOGGING=true` shows plugin <2s for 5 repos |
-| External node conflicts | Phase 1: Core graph plugin | `nx graph` with two repos using different React versions shows both |
-| Nx version incompatibility | Phase 1: Core graph plugin | Plugin emits clear error when synced repo uses unsupported Nx version |
-| Windows path issues | Phase 1: Repo assembly | CI matrix includes Windows, cloning works in a 150+ char workspace path |
-| Stale repo state | Phase 2: Repo assembly DX | Sync generator detects and reports stale repos |
-| Cross-repo false deps | Phase 2: Dependency detection | Manual override + auto-detection with disambiguation warnings |
-| Daemon caching during dev | Phase 1: Developer setup | CONTRIBUTING.md documents required env vars, npm scripts include them |
+| DependencyType.implicit overuse | Phase 1 (auto-detection) | Unit test: emitted deps have `type: DependencyType.static` and valid `sourceFile` |
+| Namespace mismatch | Phase 1 (auto-detection) | Unit test: scoped npm name `@org/foo` in repo `backend` resolves to `backend/foo-project` |
+| Wrong package.json scope | Phase 1 (auto-detection) | Unit test: host root and child repo root package.json deps are NOT included in cross-repo edges |
+| Circular dependency crash | Phase 1 (auto-detection) | Unit test: circular dep pair emits warning and omits cycle-creating edge |
+| Cache staleness | Phase 1 (auto-detection) | Integration test: add dep to package.json, verify `nx graph` shows edge without `nx reset` |
+| Override/auto-detect conflict | Phase 2 (manual overrides) | Unit test: manual override for same source+target replaces auto-detected edge |
+| Schema backward compat | Phase 2 (manual overrides) | Unit test: v1.0 config shape (repos only) parses through v1.1 schema successfully |
 
 ## Sources
 
-- [Extending the Project Graph | Nx](https://nx.dev/docs/extending-nx/project-graph-plugins) -- official plugin API docs (HIGH confidence)
-- [CreateNodes Compatibility | Nx](https://nx.dev/docs/extending-nx/createnodes-compatibility) -- v1 to v2 migration (HIGH confidence)
-- [Sync Generators | Nx](https://nx.dev/docs/concepts/sync-generators) -- sync generator concepts (HIGH confidence)
-- [GitHub #26297: Slow CLI with local plugins](https://github.com/nrwl/nx/issues/26297) -- performance issues (HIGH confidence)
-- [GitHub #29503: createNodesV2 crashes project graph](https://github.com/nrwl/nx/issues/29503) -- daemon caching bug (HIGH confidence)
-- [GitHub #32788: CI hanging at creating project graph](https://github.com/nrwl/nx/issues/32788) -- plugin timeout (HIGH confidence)
-- [GitHub #19520: External dependencies missing on Windows](https://github.com/nrwl/nx/issues/19520) -- Windows external nodes bug (HIGH confidence)
-- [GitHub #33582: prune-lockfile excludes transitive deps](https://github.com/nrwl/nx/issues/33582) -- name vs root keying bug (MEDIUM confidence)
-- [5 Hurdles of Multi-Repo Management | GitKraken](https://www.gitkraken.com/blog/multi-repo-management-hurdles-and-solutions) -- polyrepo DX patterns (MEDIUM confidence)
-- [mu-repo documentation](https://fabioz.github.io/mu-repo/) -- multi-repo tool patterns (MEDIUM confidence)
+- [Extending the Project Graph | Nx](https://nx.dev/docs/extending-nx/project-graph-plugins) -- authoritative `createDependencies` API reference (HIGH confidence)
+- [DependencyType | Nx](https://nx.dev/nx-api/devkit/documents/DependencyType) -- enum values and semantics (HIGH confidence)
+- [StaticDependency | Nx](https://nx.dev/docs/reference/devkit/StaticDependency) -- sourceFile requirement (HIGH confidence)
+- [Circular dependencies not caught for plugin nodes - nrwl/nx#7546](https://github.com/nrwl/nx/issues/7546) -- confirms cycle detection gap for plugin-contributed edges (HIGH confidence)
+- [All projects affected too often - nrwl/nx Discussion #5580](https://github.com/nrwl/nx/discussions/5580) -- implicit dep recomputation cost and `projectsAffectedByDependencyUpdates` (HIGH confidence)
+- [Implicit Dependencies Management with Nx](https://dev.to/this-is-learning/implicit-dependencies-management-with-nx-a-practical-guide-through-real-world-case-studies-59kd) -- practical guide on dependency types (MEDIUM confidence)
+- `node_modules/nx/src/project-graph/project-graph-builder.d.ts` -- verified `RawProjectGraphDependency = ImplicitDependency | StaticDependency | DynamicDependency`, `StaticDependency.sourceFile` is required for non-external-nodes (HIGH confidence, primary source)
+- `packages/op-nx-polyrepo/src/index.ts` -- existing `createDependencies` uses `DependencyType.implicit` at line 127, guards with `context.projects[dep.source]` (HIGH confidence, codebase)
+- `packages/op-nx-polyrepo/src/lib/graph/transform.ts` -- `TransformedNode` has no npm package name field currently (HIGH confidence, codebase)
+- `packages/op-nx-polyrepo/src/lib/config/schema.ts` -- `polyrepoConfigSchema` uses `.strict()` on repo entries (HIGH confidence, codebase)
+- `packages/op-nx-polyrepo/src/lib/graph/cache.ts` -- two-layer cache hashes `optionsHash + HEAD SHA + dirty files` (HIGH confidence, codebase)
 
 ---
-*Pitfalls research for: Nx plugin for synthetic monorepo / polyrepo graph merging*
-*Researched: 2026-03-10*
+*Pitfalls research for: cross-repo dependency detection and manual overrides in Nx polyrepo plugin (v1.1)*
+*Researched: 2026-03-17*
