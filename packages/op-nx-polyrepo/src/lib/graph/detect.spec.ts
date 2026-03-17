@@ -1171,4 +1171,559 @@ describe('detectCrossRepoDependencies', () => {
     });
   });
 
+  // -------------------------------------------------------------------------
+  // OVRD-01: Explicit override edge emission
+  // -------------------------------------------------------------------------
+
+  describe('OVRD-01 — explicit override edge emission', () => {
+    it('exact project name in implicitDependencies emits one implicit edge without sourceFile', () => {
+      function setup() {
+        vi.clearAllMocks();
+        vi.mocked(readFileSync).mockReturnValue('{}');
+
+        const report = makeReport({
+          'repo-a': {
+            nodes: {
+              'repo-a/my-app': makeExternalNode({
+                name: 'repo-a/my-app',
+                root: '.repos/repo-a/apps/my-app',
+              }),
+            },
+            dependencies: [],
+          },
+          'repo-b': {
+            nodes: {
+              'repo-b/my-lib': makeExternalNode({
+                name: 'repo-b/my-lib',
+                root: '.repos/repo-b/libs/my-lib',
+              }),
+            },
+            dependencies: [],
+          },
+        });
+
+        const config: PolyrepoConfig = {
+          repos: { 'repo-a': 'https://github.com/org/repo-a.git' },
+          implicitDependencies: {
+            'repo-a/my-app': ['repo-b/my-lib'],
+          },
+        };
+
+        const context = makeContext({
+          // register both in context.projects so they appear in override validation
+          // (they are external nodes, not host projects, but for override validation
+          // context.projects is not used — project names come from report.repos)
+        });
+
+        return { report, config, context };
+      }
+
+      const { report, config, context } = setup();
+      const edges = detectCrossRepoDependencies(report, config, context);
+
+      expect(edges).toHaveLength(1);
+      expect(edges[0]).toStrictEqual({
+        source: 'repo-a/my-app',
+        target: 'repo-b/my-lib',
+        type: DependencyType.implicit,
+      });
+    });
+
+    it('glob key matches multiple source projects and emits one implicit edge per matched source', () => {
+      function setup() {
+        vi.clearAllMocks();
+        vi.mocked(readFileSync).mockReturnValue('{}');
+
+        const report = makeReport({
+          'repo-a': {
+            nodes: {
+              'repo-a/app1': makeExternalNode({
+                name: 'repo-a/app1',
+                root: '.repos/repo-a/apps/app1',
+              }),
+              'repo-a/app2': makeExternalNode({
+                name: 'repo-a/app2',
+                root: '.repos/repo-a/apps/app2',
+              }),
+            },
+            dependencies: [],
+          },
+          'repo-b': {
+            nodes: {
+              'repo-b/my-lib': makeExternalNode({
+                name: 'repo-b/my-lib',
+                root: '.repos/repo-b/libs/my-lib',
+              }),
+            },
+            dependencies: [],
+          },
+        });
+
+        const config: PolyrepoConfig = {
+          repos: { 'repo-a': 'https://github.com/org/repo-a.git' },
+          implicitDependencies: {
+            'repo-a/*': ['repo-b/my-lib'],
+          },
+        };
+
+        const context = makeContext();
+
+        return { report, config, context };
+      }
+
+      const { report, config, context } = setup();
+      const edges = detectCrossRepoDependencies(report, config, context);
+
+      expect(edges).toHaveLength(2);
+
+      const sources = edges.map((e) => e.source).sort();
+      expect(sources).toEqual(['repo-a/app1', 'repo-a/app2']);
+      expect(edges.every((e) => e.target === 'repo-b/my-lib')).toBe(true);
+      expect(edges.every((e) => e.type === DependencyType.implicit)).toBe(true);
+    });
+
+    it('glob target matches multiple target projects and emits one implicit edge per matched target', () => {
+      function setup() {
+        vi.clearAllMocks();
+        vi.mocked(readFileSync).mockReturnValue('{}');
+
+        const report = makeReport({
+          'repo-a': {
+            nodes: {
+              'repo-a/my-app': makeExternalNode({
+                name: 'repo-a/my-app',
+                root: '.repos/repo-a/apps/my-app',
+              }),
+            },
+            dependencies: [],
+          },
+          'repo-b': {
+            nodes: {
+              'repo-b/lib1': makeExternalNode({
+                name: 'repo-b/lib1',
+                root: '.repos/repo-b/libs/lib1',
+              }),
+              'repo-b/lib2': makeExternalNode({
+                name: 'repo-b/lib2',
+                root: '.repos/repo-b/libs/lib2',
+              }),
+            },
+            dependencies: [],
+          },
+        });
+
+        const config: PolyrepoConfig = {
+          repos: { 'repo-a': 'https://github.com/org/repo-a.git' },
+          implicitDependencies: {
+            'repo-a/my-app': ['repo-b/*'],
+          },
+        };
+
+        const context = makeContext();
+
+        return { report, config, context };
+      }
+
+      const { report, config, context } = setup();
+      const edges = detectCrossRepoDependencies(report, config, context);
+
+      expect(edges).toHaveLength(2);
+
+      const targets = edges.map((e) => e.target).sort();
+      expect(targets).toEqual(['repo-b/lib1', 'repo-b/lib2']);
+      expect(edges.every((e) => e.source === 'repo-a/my-app')).toBe(true);
+      expect(edges.every((e) => e.type === DependencyType.implicit)).toBe(true);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // OVRD-02: Negation suppression
+  // -------------------------------------------------------------------------
+
+  describe('OVRD-02 — negation suppression', () => {
+    it('!target negation suppresses an auto-detected edge from the output', () => {
+      function setup() {
+        vi.clearAllMocks();
+        vi.mocked(readFileSync).mockReturnValue('{}');
+
+        const report = makeReport({
+          'repo-a': {
+            nodes: {
+              'repo-a/my-app': makeExternalNode({
+                name: 'repo-a/my-app',
+                root: '.repos/repo-a/apps/my-app',
+                dependencies: ['@scope/my-lib'],
+              }),
+            },
+            dependencies: [],
+          },
+          'repo-b': {
+            nodes: {
+              'repo-b/my-lib': makeExternalNode({
+                name: 'repo-b/my-lib',
+                root: '.repos/repo-b/libs/my-lib',
+                packageName: '@scope/my-lib',
+              }),
+            },
+            dependencies: [],
+          },
+        });
+
+        const config: PolyrepoConfig = {
+          repos: { 'repo-a': 'https://github.com/org/repo-a.git' },
+          implicitDependencies: {
+            'repo-a/my-app': ['!repo-b/my-lib'],
+          },
+        };
+
+        const context = makeContext();
+
+        return { report, config, context };
+      }
+
+      const { report, config, context } = setup();
+      const edges = detectCrossRepoDependencies(report, config, context);
+
+      expect(edges).toHaveLength(0);
+    });
+
+    it('negation removes only the specific source+target pair; other edges from same source are kept', () => {
+      function setup() {
+        vi.clearAllMocks();
+        vi.mocked(readFileSync).mockReturnValue('{}');
+
+        const report = makeReport({
+          'repo-a': {
+            nodes: {
+              'repo-a/my-app': makeExternalNode({
+                name: 'repo-a/my-app',
+                root: '.repos/repo-a/apps/my-app',
+                dependencies: ['@scope/lib1', '@scope/lib2'],
+              }),
+            },
+            dependencies: [],
+          },
+          'repo-b': {
+            nodes: {
+              'repo-b/lib1': makeExternalNode({
+                name: 'repo-b/lib1',
+                root: '.repos/repo-b/libs/lib1',
+                packageName: '@scope/lib1',
+              }),
+              'repo-b/lib2': makeExternalNode({
+                name: 'repo-b/lib2',
+                root: '.repos/repo-b/libs/lib2',
+                packageName: '@scope/lib2',
+              }),
+            },
+            dependencies: [],
+          },
+        });
+
+        // Suppress only repo-b/lib1; lib2 should still be emitted
+        const config: PolyrepoConfig = {
+          repos: { 'repo-a': 'https://github.com/org/repo-a.git' },
+          implicitDependencies: {
+            'repo-a/my-app': ['!repo-b/lib1'],
+          },
+        };
+
+        const context = makeContext();
+
+        return { report, config, context };
+      }
+
+      const { report, config, context } = setup();
+      const edges = detectCrossRepoDependencies(report, config, context);
+
+      expect(edges).toHaveLength(1);
+      expect(edges[0]).toMatchObject({
+        source: 'repo-a/my-app',
+        target: 'repo-b/lib2',
+        type: DependencyType.static,
+      });
+    });
+
+    it('negation suppresses edges detected via package.json AND tsconfig alias', () => {
+      function setup() {
+        vi.clearAllMocks();
+
+        vi.mocked(readFileSync).mockImplementation((path) => {
+          const p = String(path);
+
+          if (p.endsWith('repo-b/tsconfig.base.json')) {
+            return JSON.stringify({
+              compilerOptions: {
+                paths: {
+                  '@acme/core': ['libs/core/src/index.ts'],
+                },
+              },
+            });
+          }
+
+          return '{}';
+        });
+
+        const report = makeReport({
+          'repo-a': {
+            nodes: {
+              'repo-a/my-app': makeExternalNode({
+                name: 'repo-a/my-app',
+                root: '.repos/repo-a/apps/my-app',
+                dependencies: ['@acme/core'],
+              }),
+            },
+            dependencies: [],
+          },
+          'repo-b': {
+            nodes: {
+              'repo-b/core': makeExternalNode({
+                name: 'repo-b/core',
+                root: '.repos/repo-b/libs/core',
+              }),
+            },
+            dependencies: [],
+          },
+        });
+
+        const config: PolyrepoConfig = {
+          repos: { 'repo-a': 'https://github.com/org/repo-a.git' },
+          implicitDependencies: {
+            'repo-a/my-app': ['!repo-b/core'],
+          },
+        };
+
+        const context = makeContext();
+
+        return { report, config, context };
+      }
+
+      const { report, config, context } = setup();
+      const edges = detectCrossRepoDependencies(report, config, context);
+
+      expect(edges).toHaveLength(0);
+    });
+
+    it('positive override wins over negation when both explicit and negation target the same pair', () => {
+      function setup() {
+        vi.clearAllMocks();
+        vi.mocked(readFileSync).mockReturnValue('{}');
+
+        const report = makeReport({
+          'repo-a': {
+            nodes: {
+              'repo-a/my-app': makeExternalNode({
+                name: 'repo-a/my-app',
+                root: '.repos/repo-a/apps/my-app',
+              }),
+            },
+            dependencies: [],
+          },
+          'repo-b': {
+            nodes: {
+              'repo-b/my-lib': makeExternalNode({
+                name: 'repo-b/my-lib',
+                root: '.repos/repo-b/libs/my-lib',
+              }),
+            },
+            dependencies: [],
+          },
+        });
+
+        // Both positive and negation for same pair — negation suppresses auto-detect;
+        // positive override explicitly adds it; net result: edge IS emitted (as implicit)
+        const config: PolyrepoConfig = {
+          repos: { 'repo-a': 'https://github.com/org/repo-a.git' },
+          implicitDependencies: {
+            'repo-a/my-app': ['repo-b/my-lib', '!repo-b/my-lib'],
+          },
+        };
+
+        const context = makeContext();
+
+        return { report, config, context };
+      }
+
+      const { report, config, context } = setup();
+      const edges = detectCrossRepoDependencies(report, config, context);
+
+      // Negation filters auto-detected (none here anyway), override emission adds implicit edge
+      // So net result: 1 implicit edge from override emission
+      expect(edges).toHaveLength(1);
+      expect(edges[0]).toMatchObject({
+        source: 'repo-a/my-app',
+        target: 'repo-b/my-lib',
+        type: DependencyType.implicit,
+      });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // OVRD-03: Unknown project validation
+  // -------------------------------------------------------------------------
+
+  describe('OVRD-03 — unknown project validation', () => {
+    it('unknown key pattern that matches zero projects throws with the unknown name', () => {
+      function setup() {
+        vi.clearAllMocks();
+        vi.mocked(readFileSync).mockReturnValue('{}');
+
+        const report = makeReport({
+          'repo-b': {
+            nodes: {
+              'repo-b/my-lib': makeExternalNode({
+                name: 'repo-b/my-lib',
+                root: '.repos/repo-b/libs/my-lib',
+              }),
+            },
+            dependencies: [],
+          },
+        });
+
+        const config: PolyrepoConfig = {
+          repos: { 'repo-a': 'https://github.com/org/repo-a.git' },
+          implicitDependencies: {
+            'nx/missing-lib': ['repo-b/my-lib'],
+          },
+        };
+
+        const context = makeContext();
+
+        return { report, config, context };
+      }
+
+      const { report, config, context } = setup();
+
+      expect(() => detectCrossRepoDependencies(report, config, context)).toThrow(
+        'Unknown projects in implicitDependencies: nx/missing-lib',
+      );
+    });
+
+    it('unknown target pattern that matches zero projects throws with the unknown name', () => {
+      function setup() {
+        vi.clearAllMocks();
+        vi.mocked(readFileSync).mockReturnValue('{}');
+
+        const report = makeReport({
+          'repo-a': {
+            nodes: {
+              'repo-a/my-app': makeExternalNode({
+                name: 'repo-a/my-app',
+                root: '.repos/repo-a/apps/my-app',
+              }),
+            },
+            dependencies: [],
+          },
+        });
+
+        const config: PolyrepoConfig = {
+          repos: { 'repo-a': 'https://github.com/org/repo-a.git' },
+          implicitDependencies: {
+            'repo-a/my-app': ['repo-b/ghost'],
+          },
+        };
+
+        const context = makeContext();
+
+        return { report, config, context };
+      }
+
+      const { report, config, context } = setup();
+
+      expect(() => detectCrossRepoDependencies(report, config, context)).toThrow(
+        'Unknown projects in implicitDependencies: repo-b/ghost',
+      );
+    });
+
+    it('both unknown key AND unknown target are reported in a single throw', () => {
+      function setup() {
+        vi.clearAllMocks();
+        vi.mocked(readFileSync).mockReturnValue('{}');
+
+        const report = makeReport({});
+
+        const config: PolyrepoConfig = {
+          repos: { 'repo-a': 'https://github.com/org/repo-a.git' },
+          implicitDependencies: {
+            'nx/missing-lib': ['repo-b/ghost'],
+          },
+        };
+
+        const context = makeContext();
+
+        return { report, config, context };
+      }
+
+      const { report, config, context } = setup();
+
+      expect(() => detectCrossRepoDependencies(report, config, context)).toThrow(
+        /Unknown projects in implicitDependencies:.*nx\/missing-lib.*repo-b\/ghost/,
+      );
+    });
+
+    it('negation target that matches zero projects also throws', () => {
+      function setup() {
+        vi.clearAllMocks();
+        vi.mocked(readFileSync).mockReturnValue('{}');
+
+        const report = makeReport({
+          'repo-a': {
+            nodes: {
+              'repo-a/my-app': makeExternalNode({
+                name: 'repo-a/my-app',
+                root: '.repos/repo-a/apps/my-app',
+              }),
+            },
+            dependencies: [],
+          },
+        });
+
+        const config: PolyrepoConfig = {
+          repos: { 'repo-a': 'https://github.com/org/repo-a.git' },
+          implicitDependencies: {
+            'repo-a/my-app': ['!repo-b/ghost'],
+          },
+        };
+
+        const context = makeContext();
+
+        return { report, config, context };
+      }
+
+      const { report, config, context } = setup();
+
+      expect(() => detectCrossRepoDependencies(report, config, context)).toThrow(
+        'Unknown projects in implicitDependencies: repo-b/ghost',
+      );
+    });
+
+    it('config with no implicitDependencies field does not throw', () => {
+      function setup() {
+        vi.clearAllMocks();
+        vi.mocked(readFileSync).mockReturnValue('{}');
+
+        const report = makeReport({
+          'repo-b': {
+            nodes: {
+              'repo-b/my-lib': makeExternalNode({
+                name: 'repo-b/my-lib',
+                root: '.repos/repo-b/libs/my-lib',
+              }),
+            },
+            dependencies: [],
+          },
+        });
+
+        const config = makeConfig(); // no implicitDependencies
+        const context = makeContext();
+
+        return { report, config, context };
+      }
+
+      const { report, config, context } = setup();
+
+      expect(() => detectCrossRepoDependencies(report, config, context)).not.toThrow();
+    });
+  });
+
 });
