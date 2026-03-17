@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { TargetConfiguration } from '@nx/devkit';
 import type { ExternalGraphJson, TransformedNode } from './types';
 
@@ -78,7 +80,7 @@ function createProxyTarget(
 export function transformGraphForRepo(
   repoAlias: string,
   rawGraph: ExternalGraphJson,
-  _workspaceRoot: string,
+  workspaceRoot: string,
 ): {
   nodes: Record<string, TransformedNode>;
   dependencies: Array<{ source: string; target: string; type: string }>;
@@ -97,6 +99,35 @@ export function transformGraphForRepo(
     const hostSourceRoot = node.data.sourceRoot
       ? normalizePath(`.repos/${repoAlias}/${node.data.sourceRoot}`)
       : undefined;
+
+    // Extract package name from typed metadata
+    const packageName = node.data.metadata?.js?.packageName;
+
+    // Read dependency lists from package.json on disk
+    // Use original node.data.root (not rewritten hostRoot) to avoid double-path
+    const repoBasePath = join(workspaceRoot, '.repos', repoAlias);
+    const pkgJsonPath = join(repoBasePath, node.data.root, 'package.json');
+    let nodeDependencies: string[] | undefined;
+    let nodeDevDependencies: string[] | undefined;
+    let nodePeerDependencies: string[] | undefined;
+
+    try {
+      const raw = JSON.parse(readFileSync(pkgJsonPath, 'utf-8') as string);
+
+      if (raw.dependencies && typeof raw.dependencies === 'object') {
+        nodeDependencies = Object.keys(raw.dependencies);
+      }
+
+      if (raw.devDependencies && typeof raw.devDependencies === 'object') {
+        nodeDevDependencies = Object.keys(raw.devDependencies);
+      }
+
+      if (raw.peerDependencies && typeof raw.peerDependencies === 'object') {
+        nodePeerDependencies = Object.keys(raw.peerDependencies);
+      }
+    } catch {
+      // No package.json or parse error -- silent skip
+    }
 
     // Rewrite targets
     const proxyTargets: Record<string, TargetConfiguration> = {};
@@ -127,6 +158,10 @@ export function transformGraphForRepo(
       targets: proxyTargets,
       tags,
       metadata: node.data.metadata,
+      packageName: typeof packageName === 'string' ? packageName : undefined,
+      dependencies: nodeDependencies,
+      devDependencies: nodeDevDependencies,
+      peerDependencies: nodePeerDependencies,
     };
   }
 
