@@ -277,6 +277,92 @@ describe('polyrepoConfig schema', () => {
   });
 });
 
+describe('implicitDependencies', () => {
+  it('v1.0 config (repos only, no implicitDependencies) parses successfully', () => {
+    const result = polyrepoConfigSchema.safeParse({
+      repos: { 'repo-a': 'git@github.com:org/repo-a.git' },
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts config with valid implicitDependencies record', () => {
+    const result = polyrepoConfigSchema.safeParse({
+      repos: { 'repo-a': 'git@github.com:org/repo-a.git' },
+      implicitDependencies: {
+        'my-app': ['repo-b/my-lib', 'repo-c/shared-utils'],
+      },
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts implicitDependencies with glob patterns and negation', () => {
+    const result = polyrepoConfigSchema.safeParse({
+      repos: { 'repo-a': 'git@github.com:org/repo-a.git' },
+      implicitDependencies: {
+        'nx/*': ['repo-b/my-lib'],
+        '!nx/unused': ['repo-c/util'],
+      },
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts implicitDependencies with empty record ({})', () => {
+    const result = polyrepoConfigSchema.safeParse({
+      repos: { 'repo-a': 'git@github.com:org/repo-a.git' },
+      implicitDependencies: {},
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts implicitDependencies with empty array value', () => {
+    const result = polyrepoConfigSchema.safeParse({
+      repos: { 'repo-a': 'git@github.com:org/repo-a.git' },
+      implicitDependencies: {
+        'my-app': [],
+      },
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects implicitDependencies with empty string in key', () => {
+    const result = polyrepoConfigSchema.safeParse({
+      repos: { 'repo-a': 'git@github.com:org/repo-a.git' },
+      implicitDependencies: {
+        '': ['repo-b/my-lib'],
+      },
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects implicitDependencies with empty string in target array value', () => {
+    const result = polyrepoConfigSchema.safeParse({
+      repos: { 'repo-a': 'git@github.com:org/repo-a.git' },
+      implicitDependencies: {
+        'my-app': [''],
+      },
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('PolyrepoConfig type infers implicitDependencies as optional Record<string, string[]>', () => {
+    const config: PolyrepoConfig = {
+      repos: { 'repo-a': 'git@github.com:org/repo-a.git' },
+      implicitDependencies: {
+        'my-app': ['repo-b/my-lib'],
+      },
+    };
+
+    expect(config.implicitDependencies).toBeDefined();
+  });
+});
+
 describe(normalizeRepos, () => {
   it('converts string URL to remote entry with defaults', () => {
     const config: PolyrepoConfig = {
