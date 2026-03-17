@@ -51,7 +51,10 @@ Plans:
   3. Given explicit dependency overrides in plugin config, the detection function emits those edges even when no package.json or tsconfig relationship exists
   4. Given a negation override for an auto-detected edge, the detection function suppresses that edge from the output
   5. Plugin fails at load time with a clear error when an override references a project name not present in the merged graph
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 09-01-PLAN.md -- Build lookup map and package.json dep-list detection (DETECT-01, DETECT-02, DETECT-03)
+- [ ] 09-02-PLAN.md -- Tsconfig path alias expansion, override emission, negation, and validation (DETECT-04, OVRD-01, OVRD-02, OVRD-03)
 
 ### Phase 10: Integration and End-to-End Validation
 **Goal**: Cross-repo dependency edges flow through the full plugin pipeline and are observable in standard Nx CLI commands
@@ -77,8 +80,8 @@ Phases execute in numeric order: 8 -> 9 -> 10
 | 5. Maximum Type Safety | v1.0 | 6/6 | Complete | 2026-03-13 |
 | 6. Add e2e Container | v1.0 | 3/3 | Complete | 2026-03-16 |
 | 7. v1.0 Tech Debt Cleanup | v1.0 | 2/2 | Complete | 2026-03-16 |
-| 8. Schema Extension and Data Extraction | 1/1 | Complete   | 2026-03-17 | - |
-| 9. Cross-repo Dependency Detection | v1.1 | 0/0 | Not started | - |
+| 8. Schema Extension and Data Extraction | v1.1 | 1/1 | Complete | 2026-03-17 |
+| 9. Cross-repo Dependency Detection | v1.1 | 0/2 | Not started | - |
 | 10. Integration and End-to-End Validation | v1.1 | 0/0 | Not started | - |
 
 ---
