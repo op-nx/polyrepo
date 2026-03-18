@@ -10,6 +10,7 @@ import { DependencyType, logger } from '@nx/devkit';
 import { hashObject } from 'nx/src/devkit-internals';
 import type { PolyrepoConfig } from './lib/config/schema';
 import { populateGraphReport } from './lib/graph/cache';
+import { detectCrossRepoDependencies } from './lib/graph/detect';
 import type { PolyrepoGraphReport } from './lib/graph/types';
 import {
   validateConfig,
@@ -102,9 +103,10 @@ export const createDependencies: CreateDependencies<PolyrepoConfig> = async (
 
   // Defensive: re-populate in case createNodesV2 hasn't run yet
   let report: PolyrepoGraphReport | undefined;
+  let config: PolyrepoConfig;
 
   try {
-    const config = validateConfig(options);
+    config = validateConfig(options);
     const optionsHash = hashObject(options ?? {});
 
     report = await populateGraphReport(
@@ -117,6 +119,7 @@ export const createDependencies: CreateDependencies<PolyrepoConfig> = async (
     return dependencies;
   }
 
+  // Intra-repo edges (existing behavior)
   for (const [, repoReport] of Object.entries(report.repos)) {
     for (const dep of repoReport.dependencies) {
       // Only add if both source and target exist in the current project graph
@@ -129,6 +132,11 @@ export const createDependencies: CreateDependencies<PolyrepoConfig> = async (
       }
     }
   }
+
+  // Cross-repo edges -- NOT wrapped in try/catch
+  // OVRD-03 validation errors intentionally propagate to Nx
+  const crossRepoDeps = detectCrossRepoDependencies(report, config, context);
+  dependencies.push(...crossRepoDeps);
 
   return dependencies;
 };
