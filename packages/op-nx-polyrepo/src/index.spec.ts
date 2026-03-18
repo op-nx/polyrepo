@@ -91,16 +91,24 @@ function setup() {
 /**
  * Create a minimal CreateDependenciesContext for testing.
  * Uses properly typed fields instead of stub casts.
+ *
+ * @param projects - Projects to register in `context.projects`
+ * @param excludeFromFileMap - Project names to omit from `projectFileMap`
+ *   (simulates external projects in .repos/ that have no tracked files)
  */
 function createDepContext(
   projects: Record<string, { root: string }>,
+  excludeFromFileMap: string[] = [],
 ): CreateDependenciesContext {
   // Populate projectFileMap with a dummy entry for each project so that
   // the fileMap guard in createDependencies doesn't filter out edges.
   const projectFileMap: Record<string, Array<{ file: string }>> = {};
+  const excludeSet = new Set(excludeFromFileMap);
 
   for (const name of Object.keys(projects)) {
-    projectFileMap[name] = [{ file: `${projects[name]?.root ?? '.'}/package.json`, hash: '' }];
+    if (!excludeSet.has(name)) {
+      projectFileMap[name] = [{ file: `${projects[name]?.root ?? '.'}/package.json`, hash: '' }];
+    }
   }
 
   return {
@@ -570,6 +578,102 @@ describe(createDependencies, () => {
       expect.objectContaining({ repos: expect.any(Object) }),
       depContext,
     );
+  });
+
+  it('includes cross-repo edges when target has no fileMap entry', async () => {
+    expect.hasAssertions();
+
+    const { mockedPopulateGraphReport, mockedDetectCrossRepoDeps } = setup();
+
+    const report: PolyrepoGraphReport = {
+      repos: {
+        'repo-a': {
+          nodes: {},
+          dependencies: [],
+        },
+      },
+    };
+
+    mockedPopulateGraphReport.mockResolvedValue(report);
+    mockedDetectCrossRepoDeps.mockReturnValue([
+      {
+        source: 'host-app',
+        target: 'repo-a/lib',
+        type: DependencyType.implicit,
+      },
+    ]);
+
+    // repo-a/lib is registered in context.projects but excluded from
+    // fileMap -- simulates an external project in .repos/ whose files
+    // are gitignored and therefore absent from Nx's projectFileMap.
+    const depContext = createDepContext(
+      {
+        'host-app': { root: 'apps/host-app' },
+        'repo-a/lib': { root: '.repos/repo-a/libs/lib' },
+      },
+      ['repo-a/lib'],
+    );
+
+    const options = {
+      repos: { 'repo-a': 'git@github.com:org/repo-a.git' },
+    };
+
+    const deps = await createDependencies(options, depContext);
+
+    expect(deps).toContainEqual({
+      source: 'host-app',
+      target: 'repo-a/lib',
+      type: 'implicit',
+    });
+    expect(deps).toHaveLength(1);
+  });
+
+  it('filters intra-repo edges where target is not in context.projects', async () => {
+    expect.hasAssertions();
+
+    const { mockedPopulateGraphReport } = setup();
+
+    const report: PolyrepoGraphReport = {
+      repos: {
+        'repo-a': {
+          nodes: {},
+          dependencies: [
+            {
+              source: 'repo-a/my-app',
+              target: 'repo-a/missing-project',
+              type: 'static',
+            },
+            {
+              source: 'repo-a/my-app',
+              target: 'repo-a/my-lib',
+              type: 'static',
+            },
+          ],
+        },
+      },
+    };
+
+    mockedPopulateGraphReport.mockResolvedValue(report);
+
+    // repo-a/missing-project is NOT registered in context.projects at all
+    const depContext = createDepContext({
+      'repo-a/my-app': { root: '.repos/repo-a/apps/my-app' },
+      'repo-a/my-lib': { root: '.repos/repo-a/libs/my-lib' },
+    });
+
+    const options = {
+      repos: { 'repo-a': 'git@github.com:org/repo-a.git' },
+    };
+
+    const deps = await createDependencies(options, depContext);
+
+    // Only the edge to repo-a/my-lib should be included
+    expect(deps).toHaveLength(1);
+    expect(deps[0]).toStrictEqual({
+      source: 'repo-a/my-app',
+      target: 'repo-a/my-lib',
+      type: 'implicit',
+    });
   });
 
   it('propagates detectCrossRepoDependencies errors (OVRD-03)', async () => {
