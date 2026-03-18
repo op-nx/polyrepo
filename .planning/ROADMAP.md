@@ -24,7 +24,7 @@
 
 - [x] **Phase 8: Schema Extension and Data Extraction** - Config schema for overrides + package name/dependency extraction pipeline (completed 2026-03-17)
 - [x] **Phase 9: Cross-repo Dependency Detection** - Pure detection function with auto-detection, overrides, negation, and cycle safety (completed 2026-03-17)
-- [x] **Phase 10: Integration and End-to-End Validation** - Wire detection into createDependencies, verify nx graph and nx affected work cross-repo (completed 2026-03-18)
+- [ ] **Phase 10: Integration and End-to-End Validation** - Wire detection into createDependencies, verify nx graph and nx affected work cross-repo (gap closure in progress)
 
 ## Phase Details
 
@@ -39,7 +39,7 @@
   4. After graph extraction, every external project's package.json dependency fields (dependencies, devDependencies, peerDependencies) are read from disk and stored on its `TransformedNode`, cached by the existing two-layer cache
 **Plans**: 1 plan
 Plans:
-- [ ] 08-01-PLAN.md -- Extend config schema, graph types, and transform with package name extraction and dependency list reading
+- [x] 08-01-PLAN.md -- Extend config schema, graph types, and transform with package name extraction and dependency list reading
 
 ### Phase 9: Cross-repo Dependency Detection
 **Goal**: A pure function correctly identifies cross-repo dependency edges from package.json declarations, applies user overrides and negations, and handles edge cases (cycles, scoped packages, namespace mismatches)
@@ -53,8 +53,8 @@ Plans:
   5. Plugin fails at load time with a clear error when an override references a project name not present in the merged graph
 **Plans**: 2 plans
 Plans:
-- [ ] 09-01-PLAN.md -- Build lookup map and package.json dep-list detection (DETECT-01, DETECT-02, DETECT-03)
-- [ ] 09-02-PLAN.md -- Tsconfig path alias expansion, override emission, negation, and validation (DETECT-04, OVRD-01, OVRD-02, OVRD-03)
+- [x] 09-01-PLAN.md -- Build lookup map and package.json dep-list detection (DETECT-01, DETECT-02, DETECT-03)
+- [x] 09-02-PLAN.md -- Tsconfig path alias expansion, override emission, negation, and validation (DETECT-04, OVRD-01, OVRD-02, OVRD-03)
 
 ### Phase 10: Integration and End-to-End Validation
 **Goal**: Cross-repo dependency edges flow through the full plugin pipeline and are observable in standard Nx CLI commands
@@ -64,10 +64,11 @@ Plans:
   1. Running `nx graph` on a host workspace with synced repos shows cross-repo dependency edges between projects from different repos
   2. After modifying a file in repo A, `nx affected` lists dependent projects in repo B that declare a package.json dependency on repo A's package
   3. E2E tests (testcontainers) validate auto-detected edges, explicit override edges, and negation suppression against real Nx CLI output
-**Plans**: 2 plans
+**Plans**: 3 plans
 Plans:
-- [ ] 10-01-PLAN.md -- Wire detectCrossRepoDependencies into createDependencies, add integration tests, document DETECT-07 deferral
-- [ ] 10-02-PLAN.md -- E2e tests for cross-repo auto-detection, overrides, and negation suppression
+- [x] 10-01-PLAN.md -- Wire detectCrossRepoDependencies into createDependencies, add integration tests, document DETECT-07 deferral
+- [x] 10-02-PLAN.md -- E2e tests for cross-repo auto-detection, overrides, and negation suppression
+- [ ] 10-03-PLAN.md -- Gap closure: fix fileMap guard dropping cross-repo edges, restore auto-detect and negation e2e tests
 
 ## Progress
 
@@ -84,8 +85,8 @@ Phases execute in numeric order: 8 -> 9 -> 10
 | 6. Add e2e Container | v1.0 | 3/3 | Complete | 2026-03-16 |
 | 7. v1.0 Tech Debt Cleanup | v1.0 | 2/2 | Complete | 2026-03-16 |
 | 8. Schema Extension and Data Extraction | v1.1 | 1/1 | Complete | 2026-03-17 |
-| 9. Cross-repo Dependency Detection | 2/2 | Complete   | 2026-03-17 | - |
-| 10. Integration and End-to-End Validation | 2/2 | Complete   | 2026-03-18 | - |
+| 9. Cross-repo Dependency Detection | v1.1 | 2/2 | Complete | 2026-03-17 |
+| 10. Integration and End-to-End Validation | v1.1 | 2/3 | Gap Closure | - |
 
 ---
 *Full v1.0 details: [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)*
