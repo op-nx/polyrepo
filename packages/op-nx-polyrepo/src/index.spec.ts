@@ -51,7 +51,7 @@ vi.mock('./lib/graph/detect', () => ({
 }));
 
 import { createNodesV2, createDependencies } from './index';
-import { logger } from '@nx/devkit';
+import { DependencyType, logger } from '@nx/devkit';
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { hashObject } from 'nx/src/devkit-internals';
@@ -526,7 +526,7 @@ describe(createDependencies, () => {
       {
         source: 'host-app',
         target: 'repo-a/lib',
-        type: 'static' as const,
+        type: DependencyType.static,
       },
     ]);
 
