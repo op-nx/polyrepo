@@ -125,4 +125,167 @@ describe('@op-nx/polyrepo', () => {
       expect(statusResult.stdout).not.toContain('[not synced]');
     }, 120_000);
   });
+
+  describe('cross-repo dependencies', () => {
+    // Shared state discovered during auto-detection test, reused by override/negation tests
+    let autoDetectedTarget: string;
+    let nonAutoDetectedNxProject: string;
+
+    /**
+     * Run `nx graph --print` inside the container and parse the project graph JSON.
+     */
+    async function getProjectGraph(ctr: StartedTestContainer): Promise<{
+      nodes: Record<string, unknown>;
+      dependencies: Record<string, Array<{ source: string; target: string; type: string }>>;
+    }> {
+      const result = await ctr.exec(
+        ['npx', 'nx', 'graph', '--print', '--output-style=static'],
+        { workingDir: '/workspace' },
+      );
+
+      if (result.exitCode !== 0) {
+        throw new Error(
+          `nx graph --print failed (exit ${String(result.exitCode)}):\n${result.output}`,
+        );
+      }
+
+      const jsonStart = result.stdout.indexOf('{');
+
+      if (jsonStart === -1) {
+        throw new Error(
+          `No JSON found in nx graph output:\n${result.stdout}`,
+        );
+      }
+
+      const parsed: {
+        graph: {
+          nodes: Record<string, unknown>;
+          dependencies: Record<string, Array<{ source: string; target: string; type: string }>>;
+        };
+      } = JSON.parse(result.stdout.substring(jsonStart));
+
+      return parsed.graph;
+    }
+
+    /**
+     * Write nx.json with the given plugin options inside the container.
+     */
+    async function writeNxJson(
+      ctr: StartedTestContainer,
+      pluginOptions: Record<string, unknown>,
+    ): Promise<void> {
+      const nxJsonContent = JSON.stringify(
+        { plugins: [{ plugin: '@op-nx/polyrepo', options: pluginOptions }] },
+        null,
+        2,
+      );
+
+      const { exitCode, output } = await ctr.exec(
+        [
+          'sh',
+          '-c',
+          `cat > /workspace/nx.json << 'NXJSONEOF'\n${nxJsonContent}\nNXJSONEOF`,
+        ],
+        { workingDir: '/workspace' },
+      );
+
+      if (exitCode !== 0) {
+        throw new Error(`Failed to write nx.json: ${output}`);
+      }
+    }
+
+    it('should auto-detect cross-repo edges from package.json dependencies', async () => {
+      expect.hasAssertions();
+
+      // Write nx.json with repos config only (no overrides)
+      await writeNxJson(container, {
+        repos: {
+          nx: { url: 'file:///repos/nx', depth: 1, ref: nxVersion },
+        },
+      });
+
+      const graph = await getProjectGraph(container);
+
+      // Find cross-repo edges from @workspace/source to nx/* projects
+      const sourceEdges = graph.dependencies['@workspace/source'] ?? [];
+      const crossRepoEdges = sourceEdges.filter(
+        (edge) => edge.target.startsWith('nx/') && edge.type === 'static',
+      );
+
+      // The host workspace has @nx/* devDependencies (devkit, js, vitest, etc.)
+      // which should produce auto-detected static edges to namespaced nx/* projects
+      expect(crossRepoEdges.length).toBeGreaterThan(0);
+
+      // Store one auto-detected target for the negation test
+      autoDetectedTarget = crossRepoEdges[0].target;
+
+      // Discover an nx/* project that is NOT in the auto-detected edges
+      // (for the override test -- pick one that @workspace/source does NOT depend on)
+      const allNxProjectNames = Object.keys(graph.nodes).filter(
+        (name) => name.startsWith('nx/'),
+      );
+      const autoDetectedTargets = new Set(
+        crossRepoEdges.map((edge) => edge.target),
+      );
+
+      const candidateProject = allNxProjectNames.find(
+        (name) => !autoDetectedTargets.has(name),
+      );
+
+      // nrwl/nx has 100+ projects but only ~10 @nx/* packages are host deps,
+      // so there are always non-auto-detected projects available
+      expect(candidateProject).toBeDefined();
+
+      nonAutoDetectedNxProject = candidateProject ?? '';
+    }, 120_000);
+
+    it('should include explicit override edges in the graph', async () => {
+      expect.assertions(2);
+
+      // Configure an explicit override from @workspace/source to an nx/* project
+      // that has no auto-detected edge (discovered in previous test)
+      await writeNxJson(container, {
+        repos: {
+          nx: { url: 'file:///repos/nx', depth: 1, ref: nxVersion },
+        },
+        implicitDependencies: {
+          '@workspace/source': [nonAutoDetectedNxProject],
+        },
+      });
+
+      const graph = await getProjectGraph(container);
+
+      const sourceEdges = graph.dependencies['@workspace/source'] ?? [];
+      const overrideEdge = sourceEdges.find(
+        (edge) => edge.target === nonAutoDetectedNxProject,
+      );
+
+      expect(overrideEdge).toBeDefined();
+      expect(overrideEdge?.type).toBe('implicit');
+    }, 120_000);
+
+    it('should suppress negated auto-detected edges', async () => {
+      expect.assertions(1);
+
+      // Configure a negation on the auto-detected edge discovered in the first test
+      await writeNxJson(container, {
+        repos: {
+          nx: { url: 'file:///repos/nx', depth: 1, ref: nxVersion },
+        },
+        implicitDependencies: {
+          '@workspace/source': [`!${autoDetectedTarget}`],
+        },
+      });
+
+      const graph = await getProjectGraph(container);
+
+      const sourceEdges = graph.dependencies['@workspace/source'] ?? [];
+      const suppressedEdge = sourceEdges.find(
+        (edge) => edge.target === autoDetectedTarget,
+      );
+
+      // The negated edge should be absent from the graph
+      expect(suppressedEdge).toBeUndefined();
+    }, 120_000);
+  });
 });
