@@ -95,12 +95,20 @@ function setup() {
 function createDepContext(
   projects: Record<string, { root: string }>,
 ): CreateDependenciesContext {
+  // Populate projectFileMap with a dummy entry for each project so that
+  // the fileMap guard in createDependencies doesn't filter out edges.
+  const projectFileMap: Record<string, Array<{ file: string }>> = {};
+
+  for (const name of Object.keys(projects)) {
+    projectFileMap[name] = [{ file: `${projects[name]?.root ?? '.'}/package.json`, hash: '' }];
+  }
+
   return {
     projects,
     nxJsonConfiguration: {},
     workspaceRoot: '/workspace',
     externalNodes: {},
-    fileMap: { projectFileMap: {}, nonProjectFiles: [] },
+    fileMap: { projectFileMap, nonProjectFiles: [] },
     filesToProcess: { projectFileMap: {}, nonProjectFiles: [] },
   };
 }

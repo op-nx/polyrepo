@@ -148,11 +148,19 @@ export const createDependencies: CreateDependencies<PolyrepoConfig> = async (
   // propagate to Nx so users see a clear error message.
   const crossRepoDeps = detectCrossRepoDependencies(report, config, context);
 
-  // Filter out edges referencing projects that Nx didn't register (e.g., due
-  // to createNodesV2 failures or merge conflicts). Nx validates that both
-  // source and target exist in the project graph.
+  // Filter cross-repo edges: both source and target must be registered AND
+  // have files in the workspace file map. Projects in .repos/ are gitignored,
+  // so their files aren't in the file map. The task hasher needs file entries
+  // for all reachable projects — edges to projects without files cause
+  // "project not found" errors during task hashing.
+  const fileMap = context.fileMap?.projectFileMap ?? {};
   for (const dep of crossRepoDeps) {
-    if (context.projects[dep.source] && context.projects[dep.target]) {
+    if (
+      context.projects[dep.source] &&
+      context.projects[dep.target] &&
+      fileMap[dep.source] &&
+      fileMap[dep.target]
+    ) {
       dependencies.push(dep);
     }
   }

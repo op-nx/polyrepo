@@ -191,6 +191,7 @@ export function detectCrossRepoDependencies(
 ): RawProjectGraphDependency[] {
   const { workspaceRoot } = context;
 
+
   // -------------------------------------------------------------------------
   // Step 1: Build the packageName → projectName lookup map
   // -------------------------------------------------------------------------
@@ -290,7 +291,9 @@ export function detectCrossRepoDependencies(
   }
 
   for (const projectName of Object.keys(context.projects)) {
-    projectToRepo.set(projectName, HOST_REPO_SENTINEL);
+    if (!projectToRepo.has(projectName)) {
+      projectToRepo.set(projectName, HOST_REPO_SENTINEL);
+    }
   }
 
   // -------------------------------------------------------------------------
