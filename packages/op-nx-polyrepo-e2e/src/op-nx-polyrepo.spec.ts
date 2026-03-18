@@ -197,7 +197,27 @@ describe('@op-nx/polyrepo', () => {
     it('should auto-detect cross-repo edges from package.json dependencies', async () => {
       expect.hasAssertions();
 
-      // Write nx.json with repos config only (no overrides)
+      // Inject @nx/devkit as a direct devDependency in the workspace's
+      // package.json. create-nx-workspace only adds "nx" as a direct dep;
+      // detection scans declared deps, not transitive ones.
+      const injectDep = await container.exec(
+        [
+          'sh',
+          '-c',
+          'cd /workspace && node -e "' +
+            "const p=JSON.parse(require('fs').readFileSync('package.json','utf8'));" +
+            "p.devDependencies=p.devDependencies||{};" +
+            "p.devDependencies['@nx/devkit']='*';" +
+            "require('fs').writeFileSync('package.json',JSON.stringify(p,null,2));" +
+            '"',
+        ],
+        { workingDir: '/workspace' },
+      );
+
+      if (injectDep.exitCode !== 0) {
+        throw new Error(`Failed to inject dep: ${injectDep.output}`);
+      }
+
       await writeNxJson(container, {
         repos: {
           nx: { url: 'file:///repos/nx', depth: 1, ref: nxVersion },
@@ -206,17 +226,26 @@ describe('@op-nx/polyrepo', () => {
 
       const graph = await getProjectGraph(container);
 
-      // Find cross-repo edges from @workspace/source to nx/* projects
-      const sourceEdges = graph.dependencies['@workspace/source'] ?? [];
+      // Find the root project name (may vary by Nx version / preset)
+      const rootProject = Object.keys(graph.nodes).find(
+        (name) => !name.startsWith('nx/'),
+      );
+
+      if (!rootProject) {
+        throw new Error('No host project found in graph');
+      }
+
+      // Find cross-repo edges from the host project to nx/* projects.
+      // Host-sourced edges use 'static' type (sourceFile in file map).
+      const sourceEdges = graph.dependencies[rootProject] ?? [];
       const crossRepoEdges = sourceEdges.filter(
         (edge) => edge.target.startsWith('nx/') && edge.type === 'static',
       );
 
-      // The host workspace has @nx/* devDependencies (devkit, js, vitest, etc.)
-      // which should produce auto-detected static edges to namespaced nx/* projects
+      // @nx/devkit was injected and should map to an nx/* namespaced project
       expect(crossRepoEdges.length).toBeGreaterThan(0);
 
-      // Store one auto-detected target for the negation test
+      // Store the auto-detected target for the negation test
       const firstEdge = crossRepoEdges[0];
 
       if (!firstEdge) {
@@ -225,8 +254,7 @@ describe('@op-nx/polyrepo', () => {
 
       autoDetectedTarget = firstEdge.target;
 
-      // Discover an nx/* project that is NOT in the auto-detected edges
-      // (for the override test -- pick one that @workspace/source does NOT depend on)
+      // Discover an nx/* project NOT in auto-detected edges (for override test)
       const allNxProjectNames = Object.keys(graph.nodes).filter(
         (name) => name.startsWith('nx/'),
       );
@@ -238,8 +266,6 @@ describe('@op-nx/polyrepo', () => {
         (name) => !autoDetectedTargets.has(name),
       );
 
-      // nrwl/nx has 100+ projects but only ~10 @nx/* packages are host deps,
-      // so there are always non-auto-detected projects available
       expect(candidateProject).toBeDefined();
 
       nonAutoDetectedNxProject = candidateProject ?? '';
@@ -248,22 +274,40 @@ describe('@op-nx/polyrepo', () => {
     it('should include explicit override edges in the graph', async () => {
       expect.assertions(2);
 
-      // Configure an explicit override from @workspace/source to an nx/* project
-      // that has no auto-detected edge (discovered in previous test)
+      // Find the host project name dynamically
+      const preGraph = await getProjectGraph(container);
+      const rootProject = Object.keys(preGraph.nodes).find(
+        (name) => !name.startsWith('nx/'),
+      );
+
+      if (!rootProject) {
+        throw new Error('No host project found in graph');
+      }
+
+      // Use a known nx/* project if nonAutoDetectedNxProject is empty
+      // (fallback in case auto-detect test didn't run or failed)
+      const overrideTarget = nonAutoDetectedNxProject || Object.keys(preGraph.nodes).find(
+        (name) => name.startsWith('nx/'),
+      ) || '';
+
+      if (!overrideTarget) {
+        throw new Error('No nx/* project found for override test');
+      }
+
       await writeNxJson(container, {
         repos: {
           nx: { url: 'file:///repos/nx', depth: 1, ref: nxVersion },
         },
         implicitDependencies: {
-          '@workspace/source': [nonAutoDetectedNxProject],
+          [rootProject]: [overrideTarget],
         },
       });
 
       const graph = await getProjectGraph(container);
 
-      const sourceEdges = graph.dependencies['@workspace/source'] ?? [];
+      const sourceEdges = graph.dependencies[rootProject] ?? [];
       const overrideEdge = sourceEdges.find(
-        (edge) => edge.target === nonAutoDetectedNxProject,
+        (edge) => edge.target === overrideTarget,
       );
 
       expect(overrideEdge).toBeDefined();
@@ -273,19 +317,33 @@ describe('@op-nx/polyrepo', () => {
     it('should suppress negated auto-detected edges', async () => {
       expect.assertions(1);
 
-      // Configure a negation on the auto-detected edge discovered in the first test
+      // Find the host project name dynamically
+      const preGraph = await getProjectGraph(container);
+      const rootProject = Object.keys(preGraph.nodes).find(
+        (name) => !name.startsWith('nx/'),
+      );
+
+      if (!rootProject) {
+        throw new Error('No host project found in graph');
+      }
+
+      // Use the auto-detected target from test 1 (negation suppresses it)
+      if (!autoDetectedTarget) {
+        throw new Error('Auto-detected target not set — auto-detect test must run first');
+      }
+
       await writeNxJson(container, {
         repos: {
           nx: { url: 'file:///repos/nx', depth: 1, ref: nxVersion },
         },
         implicitDependencies: {
-          '@workspace/source': [`!${autoDetectedTarget}`],
+          [rootProject]: [`!${autoDetectedTarget}`],
         },
       });
 
       const graph = await getProjectGraph(container);
 
-      const sourceEdges = graph.dependencies['@workspace/source'] ?? [];
+      const sourceEdges = graph.dependencies[rootProject] ?? [];
       const suppressedEdge = sourceEdges.find(
         (edge) => edge.target === autoDetectedTarget,
       );
