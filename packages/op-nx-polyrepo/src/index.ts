@@ -133,8 +133,19 @@ export const createDependencies: CreateDependencies<PolyrepoConfig> = async (
     }
   }
 
-  // Cross-repo edges -- NOT wrapped in try/catch
-  // OVRD-03 validation errors intentionally propagate to Nx
+  // Cross-repo edges (DETECT-06) -- auto-detected from package.json deps,
+  // tsconfig path aliases, and user-configured overrides/negations.
+  //
+  // NOTE: DETECT-07 (nx affected cross-repo) is deferred to a future milestone.
+  // Nx's calculateFileChanges() filters files through .gitignore before project
+  // mapping -- .repos/ is gitignored, so nx affected --base/--head is blind to
+  // synced repo changes. The edge traversal itself is correct once a starting
+  // project is identified. Future solution: a polyrepo-affected executor that
+  // maps git diffs in .repos/<alias> to namespaced project names.
+  // See: .planning/phases/10-integration-and-end-to-end-validation/research-detect-07.md
+  //
+  // NOT wrapped in try/catch -- OVRD-03 validation errors intentionally
+  // propagate to Nx so users see a clear error message.
   const crossRepoDeps = detectCrossRepoDependencies(report, config, context);
   dependencies.push(...crossRepoDeps);
 
