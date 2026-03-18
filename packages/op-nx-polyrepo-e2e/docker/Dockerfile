@@ -1,7 +1,8 @@
 FROM node:22-slim
 
 # Install git (needed for nrwl/nx clone and Nx operations)
-RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates && \
+# Install default-jre-headless (needed for @nx/gradle plugin in nrwl/nx repo)
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates default-jre-headless && \
     rm -rf /var/lib/apt/lists/*
 
 # Disable Nx daemon inside container (prevents file locks and timeouts)
