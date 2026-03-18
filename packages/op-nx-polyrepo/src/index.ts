@@ -149,17 +149,24 @@ export const createDependencies: CreateDependencies<PolyrepoConfig> = async (
   const crossRepoDeps = detectCrossRepoDependencies(report, config, context);
 
   // Filter cross-repo edges: both source and target must be registered
-  // projects. The fileMap guard is intentionally omitted here -- external
-  // projects in .repos/ are gitignored, so Nx's projectFileMap has no
-  // entries for them. Requiring fileMap entries would silently drop ALL
-  // cross-repo edges involving external projects.
-  //
-  // Task hasher safety: all cross-repo edges use DependencyType.implicit
-  // with no sourceFile property (see detect.ts). The task hasher's
-  // "project not found" error only triggers for static edges with a
-  // sourceFile that references files not in the file map.
+  // projects AND have entries in the projectFileMap. The fileMap guard is
+  // required because Nx's native task hasher walks ALL dependency edges
+  // (including implicit) and crashes with "project not found" when it
+  // reaches a project without file map entries. Since .repos/ is gitignored,
+  // external projects have zero file map entries, so edges targeting them
+  // are dropped here. This means cross-repo edges only appear when both
+  // endpoints have files tracked by Nx (e.g., in e2e containers where
+  // .repos/ may be tracked, or when Nx adds file map support for
+  // gitignored project roots in a future version).
+  const fileMap = context.fileMap?.projectFileMap ?? {};
+
   for (const dep of crossRepoDeps) {
-    if (context.projects[dep.source] && context.projects[dep.target]) {
+    if (
+      context.projects[dep.source] &&
+      context.projects[dep.target] &&
+      fileMap[dep.source] &&
+      fileMap[dep.target]
+    ) {
       dependencies.push(dep);
     }
   }

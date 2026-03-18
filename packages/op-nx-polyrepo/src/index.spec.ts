@@ -102,7 +102,7 @@ function createDepContext(
 ): CreateDependenciesContext {
   // Populate projectFileMap with a dummy entry for each project so that
   // the fileMap guard in createDependencies doesn't filter out edges.
-  const projectFileMap: Record<string, Array<{ file: string }>> = {};
+  const projectFileMap: Record<string, Array<{ file: string; hash: string }>> = {};
   const excludeSet = new Set(excludeFromFileMap);
 
   for (const name of Object.keys(projects)) {
@@ -580,7 +580,7 @@ describe(createDependencies, () => {
     );
   });
 
-  it('includes cross-repo edges when target has no fileMap entry', async () => {
+  it('drops cross-repo edges when target has no fileMap entry', async () => {
     expect.hasAssertions();
 
     const { mockedPopulateGraphReport, mockedDetectCrossRepoDeps } = setup();
@@ -620,12 +620,10 @@ describe(createDependencies, () => {
 
     const deps = await createDependencies(options, depContext);
 
-    expect(deps).toContainEqual({
-      source: 'host-app',
-      target: 'repo-a/lib',
-      type: 'implicit',
-    });
-    expect(deps).toHaveLength(1);
+    // Edge is dropped because repo-a/lib has no fileMap entries.
+    // Nx's native task hasher crashes with "project not found" when it
+    // walks edges to projects without file map entries.
+    expect(deps).toHaveLength(0);
   });
 
   it('filters intra-repo edges where target is not in context.projects', async () => {
