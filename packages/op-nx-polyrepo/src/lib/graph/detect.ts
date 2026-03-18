@@ -347,7 +347,6 @@ export function detectCrossRepoDependencies(
 
   function maybeEmitEdge(
     sourceName: string,
-    sourceFile: string | undefined,
     depName: string,
   ): void {
     const targetName = pkgNameToProject.get(depName);
@@ -376,24 +375,15 @@ export function detectCrossRepoDependencies(
 
     emitted.add(key);
 
-    // Host-sourced edges use static type with sourceFile (files are in Nx's
-    // file map). External-sourced edges use implicit type because .repos/ is
-    // gitignored and its files are NOT in the file map — Nx rejects unknown
-    // sourceFile paths.
-    if (sourceFile !== undefined && sourceRepo === HOST_REPO_SENTINEL) {
-      edges.push({
-        source: sourceName,
-        target: targetName,
-        sourceFile,
-        type: DependencyType.static,
-      });
-    } else {
-      edges.push({
-        source: sourceName,
-        target: targetName,
-        type: DependencyType.implicit,
-      });
-    }
+    // All auto-detected cross-repo edges use implicit type. Nx validates
+    // sourceFile against its file map for static edges — .repos/ files are
+    // not in the file map (gitignored), and root-level package.json may not
+    // be in any project's file map either.
+    edges.push({
+      source: sourceName,
+      target: targetName,
+      type: DependencyType.implicit,
+    });
   }
 
   // 3a. Scan external nodes — dep lists are already on TransformedNode
@@ -407,7 +397,7 @@ export function detectCrossRepoDependencies(
       ];
 
       for (const depName of allDeps) {
-        maybeEmitEdge(node.name, undefined, depName);
+        maybeEmitEdge(node.name, depName);
       }
     }
   }
@@ -419,10 +409,6 @@ export function detectCrossRepoDependencies(
       projectConfig.root,
       'package.json',
     );
-    const sourceFile = normalizePath(
-      join(projectConfig.root, 'package.json'),
-    );
-
     let pkgJson: Record<string, unknown>;
 
     try {
@@ -444,7 +430,7 @@ export function detectCrossRepoDependencies(
     ];
 
     for (const depName of allDeps) {
-      maybeEmitEdge(projectName, sourceFile, depName);
+      maybeEmitEdge(projectName, depName);
     }
   }
 

@@ -332,7 +332,7 @@ describe('detectCrossRepoDependencies', () => {
   // -------------------------------------------------------------------------
 
   describe('DETECT-01 — dependencies field', () => {
-    it('consumer with matching dependency emits one static edge with correct sourceFile', () => {
+    it('consumer with matching dependency emits one implicit edge', () => {
       function setup() {
         vi.clearAllMocks();
         vi.mocked(readFileSync).mockReturnValue('{}');
@@ -556,7 +556,7 @@ describe('detectCrossRepoDependencies', () => {
       expect(edges[0]).not.toHaveProperty('sourceFile');
     });
 
-    it('host-sourced edges include sourceFile with forward slashes', () => {
+    it('host-sourced edges also omit sourceFile (use implicit type)', () => {
       function setup() {
         vi.clearAllMocks();
 
@@ -590,14 +590,8 @@ describe('detectCrossRepoDependencies', () => {
       const edges = detectCrossRepoDependencies(report, config, context);
 
       expect(edges).toHaveLength(1);
-
-      const edge = edges[0];
-
-      expect(edge).toHaveProperty('sourceFile', 'apps/host-app/package.json');
-
-      if ('sourceFile' in edge) {
-        expect(edge.sourceFile).not.toContain('\\');
-      }
+      expect(edges[0]).not.toHaveProperty('sourceFile');
+      expect(edges[0]).toMatchObject({ type: DependencyType.implicit });
     });
   });
 
@@ -677,7 +671,7 @@ describe('detectCrossRepoDependencies', () => {
   // -------------------------------------------------------------------------
 
   describe('host project as source', () => {
-    it('host project consuming external package emits edge with host-relative sourceFile', () => {
+    it('host project consuming external package emits implicit cross-repo edge', () => {
       function setup() {
         vi.clearAllMocks();
         // readFileSync returns the host app's package.json with a dep on @scope/my-lib
@@ -714,8 +708,7 @@ describe('detectCrossRepoDependencies', () => {
       expect(edges[0]).toStrictEqual({
         source: 'host-app',
         target: 'repo-b/my-lib',
-        sourceFile: 'apps/host-app/package.json',
-        type: DependencyType.static,
+        type: DependencyType.implicit,
       });
     });
   });

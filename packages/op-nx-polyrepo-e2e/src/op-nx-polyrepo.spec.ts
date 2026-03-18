@@ -236,10 +236,10 @@ describe('@op-nx/polyrepo', () => {
       }
 
       // Find cross-repo edges from the host project to nx/* projects.
-      // Host-sourced edges use 'static' type (sourceFile in file map).
+      // All auto-detected cross-repo edges use 'implicit' type.
       const sourceEdges = graph.dependencies[rootProject] ?? [];
       const crossRepoEdges = sourceEdges.filter(
-        (edge) => edge.target.startsWith('nx/') && edge.type === 'static',
+        (edge) => edge.target.startsWith('nx/') && edge.type === 'implicit',
       );
 
       // @nx/devkit was injected and should map to an nx/* namespaced project
