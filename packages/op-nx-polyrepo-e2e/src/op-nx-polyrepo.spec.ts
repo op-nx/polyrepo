@@ -17,9 +17,10 @@ describe('@op-nx/polyrepo', () => {
   beforeAll(async () => {
     const snapshotImage = inject('snapshotImage');
     container = await new GenericContainer(snapshotImage)
-      // tmpfs for .repos/ eliminates OverlayFS copy-up overhead during
-      // pnpm install linking (130s on overlay2 → 37s on tmpfs)
-      .withTmpFs({ '/workspace/.repos': 'rw,exec,size=4g' })
+      // No tmpfs for .repos/ — use overlay filesystem so pnpm hardlinks
+      // to the pre-warmed store at /repos/nx work (cross-filesystem hardlinks
+      // fail on tmpfs). Slightly slower I/O but no size limit and pnpm install
+      // resolves via hardlinks instead of copies.
       .withCommand(['sleep', 'infinity'])
       .start();
   });
