@@ -64,7 +64,10 @@ Plans:
   1. Running `nx graph` on a host workspace with synced repos shows cross-repo dependency edges between projects from different repos
   2. After modifying a file in repo A, `nx affected` lists dependent projects in repo B that declare a package.json dependency on repo A's package
   3. E2E tests (testcontainers) validate auto-detected edges, explicit override edges, and negation suppression against real Nx CLI output
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 10-01-PLAN.md -- Wire detectCrossRepoDependencies into createDependencies, add integration tests, document DETECT-07 deferral
+- [ ] 10-02-PLAN.md -- E2e tests for cross-repo auto-detection, overrides, and negation suppression
 
 ## Progress
 
@@ -82,7 +85,7 @@ Phases execute in numeric order: 8 -> 9 -> 10
 | 7. v1.0 Tech Debt Cleanup | v1.0 | 2/2 | Complete | 2026-03-16 |
 | 8. Schema Extension and Data Extraction | v1.1 | 1/1 | Complete | 2026-03-17 |
 | 9. Cross-repo Dependency Detection | 2/2 | Complete   | 2026-03-17 | - |
-| 10. Integration and End-to-End Validation | v1.1 | 0/0 | Not started | - |
+| 10. Integration and End-to-End Validation | v1.1 | 0/2 | Not started | - |
 
 ---
 *Full v1.0 details: [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)*
