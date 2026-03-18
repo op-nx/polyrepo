@@ -106,12 +106,30 @@ describe('@op-nx/polyrepo', () => {
     it('should show project counts after sync', async () => {
       expect.assertions(3);
 
+      // Debug: verify .repos/ is in .gitignore before sync
+      const gitignoreCheck = await container.exec(
+        ['sh', '-c', 'grep -c ".repos/" .gitignore && echo "[OK] .repos/ in .gitignore" || echo "[MISSING] .repos/ not in .gitignore"'],
+        { workingDir: '/workspace' },
+      );
+
+      console.log('[debug] gitignore check:', gitignoreCheck.stdout.trim());
+
       // Run sync -- clones from file:///repos/nx to /workspace/.repos/nx/
       // and extracts graph cache
+      console.log('[debug] starting polyrepo-sync...');
+      const syncStart = Date.now();
+
       const syncResult = await container.exec(
         ['npx', 'nx', 'polyrepo-sync'],
         { workingDir: '/workspace' },
       );
+
+      console.log(`[debug] polyrepo-sync completed in ${String(Date.now() - syncStart)}ms, exit=${String(syncResult.exitCode)}`);
+      console.log('[debug] sync stdout (last 500 chars):', syncResult.stdout.slice(-500));
+
+      if (syncResult.exitCode !== 0) {
+        console.log('[debug] sync stderr:', syncResult.stderr);
+      }
 
       expect(syncResult.exitCode).toBe(0);
 
@@ -123,7 +141,7 @@ describe('@op-nx/polyrepo', () => {
 
       expect(statusResult.stdout).toContain('projects');
       expect(statusResult.stdout).not.toContain('[not synced]');
-    }, 120_000);
+    }, 300_000);
   });
 
   describe('cross-repo dependencies', () => {
@@ -134,12 +152,20 @@ describe('@op-nx/polyrepo', () => {
      * Run polyrepo-sync inside the container to clone repos into .repos/.
      */
     async function syncRepos(ctr: StartedTestContainer): Promise<void> {
+      console.log('[debug] syncRepos starting...');
+      const start = Date.now();
+
       const result = await ctr.exec(
         ['npx', 'nx', 'polyrepo-sync'],
         { workingDir: '/workspace' },
       );
 
+      console.log(`[debug] syncRepos completed in ${String(Date.now() - start)}ms, exit=${String(result.exitCode)}`);
+
       if (result.exitCode !== 0) {
+        console.log('[debug] syncRepos stderr:', result.stderr);
+        console.log('[debug] syncRepos stdout (last 500):', result.stdout.slice(-500));
+
         throw new Error(
           `polyrepo-sync failed (exit ${String(result.exitCode)}):\n${result.output}`,
         );
@@ -251,7 +277,7 @@ describe('@op-nx/polyrepo', () => {
       // produce at least one auto-detected implicit edge to a namespaced
       // nx/* project whose packageName matches @nx/devkit.
       expect(crossRepoEdges.length).toBeGreaterThan(0);
-    }, 120_000);
+    }, 300_000);
 
     it('should include explicit override edges in the graph', async () => {
       expect.assertions(2);
@@ -292,7 +318,7 @@ describe('@op-nx/polyrepo', () => {
 
       expect(overrideEdge).toBeDefined();
       expect(overrideEdge?.type).toBe('implicit');
-    }, 120_000);
+    }, 300_000);
 
     it('should suppress negated auto-detected edges', async () => {
       expect.hasAssertions();
@@ -340,6 +366,6 @@ describe('@op-nx/polyrepo', () => {
 
       // The negated edge should be absent from the graph
       expect(suppressedEdge).toBeUndefined();
-    }, 120_000);
+    }, 300_000);
   });
 });

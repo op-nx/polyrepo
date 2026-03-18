@@ -16,13 +16,20 @@ ENV NX_DAEMON=false CI=true
 RUN git config --global user.email "e2e@test.local" && \
     git config --global user.name "e2e"
 
-# Prebake create-nx-workspace output
+# Prebake create-nx-workspace output (skip git — we init after adding .repos/ to .gitignore)
 # This layer rebuilds only when NX_VERSION changes
 # --nxCloud=skip: skip CI workflow generation (--ci is an alias for --nxCloud,
 #   passing both produces "skip,skip" which fails schema validation)
 ARG NX_VERSION=22.5.4
 RUN npx --yes create-nx-workspace@${NX_VERSION} workspace \
-    --preset=apps --interactive=false --nxCloud=skip
+    --preset=apps --interactive=false --nxCloud=skip --skipGit
+
+# Add .repos/ to .gitignore before git init so it's ignored from the first commit.
+# Matches the real-world local setup where .repos/ is always gitignored.
+RUN echo "\n# Synced polyrepo workspaces\n.repos/" >> /workspace/.gitignore
+
+# Now init git with .repos/ already in .gitignore
+RUN cd /workspace && git init && git add . && git commit -m "initial"
 
 # Prebake git clone of nrwl/nx at pinned ref
 # This layer rebuilds only when NX_REF changes

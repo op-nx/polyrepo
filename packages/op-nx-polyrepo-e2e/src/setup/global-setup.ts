@@ -115,14 +115,6 @@ export default async function setup(project: TestProject) {
       );
     }
 
-    // 5b. Add .repos/ to .gitignore (matches real-world local setup)
-    // Without this, the host Nx scans all files under .repos/<synced-repo>/,
-    // doubling resource usage and causing environmental drift vs local dev.
-    await workspace.exec(
-      ['sh', '-c', 'echo "\n# Synced polyrepo workspaces\n.repos/" >> /workspace/.gitignore'],
-      { workingDir: '/workspace' },
-    );
-
     // 6. Commit snapshot image
     console.log('[e2e] Committing workspace snapshot...');
     const snapshotImage = await workspace.commit({
