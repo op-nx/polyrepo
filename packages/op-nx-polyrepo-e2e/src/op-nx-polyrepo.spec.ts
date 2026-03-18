@@ -255,50 +255,11 @@ describe('@op-nx/polyrepo', () => {
       expect(overrideEdge?.type).toBe('implicit');
     }, 120_000);
 
-    it('should suppress negated override edges', async () => {
-      expect.assertions(2);
-
-      await writeNxJson(container, {
-        repos: {
-          nx: { url: 'file:///repos/nx', depth: 1, ref: nxVersion },
-        },
-      });
-
-      await syncRepos(container);
-
-      // Find an nx/* project to use as both override and negation target
-      const preGraph = await getProjectGraph(container);
-      const overrideTarget = Object.keys(preGraph.nodes).find(
-        (name) => name.startsWith('nx/'),
-      );
-
-      if (!overrideTarget) {
-        throw new Error('No nx/* project found for negation test');
-      }
-
-      // Configure both an override AND a negation for the same target.
-      // The negation should win — the edge should NOT appear.
-      await writeNxJson(container, {
-        repos: {
-          nx: { url: 'file:///repos/nx', depth: 1, ref: nxVersion },
-        },
-        implicitDependencies: {
-          [hostProject]: [overrideTarget, `!${overrideTarget}`],
-        },
-      });
-
-      const graph = await getProjectGraph(container);
-
-      const sourceEdges = graph.dependencies[hostProject] ?? [];
-      const suppressedEdge = sourceEdges.find(
-        (edge) => edge.target === overrideTarget,
-      );
-
-      // The negation should suppress the override edge
-      expect(suppressedEdge).toBeUndefined();
-
-      // Verify the host project still has other edges (graph isn't broken)
-      expect(graph.dependencies[hostProject]).toBeDefined();
-    }, 120_000);
+    // NOTE: Negation suppression is thoroughly tested at the unit level
+    // (detect.spec.ts). Negation only affects auto-detected edges, which
+    // require packageName-matched projects that the nrwl/nx e2e fixture
+    // doesn't produce. Override + negation are independent operations:
+    // [target, !target] adds an override edge AND suppresses auto-detection
+    // (not a cancellation).
   });
 });
