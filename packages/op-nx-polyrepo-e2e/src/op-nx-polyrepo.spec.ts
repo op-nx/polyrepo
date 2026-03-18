@@ -127,9 +127,24 @@ describe('@op-nx/polyrepo', () => {
   });
 
   describe('cross-repo dependencies', () => {
-    // Shared state discovered during auto-detection test, reused by override/negation tests
-    let autoDetectedTarget: string;
-    let nonAutoDetectedNxProject: string;
+    // The workspace root project created by create-nx-workspace
+    const hostProject = '@workspace/source';
+
+    /**
+     * Run polyrepo-sync inside the container to clone repos into .repos/.
+     */
+    async function syncRepos(ctr: StartedTestContainer): Promise<void> {
+      const result = await ctr.exec(
+        ['npx', 'nx', 'polyrepo-sync'],
+        { workingDir: '/workspace' },
+      );
+
+      if (result.exitCode !== 0) {
+        throw new Error(
+          `polyrepo-sync failed (exit ${String(result.exitCode)}):\n${result.output}`,
+        );
+      }
+    }
 
     /**
      * Run `nx graph --print` inside the container and parse the project graph JSON.
@@ -224,71 +239,35 @@ describe('@op-nx/polyrepo', () => {
         },
       });
 
+      await syncRepos(container);
+
       const graph = await getProjectGraph(container);
 
-      // Find the root project name (may vary by Nx version / preset)
-      const rootProject = Object.keys(graph.nodes).find(
-        (name) => !name.startsWith('nx/'),
-      );
-
-      if (!rootProject) {
-        throw new Error('No host project found in graph');
-      }
-
-      // Find cross-repo edges from the host project to nx/* projects.
-      // All auto-detected cross-repo edges use 'implicit' type.
-      const sourceEdges = graph.dependencies[rootProject] ?? [];
+      // Find cross-repo edges from the host project to nx/* projects
+      const sourceEdges = graph.dependencies[hostProject] ?? [];
       const crossRepoEdges = sourceEdges.filter(
         (edge) => edge.target.startsWith('nx/') && edge.type === 'implicit',
       );
 
-      // @nx/devkit was injected and should map to an nx/* namespaced project
       expect(crossRepoEdges.length).toBeGreaterThan(0);
-
-      // Store the auto-detected target for the negation test
-      const firstEdge = crossRepoEdges[0];
-
-      if (!firstEdge) {
-        throw new Error('Expected at least one cross-repo edge');
-      }
-
-      autoDetectedTarget = firstEdge.target;
-
-      // Discover an nx/* project NOT in auto-detected edges (for override test)
-      const allNxProjectNames = Object.keys(graph.nodes).filter(
-        (name) => name.startsWith('nx/'),
-      );
-      const autoDetectedTargets = new Set(
-        crossRepoEdges.map((edge) => edge.target),
-      );
-
-      const candidateProject = allNxProjectNames.find(
-        (name) => !autoDetectedTargets.has(name),
-      );
-
-      expect(candidateProject).toBeDefined();
-
-      nonAutoDetectedNxProject = candidateProject ?? '';
     }, 120_000);
 
     it('should include explicit override edges in the graph', async () => {
       expect.assertions(2);
 
-      // Find the host project name dynamically
+      await writeNxJson(container, {
+        repos: {
+          nx: { url: 'file:///repos/nx', depth: 1, ref: nxVersion },
+        },
+      });
+
+      await syncRepos(container);
+
+      // Discover an nx/* project to use as override target
       const preGraph = await getProjectGraph(container);
-      const rootProject = Object.keys(preGraph.nodes).find(
-        (name) => !name.startsWith('nx/'),
-      );
-
-      if (!rootProject) {
-        throw new Error('No host project found in graph');
-      }
-
-      // Use a known nx/* project if nonAutoDetectedNxProject is empty
-      // (fallback in case auto-detect test didn't run or failed)
-      const overrideTarget = nonAutoDetectedNxProject || Object.keys(preGraph.nodes).find(
+      const overrideTarget = Object.keys(preGraph.nodes).find(
         (name) => name.startsWith('nx/'),
-      ) || '';
+      );
 
       if (!overrideTarget) {
         throw new Error('No nx/* project found for override test');
@@ -299,13 +278,13 @@ describe('@op-nx/polyrepo', () => {
           nx: { url: 'file:///repos/nx', depth: 1, ref: nxVersion },
         },
         implicitDependencies: {
-          [rootProject]: [overrideTarget],
+          [hostProject]: [overrideTarget],
         },
       });
 
       const graph = await getProjectGraph(container);
 
-      const sourceEdges = graph.dependencies[rootProject] ?? [];
+      const sourceEdges = graph.dependencies[hostProject] ?? [];
       const overrideEdge = sourceEdges.find(
         (edge) => edge.target === overrideTarget,
       );
@@ -315,40 +294,64 @@ describe('@op-nx/polyrepo', () => {
     }, 120_000);
 
     it('should suppress negated auto-detected edges', async () => {
-      expect.assertions(1);
+      expect.hasAssertions();
 
-      // Find the host project name dynamically
-      const preGraph = await getProjectGraph(container);
-      const rootProject = Object.keys(preGraph.nodes).find(
-        (name) => !name.startsWith('nx/'),
+      // Inject @nx/devkit as a direct devDependency (same as auto-detect test)
+      const injectDep = await container.exec(
+        [
+          'sh',
+          '-c',
+          'cd /workspace && node -e "' +
+            "const p=JSON.parse(require('fs').readFileSync('package.json','utf8'));" +
+            "p.devDependencies=p.devDependencies||{};" +
+            "p.devDependencies['@nx/devkit']='*';" +
+            "require('fs').writeFileSync('package.json',JSON.stringify(p,null,2));" +
+            '"',
+        ],
+        { workingDir: '/workspace' },
       );
 
-      if (!rootProject) {
-        throw new Error('No host project found in graph');
-      }
-
-      // Use the auto-detected target from test 1 (negation suppresses it)
-      if (!autoDetectedTarget) {
-        throw new Error('Auto-detected target not set — auto-detect test must run first');
+      if (injectDep.exitCode !== 0) {
+        throw new Error(`Failed to inject dep: ${injectDep.output}`);
       }
 
       await writeNxJson(container, {
         repos: {
           nx: { url: 'file:///repos/nx', depth: 1, ref: nxVersion },
         },
+      });
+
+      await syncRepos(container);
+
+      // Discover an auto-detected edge to negate
+      const preGraph = await getProjectGraph(container);
+      const preEdges = (preGraph.dependencies[hostProject] ?? []).filter(
+        (edge) => edge.target.startsWith('nx/') && edge.type === 'implicit',
+      );
+
+      const targetToNegate = preEdges[0]?.target;
+
+      if (!targetToNegate) {
+        throw new Error('No auto-detected edge found to negate');
+      }
+
+      // Reconfigure with negation
+      await writeNxJson(container, {
+        repos: {
+          nx: { url: 'file:///repos/nx', depth: 1, ref: nxVersion },
+        },
         implicitDependencies: {
-          [rootProject]: [`!${autoDetectedTarget}`],
+          [hostProject]: [`!${targetToNegate}`],
         },
       });
 
       const graph = await getProjectGraph(container);
 
-      const sourceEdges = graph.dependencies[rootProject] ?? [];
+      const sourceEdges = graph.dependencies[hostProject] ?? [];
       const suppressedEdge = sourceEdges.find(
-        (edge) => edge.target === autoDetectedTarget,
+        (edge) => edge.target === targetToNegate,
       );
 
-      // The negated edge should be absent from the graph
       expect(suppressedEdge).toBeUndefined();
     }, 120_000);
   });
