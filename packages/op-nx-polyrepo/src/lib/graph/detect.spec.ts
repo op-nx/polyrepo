@@ -99,7 +99,7 @@ describe('detectCrossRepoDependencies', () => {
       expect(edges).toBeInstanceOf(Array);
     });
 
-    it('repo-root project (root ".repos/<alias>/.") produces clean sourceFile without "/./"', () => {
+    it('repo-root project (root ".repos/<alias>/.") emits implicit edge (no sourceFile)', () => {
       function setup() {
         vi.clearAllMocks();
         vi.mocked(readFileSync).mockReturnValue('{}');
@@ -139,17 +139,14 @@ describe('detectCrossRepoDependencies', () => {
         throw new Error('Expected at least one edge');
       }
 
+      // External-sourced edges use implicit type (no sourceFile) because
+      // .repos/ is gitignored and not in Nx's file map
       expect(edge).toMatchObject({
         source: 'repo-a/root',
         target: 'host-utils',
+        type: DependencyType.implicit,
       });
-
-      // The sourceFile must NOT contain "/./" — Nx rejects paths with dot segments
-      expect(edge).toHaveProperty('sourceFile');
-
-      if ('sourceFile' in edge) {
-        expect(edge.sourceFile).toBe('.repos/repo-a/package.json');
-      }
+      expect(edge).not.toHaveProperty('sourceFile');
     });
 
     it('external node without packageName is excluded from lookup map (no edge emitted)', () => {
@@ -231,7 +228,7 @@ describe('detectCrossRepoDependencies', () => {
       expect(edges[0]).toMatchObject({
         source: 'repo-b/my-app',
         target: 'host-utils',
-        type: DependencyType.static,
+        type: DependencyType.implicit,
       });
     });
 
@@ -324,7 +321,7 @@ describe('detectCrossRepoDependencies', () => {
       expect(edges[0]).toMatchObject({
         source: 'repo-a/my-app',
         target: 'repo-b/my-lib',
-        type: DependencyType.static,
+        type: DependencyType.implicit,
       });
     });
   });
@@ -375,8 +372,7 @@ describe('detectCrossRepoDependencies', () => {
       expect(edges[0]).toStrictEqual({
         source: 'repo-a/my-app',
         target: 'repo-b/my-lib',
-        sourceFile: '.repos/repo-a/apps/my-app/package.json',
-        type: DependencyType.static,
+        type: DependencyType.implicit,
       });
     });
 
@@ -416,7 +412,7 @@ describe('detectCrossRepoDependencies', () => {
   // -------------------------------------------------------------------------
 
   describe('DETECT-02 — devDependencies field', () => {
-    it('consumer with matching devDependency emits one static edge with correct sourceFile', () => {
+    it('consumer with matching devDependency emits one implicit edge', () => {
       function setup() {
         vi.clearAllMocks();
         vi.mocked(readFileSync).mockReturnValue('{}');
@@ -457,8 +453,7 @@ describe('detectCrossRepoDependencies', () => {
       expect(edges[0]).toStrictEqual({
         source: 'repo-a/my-app',
         target: 'repo-b/my-lib',
-        sourceFile: '.repos/repo-a/apps/my-app/package.json',
-        type: DependencyType.static,
+        type: DependencyType.implicit,
       });
     });
   });
@@ -468,7 +463,7 @@ describe('detectCrossRepoDependencies', () => {
   // -------------------------------------------------------------------------
 
   describe('DETECT-03 — peerDependencies field', () => {
-    it('consumer with matching peerDependency emits one static edge with correct sourceFile', () => {
+    it('consumer with matching peerDependency emits one implicit edge', () => {
       function setup() {
         vi.clearAllMocks();
         vi.mocked(readFileSync).mockReturnValue('{}');
@@ -509,8 +504,7 @@ describe('detectCrossRepoDependencies', () => {
       expect(edges[0]).toStrictEqual({
         source: 'repo-a/my-app',
         target: 'repo-b/my-lib',
-        sourceFile: '.repos/repo-a/apps/my-app/package.json',
-        type: DependencyType.static,
+        type: DependencyType.implicit,
       });
     });
   });
@@ -520,7 +514,7 @@ describe('detectCrossRepoDependencies', () => {
   // -------------------------------------------------------------------------
 
   describe('sourceFile path', () => {
-    it('sourceFile uses forward slashes only for external source project', () => {
+    it('external-sourced edges omit sourceFile (.repos/ not in file map)', () => {
       function setup() {
         vi.clearAllMocks();
         vi.mocked(readFileSync).mockReturnValue('{}');
@@ -558,13 +552,49 @@ describe('detectCrossRepoDependencies', () => {
       const edges = detectCrossRepoDependencies(report, config, context);
 
       expect(edges).toHaveLength(1);
+      expect(edges[0]).not.toHaveProperty('sourceFile');
+    });
+
+    it('host-sourced edges include sourceFile with forward slashes', () => {
+      function setup() {
+        vi.clearAllMocks();
+
+        const packageJson = JSON.stringify({
+          dependencies: { '@scope/ext-lib': '^1.0.0' },
+        });
+        vi.mocked(readFileSync).mockReturnValue(packageJson);
+
+        const report = makeReport({
+          'repo-b': {
+            nodes: {
+              'repo-b/my-lib': makeExternalNode({
+                name: 'repo-b/my-lib',
+                root: '.repos/repo-b/libs/my-lib',
+                packageName: '@scope/ext-lib',
+              }),
+            },
+            dependencies: [],
+          },
+        });
+
+        const config = makeConfig();
+        const context = makeContext({
+          'host-app': { root: 'apps/host-app' },
+        });
+
+        return { report, config, context };
+      }
+
+      const { report, config, context } = setup();
+      const edges = detectCrossRepoDependencies(report, config, context);
+
+      expect(edges).toHaveLength(1);
 
       const edge = edges[0];
 
-      expect(edge).toHaveProperty('sourceFile');
+      expect(edge).toHaveProperty('sourceFile', 'apps/host-app/package.json');
 
       if ('sourceFile' in edge) {
-        expect(edge.sourceFile).toBe('.repos/repo-a/apps/my-app/package.json');
         expect(edge.sourceFile).not.toContain('\\');
       }
     });
@@ -847,7 +877,7 @@ describe('detectCrossRepoDependencies', () => {
       expect(edges[0]).toMatchObject({
         source: 'repo-a/my-app',
         target: 'repo-b/core',
-        type: DependencyType.static,
+        type: DependencyType.implicit,
       });
     });
 
@@ -909,7 +939,7 @@ describe('detectCrossRepoDependencies', () => {
       expect(edges[0]).toMatchObject({
         source: 'repo-a/my-app',
         target: 'repo-b/core',
-        type: DependencyType.static,
+        type: DependencyType.implicit,
       });
     });
 
@@ -972,7 +1002,7 @@ describe('detectCrossRepoDependencies', () => {
       expect(edges[0]).toMatchObject({
         source: 'repo-a/my-app',
         target: 'repo-b/utils',
-        type: DependencyType.static,
+        type: DependencyType.implicit,
       });
     });
 
@@ -1070,7 +1100,7 @@ describe('detectCrossRepoDependencies', () => {
       expect(edges[0]).toMatchObject({
         source: 'repo-a/my-app',
         target: 'repo-b/core',
-        type: DependencyType.static,
+        type: DependencyType.implicit,
       });
     });
 
@@ -1182,7 +1212,7 @@ describe('detectCrossRepoDependencies', () => {
       expect(edges[0]).toMatchObject({
         source: 'repo-b/my-app',
         target: 'host-utils',
-        type: DependencyType.static,
+        type: DependencyType.implicit,
       });
     });
 
@@ -1493,7 +1523,7 @@ describe('detectCrossRepoDependencies', () => {
       expect(edges[0]).toMatchObject({
         source: 'repo-a/my-app',
         target: 'repo-b/lib2',
-        type: DependencyType.static,
+        type: DependencyType.implicit,
       });
     });
 

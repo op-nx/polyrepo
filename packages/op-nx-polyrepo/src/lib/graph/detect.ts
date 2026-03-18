@@ -347,7 +347,7 @@ export function detectCrossRepoDependencies(
 
   function maybeEmitEdge(
     sourceName: string,
-    sourceFile: string,
+    sourceFile: string | undefined,
     depName: string,
   ): void {
     const targetName = pkgNameToProject.get(depName);
@@ -375,18 +375,31 @@ export function detectCrossRepoDependencies(
     }
 
     emitted.add(key);
-    edges.push({
-      source: sourceName,
-      target: targetName,
-      sourceFile,
-      type: DependencyType.static,
-    });
+
+    // Host-sourced edges use static type with sourceFile (files are in Nx's
+    // file map). External-sourced edges use implicit type because .repos/ is
+    // gitignored and its files are NOT in the file map — Nx rejects unknown
+    // sourceFile paths.
+    if (sourceFile !== undefined && sourceRepo === HOST_REPO_SENTINEL) {
+      edges.push({
+        source: sourceName,
+        target: targetName,
+        sourceFile,
+        type: DependencyType.static,
+      });
+    } else {
+      edges.push({
+        source: sourceName,
+        target: targetName,
+        type: DependencyType.implicit,
+      });
+    }
   }
 
   // 3a. Scan external nodes — dep lists are already on TransformedNode
+  // sourceFile is undefined because .repos/ is gitignored and not in Nx's file map
   for (const repoData of Object.values(report.repos)) {
     for (const node of Object.values(repoData.nodes)) {
-      const sourceFile = normalizePath(join(node.root, 'package.json'));
       const allDeps = [
         ...(node.dependencies ?? []),
         ...(node.devDependencies ?? []),
@@ -394,7 +407,7 @@ export function detectCrossRepoDependencies(
       ];
 
       for (const depName of allDeps) {
-        maybeEmitEdge(node.name, sourceFile, depName);
+        maybeEmitEdge(node.name, undefined, depName);
       }
     }
   }
