@@ -99,6 +99,59 @@ describe('detectCrossRepoDependencies', () => {
       expect(edges).toBeInstanceOf(Array);
     });
 
+    it('repo-root project (root ".repos/<alias>/.") produces clean sourceFile without "/./"', () => {
+      function setup() {
+        vi.clearAllMocks();
+        vi.mocked(readFileSync).mockReturnValue('{}');
+
+        const report = makeReport({
+          'repo-a': {
+            nodes: {
+              'repo-a/root': makeExternalNode({
+                name: 'repo-a/root',
+                root: '.repos/repo-a/.',
+                dependencies: ['@host/utils'],
+              }),
+            },
+            dependencies: [],
+          },
+        });
+
+        const config = makeConfig();
+        const context = makeContext({
+          'host-utils': {
+            root: 'libs/host-utils',
+            metadata: { js: { packageName: '@host/utils' } },
+          },
+        });
+
+        return { report, config, context };
+      }
+
+      const { report, config, context } = setup();
+      const edges = detectCrossRepoDependencies(report, config, context);
+
+      expect(edges).toHaveLength(1);
+
+      const edge = edges[0];
+
+      if (!edge) {
+        throw new Error('Expected at least one edge');
+      }
+
+      expect(edge).toMatchObject({
+        source: 'repo-a/root',
+        target: 'host-utils',
+      });
+
+      // The sourceFile must NOT contain "/./" — Nx rejects paths with dot segments
+      expect(edge).toHaveProperty('sourceFile');
+
+      if ('sourceFile' in edge) {
+        expect(edge.sourceFile).toBe('.repos/repo-a/package.json');
+      }
+    });
+
     it('external node without packageName is excluded from lookup map (no edge emitted)', () => {
       function setup() {
         vi.clearAllMocks();

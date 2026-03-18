@@ -386,7 +386,7 @@ export function detectCrossRepoDependencies(
   // 3a. Scan external nodes — dep lists are already on TransformedNode
   for (const repoData of Object.values(report.repos)) {
     for (const node of Object.values(repoData.nodes)) {
-      const sourceFile = normalizePath(`${node.root}/package.json`);
+      const sourceFile = normalizePath(join(node.root, 'package.json'));
       const allDeps = [
         ...(node.dependencies ?? []),
         ...(node.devDependencies ?? []),
