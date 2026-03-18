@@ -45,12 +45,18 @@ vi.mock('./lib/graph/cache', () => ({
   populateGraphReport: vi.fn<typeof populateGraphReport>(),
 }));
 
+vi.mock('./lib/graph/detect', () => ({
+  detectCrossRepoDependencies:
+    vi.fn<typeof detectCrossRepoDependencies>(),
+}));
+
 import { createNodesV2, createDependencies } from './index';
 import { logger } from '@nx/devkit';
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { hashObject } from 'nx/src/devkit-internals';
 import { populateGraphReport } from './lib/graph/cache';
+import { detectCrossRepoDependencies } from './lib/graph/detect';
 import type { PolyrepoGraphReport } from './lib/graph/types';
 import { assertDefined } from './lib/testing/asserts';
 
@@ -61,18 +67,25 @@ function setup() {
   const mockedExistsSync = vi.mocked(existsSync);
   const mockedHashObject = vi.mocked(hashObject);
   const mockedPopulateGraphReport = vi.mocked(populateGraphReport);
+  const mockedDetectCrossRepoDeps = vi.mocked(detectCrossRepoDependencies);
   const mockedLoggerWarn = vi.mocked(logger.warn);
 
   mockedReadFile.mockResolvedValue('.repos/\nnode_modules\n');
   mockedExistsSync.mockReturnValue(true);
   mockedHashObject.mockReturnValue('mock-hash');
+  mockedDetectCrossRepoDeps.mockReturnValue([]);
 
   const mockContext: CreateNodesContextV2 = {
     nxJsonConfiguration: {},
     workspaceRoot: '/workspace',
   };
 
-  return { mockedPopulateGraphReport, mockedLoggerWarn, mockContext };
+  return {
+    mockedPopulateGraphReport,
+    mockedDetectCrossRepoDeps,
+    mockedLoggerWarn,
+    mockContext,
+  };
 }
 
 /**
@@ -486,5 +499,161 @@ describe(createDependencies, () => {
     const deps = await createDependencies(options, depContext);
 
     expect(deps).toStrictEqual([]);
+  });
+
+  it('includes cross-repo edges from detectCrossRepoDependencies', async () => {
+    expect.hasAssertions();
+
+    const { mockedPopulateGraphReport, mockedDetectCrossRepoDeps } = setup();
+
+    const report: PolyrepoGraphReport = {
+      repos: {
+        'repo-a': {
+          nodes: {},
+          dependencies: [
+            {
+              source: 'repo-a/my-app',
+              target: 'repo-a/my-lib',
+              type: 'static',
+            },
+          ],
+        },
+      },
+    };
+
+    mockedPopulateGraphReport.mockResolvedValue(report);
+    mockedDetectCrossRepoDeps.mockReturnValue([
+      {
+        source: 'host-app',
+        target: 'repo-a/lib',
+        type: 'static' as const,
+      },
+    ]);
+
+    const depContext = createDepContext({
+      'host-app': { root: 'apps/host-app' },
+      'repo-a/my-app': { root: '.repos/repo-a/apps/my-app' },
+      'repo-a/my-lib': { root: '.repos/repo-a/libs/my-lib' },
+      'repo-a/lib': { root: '.repos/repo-a/libs/lib' },
+    });
+
+    const options = {
+      repos: { 'repo-a': 'git@github.com:org/repo-a.git' },
+    };
+
+    const deps = await createDependencies(options, depContext);
+
+    // Should include both intra-repo implicit edge and cross-repo static edge
+    expect(deps).toContainEqual({
+      source: 'repo-a/my-app',
+      target: 'repo-a/my-lib',
+      type: 'implicit',
+    });
+    expect(deps).toContainEqual({
+      source: 'host-app',
+      target: 'repo-a/lib',
+      type: 'static',
+    });
+    expect(deps).toHaveLength(2);
+
+    // Verify detectCrossRepoDependencies was called with correct arguments
+    expect(mockedDetectCrossRepoDeps).toHaveBeenCalledExactlyOnceWith(
+      report,
+      expect.objectContaining({ repos: expect.any(Object) }),
+      depContext,
+    );
+  });
+
+  it('propagates detectCrossRepoDependencies errors (OVRD-03)', async () => {
+    expect.hasAssertions();
+
+    const { mockedPopulateGraphReport, mockedDetectCrossRepoDeps } = setup();
+
+    const report: PolyrepoGraphReport = {
+      repos: {
+        'repo-a': {
+          nodes: {},
+          dependencies: [],
+        },
+      },
+    };
+
+    mockedPopulateGraphReport.mockResolvedValue(report);
+    mockedDetectCrossRepoDeps.mockImplementation(() => {
+      throw new Error('Unknown project in overrides: bad-project');
+    });
+
+    const depContext = createDepContext({});
+
+    const options = {
+      repos: { 'repo-a': 'git@github.com:org/repo-a.git' },
+    };
+
+    await expect(
+      createDependencies(options, depContext),
+    ).rejects.toThrowError('Unknown project in overrides: bad-project');
+  });
+
+  it('does not call detectCrossRepoDependencies when extraction fails', async () => {
+    expect.hasAssertions();
+
+    const { mockedPopulateGraphReport, mockedDetectCrossRepoDeps } = setup();
+
+    mockedPopulateGraphReport.mockRejectedValue(
+      new Error('extraction failed'),
+    );
+
+    const depContext = createDepContext({});
+
+    const options = {
+      repos: { 'repo-a': 'git@github.com:org/repo-a.git' },
+    };
+
+    const deps = await createDependencies(options, depContext);
+
+    expect(deps).toStrictEqual([]);
+    expect(mockedDetectCrossRepoDeps).not.toHaveBeenCalled();
+  });
+
+  it('returns only intra-repo edges when detection returns empty', async () => {
+    expect.hasAssertions();
+
+    const { mockedPopulateGraphReport, mockedDetectCrossRepoDeps } = setup();
+
+    const report: PolyrepoGraphReport = {
+      repos: {
+        'repo-a': {
+          nodes: {},
+          dependencies: [
+            {
+              source: 'repo-a/my-app',
+              target: 'repo-a/my-lib',
+              type: 'static',
+            },
+          ],
+        },
+      },
+    };
+
+    mockedPopulateGraphReport.mockResolvedValue(report);
+    mockedDetectCrossRepoDeps.mockReturnValue([]);
+
+    const depContext = createDepContext({
+      'repo-a/my-app': { root: '.repos/repo-a/apps/my-app' },
+      'repo-a/my-lib': { root: '.repos/repo-a/libs/my-lib' },
+    });
+
+    const options = {
+      repos: { 'repo-a': 'git@github.com:org/repo-a.git' },
+    };
+
+    const deps = await createDependencies(options, depContext);
+
+    expect(deps).toHaveLength(1);
+    expect(deps[0]).toStrictEqual({
+      source: 'repo-a/my-app',
+      target: 'repo-a/my-lib',
+      type: 'implicit',
+    });
   });
 });
