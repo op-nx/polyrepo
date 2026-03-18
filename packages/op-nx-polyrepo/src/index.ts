@@ -147,7 +147,15 @@ export const createDependencies: CreateDependencies<PolyrepoConfig> = async (
   // NOT wrapped in try/catch -- OVRD-03 validation errors intentionally
   // propagate to Nx so users see a clear error message.
   const crossRepoDeps = detectCrossRepoDependencies(report, config, context);
-  dependencies.push(...crossRepoDeps);
+
+  // Filter out edges referencing projects that Nx didn't register (e.g., due
+  // to createNodesV2 failures or merge conflicts). Nx validates that both
+  // source and target exist in the project graph.
+  for (const dep of crossRepoDeps) {
+    if (context.projects[dep.source] && context.projects[dep.target]) {
+      dependencies.push(dep);
+    }
+  }
 
   return dependencies;
 };
