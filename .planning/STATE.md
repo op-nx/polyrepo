@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Cross-repo Dependencies
 status: completed
-stopped_at: Completed 10-integration-and-end-to-end-validation-02-PLAN.md
-last_updated: "2026-03-18T18:54:40.515Z"
-last_activity: 2026-03-18 --- Completed Phase 10 Plan 2 (cross-repo dependency e2e tests)
+stopped_at: Completed 10-integration-and-end-to-end-validation-03-PLAN.md
+last_updated: "2026-03-18T22:13:41Z"
+last_activity: 2026-03-18 --- Completed Phase 10 Plan 3 (gap closure -- fileMap guard fix and e2e restoration)
 progress:
   total_phases: 3
   completed_phases: 3
-  total_plans: 5
-  completed_plans: 5
+  total_plans: 6
+  completed_plans: 6
   percent: 100
 ---
 
@@ -21,23 +21,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-17)
 
 **Core value:** `nx graph` displays projects from all synced repos with cross-repo dependency edges, and all relevant Nx CLI commands output projects from multiple repos
-**Current focus:** Milestone v1.1 complete -- all phases executed
+**Current focus:** Milestone v1.1 complete -- all phases executed, gap closure done
 
 ## Current Position
 
 Phase: 10 of 10 (Integration and End-to-End Validation)
-Plan: 2 of 2 in Phase 10 (complete)
-Status: Milestone v1.1 complete -- all 5 plans across 3 phases executed
-Last activity: 2026-03-18 --- Completed Phase 10 Plan 2 (cross-repo dependency e2e tests)
+Plan: 3 of 3 in Phase 10 (complete)
+Status: Milestone v1.1 complete -- all 6 plans across 3 phases executed (including gap closure)
+Last activity: 2026-03-18 --- Completed Phase 10 Plan 3 (gap closure -- fileMap guard fix and e2e restoration)
 
 Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 5 (v1.1)
-- Average duration: ~5.2 minutes
-- Total execution time: ~26 minutes
+- Total plans completed: 6 (v1.1)
+- Average duration: ~6.7 minutes
+- Total execution time: ~40 minutes
 
 ## Accumulated Context
 
@@ -59,6 +59,8 @@ Recent decisions affecting current work:
 - [Phase 10-integration]: Extraction try/catch restructured so config and report survive to detection call while OVRD-03 errors propagate
 - [Phase 10-integration]: DETECT-07 deferral documented inline in index.ts near the detection call with root cause and future solution
 - [Phase 10-integration]: E2e cross-repo tests share container with polyrepo-status to reuse synced state; project names discovered dynamically from graph output
+- [Phase 10-gap-closure]: Removed fileMap guard entirely for cross-repo edges -- context.projects check sufficient since all cross-repo edges are implicit type
+- [Phase 10-gap-closure]: @nx/devkit injection in auto-detect e2e test guarantees packageName match with nrwl/nx repo
 
 ### Pending Todos
 
@@ -70,9 +72,10 @@ Recent decisions affecting current work:
 - **Cold start with daemon**: First extraction after sync needs `NX_DAEMON=false`
 - **Pop-over cmd windows on Windows**: Nx `runCommandsImpl` spawns without `windowsHide`
 - **Scaling**: ~4s for 150 projects from cached graph; may need optimization for 500+ project workspaces
+- **Task hasher crash with cross-repo edges**: Nx NativeTaskHasherImpl crashes with "project not found" when cross-repo edges target projects without file map entries (happens when .repos/ is gitignored). Workaround: run vitest/eslint directly. See deferred-items.md.
 
 ## Session Continuity
 
-Last session: 2026-03-18T18:54:40.511Z
-Stopped at: Completed 10-integration-and-end-to-end-validation-02-PLAN.md
-Resume: Milestone v1.1 complete -- /gsd:audit-milestone
+Last session: 2026-03-18T22:13:41Z
+Stopped at: Completed 10-integration-and-end-to-end-validation-03-PLAN.md
+Resume: Milestone v1.1 complete (with gap closure) -- /gsd:audit-milestone
