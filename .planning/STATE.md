@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Cross-repo Dependencies
-status: executing
-stopped_at: Completed 10-integration-and-end-to-end-validation-01-PLAN.md
-last_updated: "2026-03-18T18:37:56.922Z"
-last_activity: 2026-03-18 --- Completed Phase 10 Plan 1 (integration wiring + DETECT-07 docs)
+status: completed
+stopped_at: Completed 10-integration-and-end-to-end-validation-02-PLAN.md
+last_updated: "2026-03-18T18:54:40.515Z"
+last_activity: 2026-03-18 --- Completed Phase 10 Plan 2 (cross-repo dependency e2e tests)
 progress:
   total_phases: 3
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 5
-  completed_plans: 4
-  percent: 80
+  completed_plans: 5
+  percent: 100
 ---
 
 # Project State
@@ -21,23 +21,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-17)
 
 **Core value:** `nx graph` displays projects from all synced repos with cross-repo dependency edges, and all relevant Nx CLI commands output projects from multiple repos
-**Current focus:** Phase 10 -- Integration and End-to-End Validation
+**Current focus:** Milestone v1.1 complete -- all phases executed
 
 ## Current Position
 
 Phase: 10 of 10 (Integration and End-to-End Validation)
-Plan: 1 of 2 in Phase 10 (complete)
-Status: Phase 10 Plan 1 complete, ready for Plan 2
-Last activity: 2026-03-18 --- Completed Phase 10 Plan 1 (integration wiring + DETECT-07 docs)
+Plan: 2 of 2 in Phase 10 (complete)
+Status: Milestone v1.1 complete -- all 5 plans across 3 phases executed
+Last activity: 2026-03-18 --- Completed Phase 10 Plan 2 (cross-repo dependency e2e tests)
 
-Progress: [████████░░] 80%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 4 (v1.1)
-- Average duration: ~5.5 minutes
-- Total execution time: ~22 minutes
+- Total plans completed: 5 (v1.1)
+- Average duration: ~5.2 minutes
+- Total execution time: ~26 minutes
 
 ## Accumulated Context
 
@@ -58,6 +58,7 @@ Recent decisions affecting current work:
 - [Phase 09-cross-repo-dependency-detection]: Override validation uses allProjectNames (external + host) to support patterns targeting host projects
 - [Phase 10-integration]: Extraction try/catch restructured so config and report survive to detection call while OVRD-03 errors propagate
 - [Phase 10-integration]: DETECT-07 deferral documented inline in index.ts near the detection call with root cause and future solution
+- [Phase 10-integration]: E2e cross-repo tests share container with polyrepo-status to reuse synced state; project names discovered dynamically from graph output
 
 ### Pending Todos
 
@@ -72,6 +73,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-03-18T18:37:56.912Z
-Stopped at: Completed 10-integration-and-end-to-end-validation-01-PLAN.md
-Resume: /gsd:execute-phase 10
+Last session: 2026-03-18T18:54:40.511Z
+Stopped at: Completed 10-integration-and-end-to-end-validation-02-PLAN.md
+Resume: Milestone v1.1 complete -- /gsd:audit-milestone
