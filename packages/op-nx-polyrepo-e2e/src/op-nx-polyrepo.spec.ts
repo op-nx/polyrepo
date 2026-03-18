@@ -217,7 +217,13 @@ describe('@op-nx/polyrepo', () => {
       expect(crossRepoEdges.length).toBeGreaterThan(0);
 
       // Store one auto-detected target for the negation test
-      autoDetectedTarget = crossRepoEdges[0].target;
+      const firstEdge = crossRepoEdges[0];
+
+      if (!firstEdge) {
+        throw new Error('Expected at least one cross-repo edge');
+      }
+
+      autoDetectedTarget = firstEdge.target;
 
       // Discover an nx/* project that is NOT in the auto-detected edges
       // (for the override test -- pick one that @workspace/source does NOT depend on)
