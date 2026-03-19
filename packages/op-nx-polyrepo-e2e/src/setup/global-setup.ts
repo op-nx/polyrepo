@@ -78,44 +78,62 @@ export default async function setup(project: TestProject) {
   let workspace: StartedTestContainer | undefined;
 
   try {
-    const t0 = performance.now();
-    const elapsed = () => `${((performance.now() - t0) / 1000).toFixed(1)}s`;
+    async function timed<T>(label: string, fn: () => Promise<T>): Promise<T> {
+      const start = performance.now();
+      const result = await fn();
+      const sec = (performance.now() - start) / 1000;
+      const m = Math.floor(sec / 60);
+      const s = sec % 60;
+      const duration = m > 0 ? `${String(m)}m${s.toFixed(1)}s` : `${s.toFixed(1)}s`;
+      console.log(`[e2e] ${label} (${duration})`);
+
+      return result;
+    }
 
     // Phase 1: Build image and create network in parallel (independent)
-    console.log('[e2e] Building image and creating network...');
     const dockerfilePath = resolve(__dirname, '../../docker').replaceAll('\\', '/');
     const verdaccioConfig = resolve(__dirname, '../../docker/verdaccio.yaml').replaceAll('\\', '/');
 
-    const [workspaceImage, startedNetwork] = await Promise.all([
-      GenericContainer.fromDockerfile(dockerfilePath)
-        .withCache(true)
-        .build('op-nx-e2e-workspace', { deleteOnExit: false }),
-      new Network().start(),
-    ]);
+    const [workspaceImage, startedNetwork] = await timed(
+      'Image + network ready',
+      () => Promise.all([
+        GenericContainer.fromDockerfile(dockerfilePath)
+          .withCache(true)
+          .build('op-nx-e2e-workspace', { deleteOnExit: false }),
+        new Network().start(),
+      ]),
+    );
 
     network = startedNetwork;
-    console.log(`[e2e] [${elapsed()}] Image + network ready`);
 
     // Phase 2: Start Verdaccio and workspace in parallel (both need network)
-    const [startedVerdaccio, startedWorkspace] = await Promise.all([
-      new GenericContainer('hertzg/verdaccio')
-        .withNetwork(network)
-        .withNetworkAliases('verdaccio')
-        .withExposedPorts(4873)
-        .withName('op-nx-polyrepo-e2e-verdaccio')
-        .withCopyFilesToContainer([{ source: verdaccioConfig, target: '/verdaccio/conf/config.yaml' }])
-        .withWaitStrategy(Wait.forListeningPorts())
-        .start(),
-      workspaceImage
-        .withNetwork(network)
-        .withName('op-nx-polyrepo-e2e-workspace')
-        .withCommand(['sleep', 'infinity'])
-        .start(),
-    ]);
+    // network is guaranteed assigned from phase 1 above
+    const readyNetwork = network;
+
+    const [startedVerdaccio, startedWorkspace] = await timed(
+      'Verdaccio + workspace started',
+      () => Promise.all([
+        new GenericContainer('hertzg/verdaccio')
+          .withNetwork(readyNetwork)
+          .withNetworkAliases('verdaccio')
+          .withExposedPorts(4873)
+          .withName('op-nx-polyrepo-e2e-verdaccio')
+          .withCopyFilesToContainer([{ source: verdaccioConfig, target: '/verdaccio/conf/config.yaml' }])
+          .withWaitStrategy(Wait.forListeningPorts())
+          .start(),
+        workspaceImage
+          .withNetwork(readyNetwork)
+          .withName('op-nx-polyrepo-e2e-workspace')
+          .withCommand(['sleep', 'infinity'])
+          .start(),
+      ]),
+    );
 
     verdaccio = startedVerdaccio;
     workspace = startedWorkspace;
-    console.log(`[e2e] [${elapsed()}] Verdaccio + workspace started`);
+
+    // Local binding guaranteed non-undefined for closures below
+    const ctr = startedWorkspace;
 
     // Phase 3: Publish plugin and write nx.json in parallel
     // (publish needs Verdaccio, write needs workspace — independent)
@@ -139,9 +157,9 @@ export default async function setup(project: TestProject) {
       2,
     );
 
-    await Promise.all([
+    await timed('Published + nx.json written', () => Promise.all([
       publishPlugin(registryPort, registryUrl),
-      workspace.exec(
+      ctr.exec(
         [
           'sh',
           '-c',
@@ -149,51 +167,46 @@ export default async function setup(project: TestProject) {
         ],
         { workingDir: '/workspace' },
       ),
-    ]);
-
-    console.log(`[e2e] [${elapsed()}] Published + nx.json written`);
+    ]));
 
     // Phase 4: Install plugin (needs both Verdaccio published + workspace ready)
-    const installResult = await workspace.exec(
-      ['npm', 'install', '-D', '@op-nx/polyrepo@e2e', '--registry', 'http://verdaccio:4873'],
-      { workingDir: '/workspace' },
-    );
-
-    if (installResult.exitCode !== 0) {
-      throw new Error(
-        `Plugin install failed (exit ${String(installResult.exitCode)}):\n${installResult.stderr || installResult.output}`,
+    await timed('Plugin installed', async () => {
+      const installResult = await ctr.exec(
+        ['npm', 'install', '-D', '@op-nx/polyrepo@e2e', '--registry', 'http://verdaccio:4873'],
+        { workingDir: '/workspace' },
       );
-    }
 
-    console.log(`[e2e] [${elapsed()}] Plugin installed`);
+      if (installResult.exitCode !== 0) {
+        throw new Error(
+          `Plugin install failed (exit ${String(installResult.exitCode)}):\n${installResult.stderr || installResult.output}`,
+        );
+      }
+    });
 
     // Phase 5: Warm the plugin's graph cache.
     // This triggers createNodesV2 → populateGraphReport → extractGraphFromRepo
     // which writes .repos/.polyrepo-graph-cache.json. Without this, every test
     // container's first nx command would re-extract the graph.
-    await workspace.exec(
+    await timed('Graph cache warmed', () => ctr.exec(
       ['npx', 'nx', 'show', 'projects'],
       { workingDir: '/workspace' },
-    );
-
-    console.log(`[e2e] [${elapsed()}] Graph cache warmed`);
+    ));
 
     // Phase 6: Commit snapshot image
-    console.log('[e2e] Committing workspace snapshot...');
-    const snapshotImage = await workspace.commit({
+    const snapshotImage = await timed('Snapshot committed', () => ctr.commit({
       repo: 'op-nx-e2e-snapshot',
       tag: 'latest',
       deleteOnExit: true,
-    });
+    }));
 
     // 7. Provide to test files via Vitest inject()
     project.provide('snapshotImage', snapshotImage);
 
     // Stop the setup workspace (tests use snapshot, not this container)
-    await workspace.stop();
-    workspace = undefined;
-
-    console.log(`[e2e] [${elapsed()}] Global setup complete.`);
+    await timed('Setup container stopped', async () => {
+      await ctr.stop();
+      workspace = undefined;
+    });
 
     // 8. Return teardown function
     return async function teardown() {
