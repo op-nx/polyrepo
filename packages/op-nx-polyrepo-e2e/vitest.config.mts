@@ -14,7 +14,6 @@ export default defineConfig(() => ({
     hookTimeout: 120_000,
     globalSetup: ['./src/setup/global-setup.ts'],
     pool: 'forks',
-    maxWorkers: 1,
     coverage: {
       reportsDirectory: './test-output/vitest/coverage',
       provider: 'v8' as const,
