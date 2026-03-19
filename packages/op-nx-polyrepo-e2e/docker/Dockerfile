@@ -67,4 +67,11 @@ COPY --link --from=nx-prep /synced-nx /workspace/.repos/nx
 
 WORKDIR /workspace
 
+# Pre-warm the host workspace's Nx cache (.nx/workspace-data/).
+# This caches file scanning, built-in plugin processing, and the base
+# project graph. When the polyrepo plugin is installed later (in
+# global-setup), Nx incrementally updates the cached graph instead of
+# rebuilding from scratch.
+RUN NX_DAEMON=false npx nx show projects 2>/dev/null || true
+
 CMD ["sleep", "infinity"]

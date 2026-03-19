@@ -25,104 +25,103 @@ import { releasePublish, releaseVersion } from 'nx/release';
 const require = createRequire(import.meta.url);
 const nxVersion: string = require('nx/package.json').version;
 
+async function publishPlugin(registryPort: number, registryUrl: string): Promise<void> {
+  const originalRegistry = process.env['npm_config_registry'];
+  const originalNxDaemon = process.env['NX_DAEMON'];
+  process.env['npm_config_registry'] = registryUrl;
+  process.env['NX_DAEMON'] = 'false';
+
+  execSync(
+    `npm config set //localhost:${String(registryPort)}/:_authToken "secretVerdaccioToken" --ws=false`,
+    { stdio: 'inherit', windowsHide: true },
+  );
+
+  try {
+    await releaseVersion({
+      specifier: '0.0.0-e2e',
+      stageChanges: false,
+      gitCommit: false,
+      gitTag: false,
+      firstRelease: true,
+      versionActionsOptionsOverrides: {
+        skipLockFileUpdate: true,
+      },
+    });
+
+    await releasePublish({
+      tag: 'e2e',
+      firstRelease: true,
+    });
+  } finally {
+    execSync(
+      `npm config delete //localhost:${String(registryPort)}/:_authToken --ws=false`,
+      { stdio: 'ignore', windowsHide: true },
+    );
+
+    if (originalRegistry === undefined) {
+      delete process.env['npm_config_registry'];
+    } else {
+      process.env['npm_config_registry'] = originalRegistry;
+    }
+
+    if (originalNxDaemon === undefined) {
+      delete process.env['NX_DAEMON'];
+    } else {
+      process.env['NX_DAEMON'] = originalNxDaemon;
+    }
+  }
+}
+
 export default async function setup(project: TestProject) {
   let network: StartedNetwork | undefined;
   let verdaccio: StartedTestContainer | undefined;
   let workspace: StartedTestContainer | undefined;
 
   try {
-    // 1. Build the prebaked workspace image using testcontainers API
-    console.log('[e2e] Building prebaked workspace Docker image...');
+    const t0 = performance.now();
+    const elapsed = () => `${((performance.now() - t0) / 1000).toFixed(1)}s`;
+
+    // Phase 1: Build image and create network in parallel (independent)
+    console.log('[e2e] Building image and creating network...');
     const dockerfilePath = resolve(__dirname, '../../docker').replaceAll('\\', '/');
-    const workspaceImage = await GenericContainer.fromDockerfile(dockerfilePath)
-      .withCache(true)
-      .build('op-nx-e2e-workspace', { deleteOnExit: false });
-
-    // 2. Create shared network
-    console.log('[e2e] Creating shared network...');
-    network = await new Network().start();
-
-    // 3. Start Verdaccio on the shared network with permissive config
-    // (default hertzg/verdaccio config requires auth for publish)
-    console.log('[e2e] Starting Verdaccio registry...');
     const verdaccioConfig = resolve(__dirname, '../../docker/verdaccio.yaml').replaceAll('\\', '/');
-    verdaccio = await new GenericContainer('hertzg/verdaccio')
-      .withNetwork(network)
-      .withNetworkAliases('verdaccio')
-      .withExposedPorts(4873)
-      .withName('op-nx-polyrepo-e2e-verdaccio')
-      .withCopyFilesToContainer([{ source: verdaccioConfig, target: '/verdaccio/conf/config.yaml' }])
-      .withWaitStrategy(Wait.forListeningPorts())
-      .start();
 
+    const [workspaceImage, startedNetwork] = await Promise.all([
+      GenericContainer.fromDockerfile(dockerfilePath)
+        .withCache(true)
+        .build('op-nx-e2e-workspace', { deleteOnExit: false }),
+      new Network().start(),
+    ]);
+
+    network = startedNetwork;
+    console.log(`[e2e] [${elapsed()}] Image + network ready`);
+
+    // Phase 2: Start Verdaccio and workspace in parallel (both need network)
+    const [startedVerdaccio, startedWorkspace] = await Promise.all([
+      new GenericContainer('hertzg/verdaccio')
+        .withNetwork(network)
+        .withNetworkAliases('verdaccio')
+        .withExposedPorts(4873)
+        .withName('op-nx-polyrepo-e2e-verdaccio')
+        .withCopyFilesToContainer([{ source: verdaccioConfig, target: '/verdaccio/conf/config.yaml' }])
+        .withWaitStrategy(Wait.forListeningPorts())
+        .start(),
+      workspaceImage
+        .withNetwork(network)
+        .withName('op-nx-polyrepo-e2e-workspace')
+        .withCommand(['sleep', 'infinity'])
+        .start(),
+    ]);
+
+    verdaccio = startedVerdaccio;
+    workspace = startedWorkspace;
+    console.log(`[e2e] [${elapsed()}] Verdaccio + workspace started`);
+
+    // Phase 3: Publish plugin and write nx.json in parallel
+    // (publish needs Verdaccio, write needs workspace — independent)
     const registryPort = verdaccio.getMappedPort(4873);
     const registryUrl = `http://localhost:${String(registryPort)}`;
 
-    // 4. Publish plugin to Verdaccio (on host via mapped port)
-    // Set auth token — Verdaccio accepts any token when publish: $all,
-    // but npm CLI requires one to be configured
-    console.log(`[e2e] Publishing plugin to Verdaccio at ${registryUrl}...`);
-    const originalRegistry = process.env['npm_config_registry'];
-    process.env['npm_config_registry'] = registryUrl;
-    execSync(
-      `npm config set //localhost:${String(registryPort)}/:_authToken "secretVerdaccioToken" --ws=false`,
-      { stdio: 'inherit', windowsHide: true },
-    );
-
-    try {
-      await releaseVersion({
-        specifier: '0.0.0-e2e',
-        stageChanges: false,
-        gitCommit: false,
-        gitTag: false,
-        firstRelease: true,
-        versionActionsOptionsOverrides: {
-          skipLockFileUpdate: true,
-        },
-      });
-
-      await releasePublish({
-        tag: 'e2e',
-        firstRelease: true,
-      });
-    } finally {
-      // Clean up auth token and restore registry
-      execSync(
-        `npm config delete //localhost:${String(registryPort)}/:_authToken --ws=false`,
-        { stdio: 'ignore', windowsHide: true },
-      );
-
-      if (originalRegistry === undefined) {
-        delete process.env['npm_config_registry'];
-      } else {
-        process.env['npm_config_registry'] = originalRegistry;
-      }
-    }
-
-    // 5. Start workspace container and install plugin
-    console.log('[e2e] Starting workspace container...');
-    workspace = await workspaceImage
-      .withNetwork(network)
-      .withName('op-nx-polyrepo-e2e-workspace')
-      .withCommand(['sleep', 'infinity'])
-      .start();
-
-    console.log('[e2e] Installing plugin in workspace container...');
-    const installResult = await workspace.exec(
-      ['npm', 'install', '-D', '@op-nx/polyrepo@e2e', '--registry', 'http://verdaccio:4873'],
-      { workingDir: '/workspace' },
-    );
-
-    if (installResult.exitCode !== 0) {
-      throw new Error(
-        `Plugin install failed (exit ${String(installResult.exitCode)}):\n${installResult.stderr || installResult.output}`,
-      );
-    }
-
-    // 5b. Write nx.json with plugin config.
-    // The Dockerfile already pre-synced .repos/nx/ (clone + pnpm install + graph cache).
-    // We just need the plugin config so the snapshot starts with a working nx.json.
-    console.log('[e2e] Writing nx.json...');
     const nxJsonContent = JSON.stringify(
       {
         plugins: [
@@ -140,26 +139,46 @@ export default async function setup(project: TestProject) {
       2,
     );
 
-    await workspace.exec(
-      [
-        'sh',
-        '-c',
-        `cat > /workspace/nx.json << 'NXJSONEOF'\n${nxJsonContent}\nNXJSONEOF`,
-      ],
+    await Promise.all([
+      publishPlugin(registryPort, registryUrl),
+      workspace.exec(
+        [
+          'sh',
+          '-c',
+          `cat > /workspace/nx.json << 'NXJSONEOF'\n${nxJsonContent}\nNXJSONEOF`,
+        ],
+        { workingDir: '/workspace' },
+      ),
+    ]);
+
+    console.log(`[e2e] [${elapsed()}] Published + nx.json written`);
+
+    // Phase 4: Install plugin (needs both Verdaccio published + workspace ready)
+    const installResult = await workspace.exec(
+      ['npm', 'install', '-D', '@op-nx/polyrepo@e2e', '--registry', 'http://verdaccio:4873'],
       { workingDir: '/workspace' },
     );
 
-    // 5c. Warm the plugin's graph cache by running any nx command.
+    if (installResult.exitCode !== 0) {
+      throw new Error(
+        `Plugin install failed (exit ${String(installResult.exitCode)}):\n${installResult.stderr || installResult.output}`,
+      );
+    }
+
+    console.log(`[e2e] [${elapsed()}] Plugin installed`);
+
+    // Phase 5: Warm the plugin's graph cache.
     // This triggers createNodesV2 → populateGraphReport → extractGraphFromRepo
     // which writes .repos/.polyrepo-graph-cache.json. Without this, every test
-    // container's first nx command would re-extract the graph (~2-5 min).
-    console.log('[e2e] Warming plugin graph cache...');
+    // container's first nx command would re-extract the graph.
     await workspace.exec(
       ['npx', 'nx', 'show', 'projects'],
       { workingDir: '/workspace' },
     );
 
-    // 6. Commit snapshot image
+    console.log(`[e2e] [${elapsed()}] Graph cache warmed`);
+
+    // Phase 6: Commit snapshot image
     console.log('[e2e] Committing workspace snapshot...');
     const snapshotImage = await workspace.commit({
       repo: 'op-nx-e2e-snapshot',
@@ -171,11 +190,10 @@ export default async function setup(project: TestProject) {
     project.provide('snapshotImage', snapshotImage);
 
     // Stop the setup workspace (tests use snapshot, not this container)
-    console.log('[e2e] Stopping setup workspace container...');
     await workspace.stop();
     workspace = undefined;
 
-    console.log('[e2e] Global setup complete.');
+    console.log(`[e2e] [${elapsed()}] Global setup complete.`);
 
     // 8. Return teardown function
     return async function teardown() {
