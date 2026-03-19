@@ -32,15 +32,18 @@ function tryReadCachedGraph(repoPath: string): ExternalGraphJson | undefined {
 
     // The cached file may contain Nx banner/error output before the JSON
     // (e.g., Gradle plugin download progress on stdout). Find the actual
-    // JSON start by looking for the nx graph --print envelope.
-    const jsonStart = raw.indexOf('{"graph"');
+    // JSON start by looking for the nx graph --print envelope. The output
+    // may be pretty-printed ({\n  "graph") or compact ({"graph").
+    const match = /\{\s*"graph"/.exec(raw);
+    const jsonStart = match?.index ?? -1;
 
     if (jsonStart < 0) {
       return undefined;
     }
 
-    const parsed: { graph?: unknown } = JSON.parse(raw.substring(jsonStart));
-    const result = externalGraphJsonSchema.safeParse(parsed.graph);
+    const result = externalGraphJsonSchema.safeParse(
+      JSON.parse(raw.substring(jsonStart)),
+    );
 
     if (!result.success) {
       return undefined;
