@@ -71,7 +71,7 @@
   ],
   "release": {
     "version": {
-      "preVersionCommand": "npx nx run-many -t build --exclude tag:polyrepo:external --skipSync"
+      "preVersionCommand": "npx nx run-many -t build --exclude tag:polyrepo:external --exclude-task-dependencies"
     }
   },
   "targetDefaults": {

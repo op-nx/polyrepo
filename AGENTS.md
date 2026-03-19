@@ -13,6 +13,7 @@ Never stage `.planning/config.json` fields prefixed with `_` (e.g., `workflow._a
 - You have access to the Nx MCP server and its tools, use them to help the user
 - For Nx plugin best practices, check `node_modules/@nx/<plugin>/PLUGIN.md`. Not all plugins have this file - proceed without it if unavailable.
 - NEVER guess CLI flags - always check nx_docs or `--help` first when unsure
+- **Always use kebab-case for Nx CLI options** (e.g., `--skip-sync`, `--skip-git`, `--nx-cloud`, `--exclude-task-dependencies`). Never use camelCase (e.g., ~~`--skipSync`~~, ~~`--skipGit`~~). Exception: when flags are passed through to a tool that requires camelCase (e.g., Jest).
 
 ## Scaffolding & Generators
 

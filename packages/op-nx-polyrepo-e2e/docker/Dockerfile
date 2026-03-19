@@ -51,10 +51,10 @@ RUN git config --global user.email "e2e@test.local" && \
 # Copy prebaked nrwl/nx source repo (for file:///repos/nx clone source)
 COPY --link --from=nx-prep /repos/nx /repos/nx
 
-# Create workspace (--skipGit: we init after adding .repos/ to .gitignore)
+# Create workspace (--skip-git: we init after adding .repos/ to .gitignore)
 ARG NX_VERSION=22.5.4
 RUN npx --yes create-nx-workspace@${NX_VERSION} workspace \
-    --preset=apps --interactive=false --nxCloud=skip --skipGit
+    --preset=apps --interactive=false --nx-cloud=skip --skip-git
 
 # Add .repos/ to .gitignore before git init — matches local dev setup
 RUN echo "\n# Synced polyrepo workspaces\n.repos/" >> /workspace/.gitignore
