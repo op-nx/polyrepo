@@ -9,12 +9,28 @@ export const nxVersion: string = require('nx/package.json').version;
 
 /**
  * Start a test container from the pre-synced snapshot image.
+ * Restores node_modules from the warm npm cache — the snapshot has
+ * ~/.npm/_cacache/ but node_modules is deleted before commit to keep
+ * the overlay2 diff small (30K fewer files = minutes faster commit).
  */
 export async function startContainer(snapshotImage: string, name: string): Promise<StartedTestContainer> {
-  return new GenericContainer(snapshotImage)
+  const ctr = await new GenericContainer(snapshotImage)
     .withName(`op-nx-polyrepo-e2e-${name}`)
     .withCommand(['sleep', 'infinity'])
     .start();
+
+  const result = await ctr.exec(
+    ['npm', 'install', '--prefer-offline', '--no-audit'],
+    { workingDir: '/workspace' },
+  );
+
+  if (result.exitCode !== 0) {
+    throw new Error(
+      `npm install failed in ${name}: ${result.stderr || result.output}`,
+    );
+  }
+
+  return ctr;
 }
 
 /**

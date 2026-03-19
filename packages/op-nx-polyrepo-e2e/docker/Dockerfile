@@ -28,9 +28,13 @@ RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
     cd /synced-nx && corepack enable && \
     COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack pnpm install --frozen-lockfile
 
-# Pre-warm Nx graph cache (Gradle daemon init ~2min, subsequent runs fast).
+# Pre-warm Nx graph cache AND capture raw JSON for the polyrepo plugin.
+# The plugin's extractGraphFromRepo() reads this cached file instead of
+# spawning a child `nx graph --print` process (~4-5 min cold start due to
+# @nx/gradle JVM init). The JSON is copied alongside .repos/nx/ so the
+# plugin can find it at .repos/nx/.nx-graph-output.json.
 # || true: don't fail the build if a plugin errors — graph cache is best-effort.
-RUN cd /synced-nx && npx nx graph --print > /dev/null 2>&1 || true
+RUN cd /synced-nx && npx nx graph --print > /synced-nx/.nx-graph-output.json 2>/dev/null || true
 
 # ─── Stage 2: workspace setup (cheap, changes often) ─────────────────────────
 FROM node:22-slim
