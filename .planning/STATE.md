@@ -4,8 +4,8 @@ milestone: v1.1
 milestone_name: Cross-repo Dependencies
 status: completed
 stopped_at: Completed 10-integration-and-end-to-end-validation-03-PLAN.md
-last_updated: "2026-03-18T22:13:41Z"
-last_activity: 2026-03-18 --- Completed Phase 10 Plan 3 (gap closure -- fileMap guard fix and e2e restoration)
+last_updated: "2026-03-19T17:30:00Z"
+last_activity: 2026-03-19 --- Resolved fileMap guard with namedInputs override; all 7 e2e tests pass
 progress:
   total_phases: 3
   completed_phases: 3
@@ -61,6 +61,9 @@ Recent decisions affecting current work:
 - [Phase 10-integration]: E2e cross-repo tests share container with polyrepo-status to reuse synced state; project names discovered dynamically from graph output
 - [Phase 10-gap-closure]: Removed fileMap guard entirely for cross-repo edges -- context.projects check sufficient since all cross-repo edges are implicit type
 - [Phase 10-gap-closure]: @nx/devkit injection in auto-detect e2e test guarantees packageName match with nrwl/nx repo
+- [Phase 10-fileMap-fix]: namedInputs override on external projects (all workspace-level named inputs set to []) prevents native task hasher crash
+- [Phase 10-fileMap-fix]: Cache key uses only repos config hash, not full options hash -- detection-only options (overrides, negations) don't invalidate extraction cache
+- [Phase 10-fileMap-fix]: Cross-repo edges target project nodes directly (not externalNodes) because nx graph --print prunes externalNodes from output
 
 ### Pending Todos
 
@@ -73,10 +76,10 @@ Recent decisions affecting current work:
 - **Cold start with daemon**: First extraction after sync needs `NX_DAEMON=false`
 - **Pop-over cmd windows on Windows**: Nx `runCommandsImpl` spawns without `windowsHide`
 - **Scaling**: ~4s for 150 projects from cached graph; may need optimization for 500+ project workspaces
-- **Task hasher crash with cross-repo edges**: Nx NativeTaskHasherImpl crashes with "project not found" when cross-repo edges target projects without file map entries (happens when .repos/ is gitignored). Workaround: run vitest/eslint directly. See deferred-items.md.
+- **Task cascading via ^build**: Cross-repo edges cause ^build to cascade into external repo builds. Workaround: run vitest/eslint directly, or use --exclude-task-dependencies. Pre-version command already uses this flag.
 
 ## Session Continuity
 
-Last session: 2026-03-18T22:13:41Z
-Stopped at: Completed 10-integration-and-end-to-end-validation-03-PLAN.md
-Resume: Milestone v1.1 complete (with gap closure) -- /gsd:audit-milestone
+Last session: 2026-03-19T17:30:00Z
+Stopped at: fileMap guard resolved, all e2e pass
+Resume: Milestone v1.1 complete -- /gsd:audit-milestone
