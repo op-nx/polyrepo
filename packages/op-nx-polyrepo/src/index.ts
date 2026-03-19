@@ -34,8 +34,10 @@ export const createNodesV2: CreateNodesV2<PolyrepoConfig> = [
     await warnIfReposNotGitignored(context.workspaceRoot);
     warnUnsyncedRepos(config, context.workspaceRoot);
 
-    // Compute options hash for cache invalidation
-    const optionsHash = hashObject(options ?? {});
+    // Hash only the repos config for cache invalidation. Other options
+    // (implicitDependencies, negations) affect detection but not graph
+    // extraction — changing them should not invalidate the extraction cache.
+    const reposHash = hashObject(config.repos ?? {});
 
     // Populate graph report (lazy extraction with caching)
     let report: PolyrepoGraphReport | undefined;
@@ -44,7 +46,7 @@ export const createNodesV2: CreateNodesV2<PolyrepoConfig> = [
       report = await populateGraphReport(
         config,
         context.workspaceRoot,
-        optionsHash,
+        reposHash,
       );
     } catch (error) {
       logger.warn(
@@ -123,12 +125,12 @@ export const createDependencies: CreateDependencies<PolyrepoConfig> = async (
 
   try {
     config = validateConfig(options);
-    const optionsHash = hashObject(options ?? {});
+    const reposHash = hashObject(config.repos ?? {});
 
     report = await populateGraphReport(
       config,
       context.workspaceRoot,
-      optionsHash,
+      reposHash,
     );
   } catch {
     // If extraction fails, return no dependencies (degraded mode)
