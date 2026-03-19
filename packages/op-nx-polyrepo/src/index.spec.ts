@@ -93,30 +93,16 @@ function setup() {
  * Uses properly typed fields instead of stub casts.
  *
  * @param projects - Projects to register in `context.projects`
- * @param excludeFromFileMap - Project names to omit from `projectFileMap`
- *   (simulates external projects in .repos/ that have no tracked files)
  */
 function createDepContext(
   projects: Record<string, { root: string }>,
-  excludeFromFileMap: string[] = [],
 ): CreateDependenciesContext {
-  // Populate projectFileMap with a dummy entry for each project so that
-  // the fileMap guard in createDependencies doesn't filter out edges.
-  const projectFileMap: Record<string, Array<{ file: string; hash: string }>> = {};
-  const excludeSet = new Set(excludeFromFileMap);
-
-  for (const name of Object.keys(projects)) {
-    if (!excludeSet.has(name)) {
-      projectFileMap[name] = [{ file: `${projects[name]?.root ?? '.'}/package.json`, hash: '' }];
-    }
-  }
-
   return {
     projects,
     nxJsonConfiguration: {},
     workspaceRoot: '/workspace',
     externalNodes: {},
-    fileMap: { projectFileMap, nonProjectFiles: [] },
+    fileMap: { projectFileMap: {}, nonProjectFiles: [] },
     filesToProcess: { projectFileMap: {}, nonProjectFiles: [] },
   };
 }
@@ -280,6 +266,7 @@ describe('createNodesV2 plugin', () => {
       description: 'My library',
     });
     expect(myLib?.targets?.['build']).toBeDefined();
+    expect(myLib?.namedInputs).toStrictEqual({ default: [] });
   });
 
   it('registers external app project from graph report', async () => {
@@ -559,7 +546,7 @@ describe(createDependencies, () => {
 
     const deps = await createDependencies(options, depContext);
 
-    // Should include both intra-repo implicit edge and cross-repo static edge
+    // Should include both intra-repo implicit edge and cross-repo edge
     expect(deps).toContainEqual({
       source: 'repo-a/my-app',
       target: 'repo-a/my-lib',
@@ -580,7 +567,7 @@ describe(createDependencies, () => {
     );
   });
 
-  it('drops cross-repo edges when target has no fileMap entry', async () => {
+  it('keeps cross-repo edges when target has no fileMap entry', async () => {
     expect.hasAssertions();
 
     const { mockedPopulateGraphReport, mockedDetectCrossRepoDeps } = setup();
@@ -603,16 +590,13 @@ describe(createDependencies, () => {
       },
     ]);
 
-    // repo-a/lib is registered in context.projects but excluded from
-    // fileMap -- simulates an external project in .repos/ whose files
-    // are gitignored and therefore absent from Nx's projectFileMap.
-    const depContext = createDepContext(
-      {
-        'host-app': { root: 'apps/host-app' },
-        'repo-a/lib': { root: '.repos/repo-a/libs/lib' },
-      },
-      ['repo-a/lib'],
-    );
+    // Cross-repo edges target project nodes directly. The namedInputs
+    // override on external projects prevents the native task hasher
+    // from crashing on missing fileMap entries.
+    const depContext = createDepContext({
+      'host-app': { root: 'apps/host-app' },
+      'repo-a/lib': { root: '.repos/repo-a/libs/lib' },
+    });
 
     const options = {
       repos: { 'repo-a': 'git@github.com:org/repo-a.git' },
@@ -620,10 +604,12 @@ describe(createDependencies, () => {
 
     const deps = await createDependencies(options, depContext);
 
-    // Edge is dropped because repo-a/lib has no fileMap entries.
-    // Nx's native task hasher crashes with "project not found" when it
-    // walks edges to projects without file map entries.
-    expect(deps).toHaveLength(0);
+    expect(deps).toHaveLength(1);
+    expect(deps[0]).toMatchObject({
+      source: 'host-app',
+      target: 'repo-a/lib',
+      type: DependencyType.implicit,
+    });
   });
 
   it('filters intra-repo edges where target is not in context.projects', async () => {

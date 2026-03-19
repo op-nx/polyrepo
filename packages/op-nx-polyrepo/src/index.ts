@@ -55,6 +55,21 @@ export const createNodesV2: CreateNodesV2<PolyrepoConfig> = [
       );
     }
 
+    // Build namedInputs override for external projects: every workspace-level
+    // named input (plus the built-in "default") is overridden to []. This
+    // prevents the native task hasher from generating ProjectFileSet hash
+    // instructions when it walks dependency edges to external projects.
+    // Without this, inputs like ^production expand file-based patterns
+    // (e.g., !{projectRoot}/**/*.spec.ts) against external projects whose
+    // files are absent from the fileMap (.repos/ is gitignored).
+    const externalNamedInputs: Record<string, never[]> = { default: [] };
+
+    for (const key of Object.keys(
+      context.nxJsonConfiguration.namedInputs ?? {},
+    )) {
+      externalNamedInputs[key] = [];
+    }
+
     const results: Array<readonly [string, CreateNodesResult]> = [];
 
     for (const configFile of configFiles) {
@@ -83,6 +98,7 @@ export const createNodesV2: CreateNodesV2<PolyrepoConfig> = [
               targets: node.targets,
               tags: node.tags,
               metadata: node.metadata,
+              namedInputs: externalNamedInputs,
             };
           }
         }
@@ -148,25 +164,17 @@ export const createDependencies: CreateDependencies<PolyrepoConfig> = async (
   // propagate to Nx so users see a clear error message.
   const crossRepoDeps = detectCrossRepoDependencies(report, config, context);
 
-  // Filter cross-repo edges: both source and target must be registered
-  // projects AND have entries in the projectFileMap. The fileMap guard is
-  // required because Nx's native task hasher walks ALL dependency edges
-  // (including implicit) and crashes with "project not found" when it
-  // reaches a project without file map entries. Since .repos/ is gitignored,
-  // external projects have zero file map entries, so edges targeting them
-  // are dropped here. This means cross-repo edges only appear when both
-  // endpoints have files tracked by Nx (e.g., in e2e containers where
-  // .repos/ may be tracked, or when Nx adds file map support for
-  // gitignored project roots in a future version).
-  const fileMap = context.fileMap?.projectFileMap ?? {};
-
+  // Cross-repo edges target project nodes directly. The namedInputs
+  // override on external projects (set in createNodesV2) prevents the
+  // native task hasher from crashing on missing fileMap entries.
+  //
+  // Known limitation: cross-repo edges cause ^build task cascading from
+  // host projects into external repo builds. Workaround: run vitest/eslint
+  // directly instead of via `nx test`/`nx lint`. Future fix: Nx upstream
+  // support for excluding edges from task graph traversal, or conditional
+  // target stripping based on edge type.
   for (const dep of crossRepoDeps) {
-    if (
-      context.projects[dep.source] &&
-      context.projects[dep.target] &&
-      fileMap[dep.source] &&
-      fileMap[dep.target]
-    ) {
+    if (context.projects[dep.source] && context.projects[dep.target]) {
       dependencies.push(dep);
     }
   }
