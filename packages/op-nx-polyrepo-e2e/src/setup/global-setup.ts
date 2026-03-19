@@ -72,10 +72,33 @@ async function publishPlugin(registryPort: number, registryUrl: string): Promise
   }
 }
 
+/**
+ * Remove stale resources from previous crashed/killed runs.
+ * Keeps the base image (op-nx-e2e-workspace) and pulled images
+ * (node:22-slim, hertzg/verdaccio) to speed up the next run.
+ */
+function cleanupStaleResources(): void {
+  const commands = [
+    // Remove any containers from previous e2e runs
+    'docker rm -f $(docker ps -aq --filter name=op-nx-polyrepo-e2e) 2>/dev/null || true',
+    // Remove stale network
+    'docker network rm op-nx-polyrepo-e2e 2>/dev/null || true',
+    // Remove previous snapshot image (single-use, rebuilt each run)
+    'docker rmi op-nx-e2e-snapshot:latest 2>/dev/null || true',
+  ];
+
+  for (const cmd of commands) {
+    execSync(cmd, { stdio: 'ignore', windowsHide: true });
+  }
+}
+
 export default async function setup(project: TestProject) {
   let network: StartedNetwork | undefined;
   let verdaccio: StartedTestContainer | undefined;
   let workspace: StartedTestContainer | undefined;
+
+  // Clean up stale resources from previous crashed/killed runs
+  cleanupStaleResources();
 
   try {
     async function timed<T>(label: string, fn: () => Promise<T>): Promise<T> {
@@ -192,7 +215,16 @@ export default async function setup(project: TestProject) {
       { workingDir: '/workspace' },
     ));
 
-    // Phase 6: Commit snapshot image
+    // Phase 6: Delete node_modules to shrink the overlay2 diff before commit.
+    // The npm cache (~/.npm/_cacache/) stays in the snapshot. Each test
+    // container restores node_modules via `npm install --prefer-offline`
+    // in startContainer() (~15-30s from cache vs ~5min commit with 30K files).
+    await timed('node_modules deleted', () => ctr.exec(
+      ['rm', '-rf', '/workspace/node_modules'],
+      { workingDir: '/workspace' },
+    ));
+
+    // Phase 7: Commit snapshot image
     const snapshotImage = await timed('Snapshot committed', () => ctr.commit({
       repo: 'op-nx-e2e-snapshot',
       tag: 'latest',
@@ -219,6 +251,13 @@ export default async function setup(project: TestProject) {
       if (network) {
         await network.stop();
       }
+
+      // Remove the snapshot image (single-use, rebuilt each run).
+      // Keep the base image and BuildKit cache for faster rebuilds.
+      execSync('docker rmi op-nx-e2e-snapshot:latest 2>/dev/null || true', {
+        stdio: 'ignore',
+        windowsHide: true,
+      });
 
       console.log('[e2e] Teardown complete.');
     };
