@@ -41,41 +41,16 @@ describe('@op-nx/polyrepo', () => {
   });
 
   describe('polyrepo-status', () => {
-    beforeAll(async () => {
-      // Register plugin in nx.json using local /repos/nx path (prebaked in Docker image)
-      const nxJsonContent = JSON.stringify(
-        {
-          plugins: [
-            {
-              plugin: '@op-nx/polyrepo',
-              options: {
-                repos: {
-                  nx: { url: 'file:///repos/nx', depth: 1, ref: nxVersion },
-                },
-              },
-            },
-          ],
-        },
-        null,
-        2,
-      );
-
-      const { exitCode, output } = await container.exec(
-        [
-          'sh',
-          '-c',
-          `cat > /workspace/nx.json << 'NXJSONEOF'\n${nxJsonContent}\nNXJSONEOF`,
-        ],
-        { workingDir: '/workspace' },
-      );
-
-      if (exitCode !== 0) {
-        throw new Error(`Failed to write nx.json: ${output}`);
-      }
-    });
+    // nx.json and synced repos are pre-baked into the snapshot by global-setup.
 
     it('should report unsynced repos', async () => {
       expect.assertions(2);
+
+      // Remove the pre-synced repo to simulate unsynced state
+      await container.exec(
+        ['rm', '-rf', '/workspace/.repos/nx'],
+        { workingDir: '/workspace' },
+      );
 
       const { stdout } = await container.exec(
         ['npx', 'nx', 'polyrepo-status'],
@@ -107,30 +82,11 @@ describe('@op-nx/polyrepo', () => {
     it('should show project counts after sync', async () => {
       expect.assertions(3);
 
-      // Debug: verify .repos/ is in .gitignore before sync
-      const gitignoreCheck = await container.exec(
-        ['sh', '-c', 'grep -c ".repos/" .gitignore && echo "[OK] .repos/ in .gitignore" || echo "[MISSING] .repos/ not in .gitignore"'],
-        { workingDir: '/workspace' },
-      );
-
-      console.log('[debug] gitignore check:', gitignoreCheck.stdout.trim());
-
-      // Run sync -- clones from file:///repos/nx to /workspace/.repos/nx/
-      // and extracts graph cache
-      console.log('[debug] starting polyrepo-sync...');
-      const syncStart = Date.now();
-
+      // Re-sync after the unsynced test deleted .repos/nx
       const syncResult = await container.exec(
         ['npx', 'nx', 'polyrepo-sync'],
         { workingDir: '/workspace' },
       );
-
-      console.log(`[debug] polyrepo-sync completed in ${String(Date.now() - syncStart)}ms, exit=${String(syncResult.exitCode)}`);
-      console.log('[debug] sync stdout (last 500 chars):', syncResult.stdout.slice(-500));
-
-      if (syncResult.exitCode !== 0) {
-        console.log('[debug] sync stderr:', syncResult.stderr);
-      }
 
       expect(syncResult.exitCode).toBe(0);
 
@@ -148,30 +104,6 @@ describe('@op-nx/polyrepo', () => {
   describe('cross-repo dependencies', () => {
     // The workspace root project created by create-nx-workspace
     const hostProject = '@workspace/source';
-
-    /**
-     * Run polyrepo-sync inside the container to clone repos into .repos/.
-     */
-    async function syncRepos(ctr: StartedTestContainer): Promise<void> {
-      console.log('[debug] syncRepos starting...');
-      const start = Date.now();
-
-      const result = await ctr.exec(
-        ['npx', 'nx', 'polyrepo-sync'],
-        { workingDir: '/workspace' },
-      );
-
-      console.log(`[debug] syncRepos completed in ${String(Date.now() - start)}ms, exit=${String(result.exitCode)}`);
-
-      if (result.exitCode !== 0) {
-        console.log('[debug] syncRepos stderr:', result.stderr);
-        console.log('[debug] syncRepos stdout (last 500):', result.stdout.slice(-500));
-
-        throw new Error(
-          `polyrepo-sync failed (exit ${String(result.exitCode)}):\n${result.output}`,
-        );
-      }
-    }
 
     /**
      * Run `nx graph --print` inside the container and parse the project graph JSON.
@@ -239,14 +171,13 @@ describe('@op-nx/polyrepo', () => {
     it('should auto-detect cross-repo edges from package.json dependencies', async () => {
       expect.hasAssertions();
 
-      // Write nx.json with repos config only (no overrides)
+      // Write nx.json with repos config only (no overrides).
+      // Repos are already synced from the pre-synced snapshot.
       await writeNxJson(container, {
         repos: {
           nx: { url: 'file:///repos/nx', depth: 1, ref: nxVersion },
         },
       });
-
-      await syncRepos(container);
 
       // Inject @nx/devkit into the host's devDependencies to guarantee
       // a package name match. The host workspace may already have nx/*
@@ -283,13 +214,12 @@ describe('@op-nx/polyrepo', () => {
     it('should include explicit override edges in the graph', async () => {
       expect.assertions(2);
 
+      // Write base config (repos already synced from snapshot)
       await writeNxJson(container, {
         repos: {
           nx: { url: 'file:///repos/nx', depth: 1, ref: nxVersion },
         },
       });
-
-      await syncRepos(container);
 
       // Discover an nx/* project to use as override target
       const preGraph = await getProjectGraph(container);

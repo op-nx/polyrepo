@@ -13,6 +13,7 @@
  */
 import './provided-context.js';
 
+import { createRequire } from 'node:module';
 import { execSync } from 'node:child_process';
 import { resolve } from 'node:path';
 
@@ -20,6 +21,9 @@ import { GenericContainer, type StartedTestContainer, Network, type StartedNetwo
 import type { TestProject } from 'vitest/node';
 
 import { releasePublish, releaseVersion } from 'nx/release';
+
+const require = createRequire(import.meta.url);
+const nxVersion: string = require('nx/package.json').version;
 
 export default async function setup(project: TestProject) {
   let network: StartedNetwork | undefined;
@@ -114,6 +118,49 @@ export default async function setup(project: TestProject) {
         `Plugin install failed (exit ${String(installResult.exitCode)}):\n${installResult.stderr || installResult.output}`,
       );
     }
+
+    // 5b. Write nx.json and pre-sync repos into the snapshot.
+    // This bakes the synced nrwl/nx repo (with node_modules + graph cache)
+    // into the snapshot image so individual tests don't pay the 150s sync cost.
+    console.log('[e2e] Pre-syncing repos into snapshot...');
+    const nxJsonContent = JSON.stringify(
+      {
+        plugins: [
+          {
+            plugin: '@op-nx/polyrepo',
+            options: {
+              repos: {
+                nx: { url: 'file:///repos/nx', depth: 1, ref: nxVersion },
+              },
+            },
+          },
+        ],
+      },
+      null,
+      2,
+    );
+
+    await workspace.exec(
+      [
+        'sh',
+        '-c',
+        `cat > /workspace/nx.json << 'NXJSONEOF'\n${nxJsonContent}\nNXJSONEOF`,
+      ],
+      { workingDir: '/workspace' },
+    );
+
+    const syncResult = await workspace.exec(
+      ['npx', 'nx', 'polyrepo-sync'],
+      { workingDir: '/workspace' },
+    );
+
+    if (syncResult.exitCode !== 0) {
+      throw new Error(
+        `Pre-sync failed (exit ${String(syncResult.exitCode)}):\n${syncResult.output}`,
+      );
+    }
+
+    console.log('[e2e] Pre-sync complete.');
 
     // 6. Commit snapshot image
     console.log('[e2e] Committing workspace snapshot...');
