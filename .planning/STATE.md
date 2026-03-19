@@ -64,8 +64,9 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-1 pending:
+2 pending:
 - [sync] Parse pnpm ndjson reporter for concise install progress
+- [detection] Migrate auto-detected edges from implicit to static
 
 ### Blockers/Concerns
 
