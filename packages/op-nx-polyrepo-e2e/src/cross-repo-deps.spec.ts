@@ -13,7 +13,7 @@ describe('cross-repo dependencies', () => {
   const hostProject = '@workspace/source';
 
   beforeAll(async () => {
-    container = await startContainer(inject('snapshotImage'));
+    container = await startContainer(inject('snapshotImage'), 'cross-repo-deps');
   });
 
   afterAll(async () => {

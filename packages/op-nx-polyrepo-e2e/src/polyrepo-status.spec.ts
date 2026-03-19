@@ -7,7 +7,7 @@ describe('polyrepo-status', () => {
   let container: StartedTestContainer;
 
   beforeAll(async () => {
-    container = await startContainer(inject('snapshotImage'));
+    container = await startContainer(inject('snapshotImage'), 'polyrepo-status');
   });
 
   afterAll(async () => {

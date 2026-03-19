@@ -149,6 +149,16 @@ export default async function setup(project: TestProject) {
       { workingDir: '/workspace' },
     );
 
+    // 5c. Warm the plugin's graph cache by running any nx command.
+    // This triggers createNodesV2 → populateGraphReport → extractGraphFromRepo
+    // which writes .repos/.polyrepo-graph-cache.json. Without this, every test
+    // container's first nx command would re-extract the graph (~2-5 min).
+    console.log('[e2e] Warming plugin graph cache...');
+    await workspace.exec(
+      ['npx', 'nx', 'show', 'projects'],
+      { workingDir: '/workspace' },
+    );
+
     // 6. Commit snapshot image
     console.log('[e2e] Committing workspace snapshot...');
     const snapshotImage = await workspace.commit({

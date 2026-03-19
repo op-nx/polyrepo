@@ -10,8 +10,9 @@ export const nxVersion: string = require('nx/package.json').version;
 /**
  * Start a test container from the pre-synced snapshot image.
  */
-export async function startContainer(snapshotImage: string): Promise<StartedTestContainer> {
+export async function startContainer(snapshotImage: string, name: string): Promise<StartedTestContainer> {
   return new GenericContainer(snapshotImage)
+    .withName(`op-nx-polyrepo-e2e-${name}`)
     .withCommand(['sleep', 'infinity'])
     .start();
 }

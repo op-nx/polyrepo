@@ -7,7 +7,7 @@ describe('@op-nx/polyrepo installation', () => {
   let container: StartedTestContainer;
 
   beforeAll(async () => {
-    container = await startContainer(inject('snapshotImage'));
+    container = await startContainer(inject('snapshotImage'), 'installed');
   });
 
   afterAll(async () => {
