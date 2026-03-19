@@ -2,10 +2,6 @@
 
 Never stage `.planning/config.json` fields prefixed with `_` (e.g., `workflow._auto_chain_active`). These are transient runtime state injected by the GSD workflow system. If the file has been modified only by the addition or change of `_`-prefixed fields, do not stage it at all.
 
-## Nx output style
-
-- Always pass `--output-style=static` when running `nx run`, `nx run-many`, `nx affected`, and shorthand aliases (`nx build`, `nx test`, `nx lint`, `nx e2e`, etc.). This ensures full stdout/stderr is printed sequentially, which is required for non-interactive environments like AI agents and CI.
-
 <!-- nx configuration start-->
 <!-- Leave the start & end comments to automatically receive updates. -->
 

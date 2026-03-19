@@ -70,7 +70,7 @@ Wire `detectCrossRepoDependencies` into `createDependencies` and validate that c
 - `DependencyType.static` for auto-detected edges, `DependencyType.implicit` for overrides (Phase 9)
 - SIFERS test pattern: no `beforeEach`/`afterEach`; typed mocks via explicit setup functions
 - Silent skip on missing files: `try/catch` with `continue` for missing `package.json` / tsconfig
-- `--output-style=static` required on all `nx` commands per AGENTS.md
+
 
 ### Integration Points
 
