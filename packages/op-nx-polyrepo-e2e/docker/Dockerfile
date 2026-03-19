@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 FROM node:22-slim
 
 # Install git (needed for nrwl/nx clone and Nx operations)
@@ -16,11 +17,34 @@ ENV NX_DAEMON=false CI=true
 RUN git config --global user.email "e2e@test.local" && \
     git config --global user.name "e2e"
 
+# --- Expensive layers: nrwl/nx clone + pnpm install ---
+# These are placed BEFORE workspace setup so that changes to .gitignore logic,
+# create-nx-workspace flags, or other workspace scaffolding do NOT invalidate
+# the 10-15 min pnpm install layer.
+
+# Prebake git clone of nrwl/nx at pinned ref
+# This layer rebuilds only when NX_REF (or NX_VERSION) changes
+ARG NX_VERSION=22.5.4
+ARG NX_REF=${NX_VERSION}
+RUN git clone --depth 1 --branch ${NX_REF} https://github.com/nrwl/nx.git /repos/nx
+
+# Prebake pnpm install for nrwl/nx to warm pnpm content-addressable store.
+# The sync executor runs `corepack pnpm install` after cloning into the workspace,
+# but git clone does not carry node_modules. With a warm pnpm store, the install
+# resolves from cache via hardlinks instead of downloading packages.
+# --mount=type=cache: BuildKit persistent cache for the pnpm store — even when
+# this layer is invalidated, previously downloaded packages are still in the
+# store and resolve via hardlinks instead of network fetches.
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
+    cd /repos/nx && corepack enable && COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack pnpm install --frozen-lockfile
+
+# --- Cheap layers: workspace setup (~60s rebuild) ---
+# Changes here do NOT invalidate the expensive nrwl/nx layers above.
+
 # Prebake create-nx-workspace output (skip git — we init after adding .repos/ to .gitignore)
 # This layer rebuilds only when NX_VERSION changes
 # --nxCloud=skip: skip CI workflow generation (--ci is an alias for --nxCloud,
 #   passing both produces "skip,skip" which fails schema validation)
-ARG NX_VERSION=22.5.4
 RUN npx --yes create-nx-workspace@${NX_VERSION} workspace \
     --preset=apps --interactive=false --nxCloud=skip --skipGit
 
@@ -30,17 +54,6 @@ RUN echo "\n# Synced polyrepo workspaces\n.repos/" >> /workspace/.gitignore
 
 # Now init git with .repos/ already in .gitignore
 RUN cd /workspace && git init && git add . && git commit -m "initial"
-
-# Prebake git clone of nrwl/nx at pinned ref
-# This layer rebuilds only when NX_REF changes
-ARG NX_REF=${NX_VERSION}
-RUN git clone --depth 1 --branch ${NX_REF} https://github.com/nrwl/nx.git /repos/nx
-
-# Prebake pnpm install for nrwl/nx to warm pnpm content-addressable store.
-# The sync executor runs `corepack pnpm install` after cloning into the workspace,
-# but git clone does not carry node_modules. With a warm pnpm store, the install
-# resolves from cache via hardlinks instead of downloading packages.
-RUN cd /repos/nx && corepack enable && CI=true COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack pnpm install --frozen-lockfile
 
 WORKDIR /workspace
 
