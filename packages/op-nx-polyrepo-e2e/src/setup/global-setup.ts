@@ -119,10 +119,10 @@ export default async function setup(project: TestProject) {
       );
     }
 
-    // 5b. Write nx.json and pre-sync repos into the snapshot.
-    // This bakes the synced nrwl/nx repo (with node_modules + graph cache)
-    // into the snapshot image so individual tests don't pay the 150s sync cost.
-    console.log('[e2e] Pre-syncing repos into snapshot...');
+    // 5b. Write nx.json with plugin config.
+    // The Dockerfile already pre-synced .repos/nx/ (clone + pnpm install + graph cache).
+    // We just need the plugin config so the snapshot starts with a working nx.json.
+    console.log('[e2e] Writing nx.json...');
     const nxJsonContent = JSON.stringify(
       {
         plugins: [
@@ -148,19 +148,6 @@ export default async function setup(project: TestProject) {
       ],
       { workingDir: '/workspace' },
     );
-
-    const syncResult = await workspace.exec(
-      ['npx', 'nx', 'polyrepo-sync'],
-      { workingDir: '/workspace' },
-    );
-
-    if (syncResult.exitCode !== 0) {
-      throw new Error(
-        `Pre-sync failed (exit ${String(syncResult.exitCode)}):\n${syncResult.output}`,
-      );
-    }
-
-    console.log('[e2e] Pre-sync complete.');
 
     // 6. Commit snapshot image
     console.log('[e2e] Committing workspace snapshot...');

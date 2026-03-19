@@ -38,6 +38,17 @@ RUN git clone --depth 1 --branch ${NX_REF} https://github.com/nrwl/nx.git /repos
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
     cd /repos/nx && corepack enable && COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack pnpm install --frozen-lockfile
 
+# --- Pre-sync: clone nrwl/nx into workspace .repos/ and warm graph cache ---
+# Replicates what polyrepo-sync does, but at build time (no time pressure).
+# The plugin isn't installed yet, but the expensive parts (clone, pnpm install,
+# nx graph --print with Gradle/Maven init) are plugin-independent.
+RUN git clone /repos/nx /workspace/.repos/nx
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
+    cd /workspace/.repos/nx && corepack enable && COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack pnpm install --frozen-lockfile
+# Pre-warm Nx graph cache inside the synced repo (Gradle daemon init is ~2min).
+# || true: don't fail the build if a plugin errors — the graph cache is best-effort.
+RUN cd /workspace/.repos/nx && npx nx graph --print > /dev/null 2>&1 || true
+
 # --- Cheap layers: workspace setup (~60s rebuild) ---
 # Changes here do NOT invalidate the expensive nrwl/nx layers above.
 
