@@ -36,8 +36,8 @@ RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
 # || true: don't fail the build if a plugin errors — graph cache is best-effort.
 RUN cd /synced-nx && npx nx graph --print > /synced-nx/.nx-graph-output.json 2>/dev/null || true
 
-# ─── Stage 2: workspace setup (cheap, changes often) ─────────────────────────
-FROM node:22-slim
+# ─── Stage 2: workspace setup (cached, changes on NX_VERSION bump) ───────────
+FROM node:22-slim AS workspace
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git ca-certificates default-jre-headless && \
@@ -79,3 +79,24 @@ WORKDIR /workspace
 RUN NX_DAEMON=false npx nx show projects 2>/dev/null || true
 
 CMD ["sleep", "infinity"]
+
+# ─── Stage 3: snapshot (rebuilds on every plugin source change) ──────────────
+FROM workspace AS snapshot
+
+# Stable args first — don't bust cache for the nx.json write
+ARG NX_VERSION=22.5.4
+ARG PLUGIN_TAG=e2e
+
+# Write nx.json with polyrepo plugin config
+RUN printf '{\n  "plugins": [\n    {\n      "plugin": "@op-nx/polyrepo",\n      "options": {\n        "repos": {\n          "nx": { "url": "file:///repos/nx", "depth": 1, "ref": "%s" }\n        }\n      }\n    }\n  ]\n}\n' "${NX_VERSION}" > /workspace/nx.json
+
+# Volatile arg last — only busts cache from here onwards
+ARG REGISTRY_URL
+
+# Install plugin from Verdaccio (running on host, reached via host.docker.internal)
+RUN npm install -D "@op-nx/polyrepo@${PLUGIN_TAG}" --registry "${REGISTRY_URL}" --no-audit
+
+# Warm the plugin's graph cache. The plugin reads the pre-computed
+# .nx-graph-output.json (from the workspace stage) instead of spawning a
+# ~5 min child nx graph --print process.
+RUN NX_DAEMON=false npx nx show projects 2>/dev/null || true

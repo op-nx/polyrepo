@@ -124,6 +124,7 @@ export default async function setup(project: TestProject) {
       'Base image + Verdaccio ready',
       () => Promise.all([
         GenericContainer.fromDockerfile(dockerfilePath)
+          .withTarget('workspace')
           .withBuildkit()
           .withCache(true)
           .build('op-nx-e2e-workspace', { deleteOnExit: false }),
@@ -150,7 +151,8 @@ export default async function setup(project: TestProject) {
 
     await timed(
       'Snapshot built',
-      () => GenericContainer.fromDockerfile(dockerfilePath, 'Dockerfile.snapshot')
+      () => GenericContainer.fromDockerfile(dockerfilePath)
+        .withTarget('snapshot')
         .withBuildArgs({
           REGISTRY_URL: `http://host.docker.internal:${String(registryPort)}`,
           PLUGIN_TAG: 'e2e',
