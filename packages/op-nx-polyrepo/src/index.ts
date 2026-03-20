@@ -37,7 +37,7 @@ export const createNodesV2: CreateNodesV2<PolyrepoConfig> = [
     // Hash only the repos config for cache invalidation. Other options
     // (implicitDependencies, negations) affect detection but not graph
     // extraction — changing them should not invalidate the extraction cache.
-    const reposHash = hashObject(config.repos ?? {});
+    const reposConfigHash = hashObject(config.repos ?? {});
 
     // Populate graph report (lazy extraction with caching)
     let report: PolyrepoGraphReport | undefined;
@@ -46,7 +46,7 @@ export const createNodesV2: CreateNodesV2<PolyrepoConfig> = [
       report = await populateGraphReport(
         config,
         context.workspaceRoot,
-        reposHash,
+        reposConfigHash,
       );
     } catch (error) {
       logger.warn(
@@ -125,12 +125,12 @@ export const createDependencies: CreateDependencies<PolyrepoConfig> = async (
 
   try {
     config = validateConfig(options);
-    const reposHash = hashObject(config.repos ?? {});
+    const reposConfigHash = hashObject(config.repos ?? {});
 
     report = await populateGraphReport(
       config,
       context.workspaceRoot,
-      reposHash,
+      reposConfigHash,
     );
   } catch {
     // If extraction fails, return no dependencies (degraded mode)
