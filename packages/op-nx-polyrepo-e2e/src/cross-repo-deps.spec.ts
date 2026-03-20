@@ -150,4 +150,44 @@ describe('cross-repo dependencies', () => {
     // The negated edge should be absent from the graph
     expect(suppressedEdge).toBeUndefined();
   }, 300_000);
+
+  it('should produce correct graph with --skip-nx-cache', async () => {
+    expect.hasAssertions();
+
+    // Run nx graph --print with --skip-nx-cache to bypass Nx's task cache.
+    // This verifies the graph is computed from scratch, not served from
+    // a stale Nx task cache (DAEMON-11).
+    const result = await container.exec(
+      ['npx', 'nx', 'graph', '--print', '--skip-nx-cache', '--output-style=static'],
+      { workingDir: '/workspace' },
+    );
+
+    expect(result.exitCode).toBe(0);
+
+    const jsonStart = result.stdout.indexOf('{');
+    expect(jsonStart).toBeGreaterThanOrEqual(0);
+
+    const parsed: {
+      graph: {
+        nodes: Record<string, unknown>;
+        dependencies: Record<string, Array<{ source: string; target: string; type: string }>>;
+      };
+    } = JSON.parse(result.stdout.substring(jsonStart));
+
+    // Verify external projects from synced repo are present
+    const projectNames = Object.keys(parsed.graph.nodes);
+    const externalProjects = projectNames.filter((name) => name.startsWith('nx/'));
+
+    expect(externalProjects.length).toBeGreaterThan(0);
+
+    // Verify cross-repo edges exist (same assertion as auto-detect test)
+    const allDeps = Object.values(parsed.graph.dependencies).flat();
+    const crossRepoEdges = allDeps.filter(
+      (dep) =>
+        (dep.source === hostProject && dep.target.startsWith('nx/')) ||
+        (dep.source.startsWith('nx/') && dep.target === hostProject),
+    );
+
+    expect(crossRepoEdges.length).toBeGreaterThan(0);
+  }, 300_000);
 });
