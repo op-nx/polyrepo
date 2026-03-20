@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Cross-repo Dependencies
-status: completed
-stopped_at: Phase 11 context gathered
-last_updated: "2026-03-20T11:46:19.816Z"
-last_activity: 2026-03-18 --- Completed Phase 10 Plan 3 (gap closure -- fileMap guard fix and e2e restoration)
+status: in-progress
+stopped_at: Completed Phase 11 Plan 1 (per-repo cache refactor)
+last_updated: "2026-03-20T12:55:58.747Z"
+last_activity: 2026-03-20 --- Completed Phase 11 Plan 1 (per-repo cache refactor with three-layer invalidation and backoff)
 progress:
   total_phases: 4
   completed_phases: 3
-  total_plans: 6
-  completed_plans: 6
-  percent: 100
+  total_plans: 9
+  completed_plans: 7
+  percent: 78
 ---
 
 # Project State
@@ -21,23 +21,27 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-17)
 
 **Core value:** `nx graph` displays projects from all synced repos with cross-repo dependency edges, and all relevant Nx CLI commands output projects from multiple repos
-**Current focus:** Milestone v1.1 complete -- all phases executed, gap closure done
+**Current focus:** Phase 11 -- Full Nx Daemon Support (per-repo cache, sync pre-caching, e2e daemon verification)
 
 ## Current Position
 
-Phase: 10 of 9 (Integration and End-to-End Validation)
-Plan: 3 of 3 in Phase 10 (complete)
-Status: Milestone v1.1 complete -- all 6 plans across 3 phases executed (including gap closure)
-Last activity: 2026-03-18 --- Completed Phase 10 Plan 3 (gap closure -- fileMap guard fix and e2e restoration)
+Phase: 11 of 11 (Full Nx Daemon Support)
+Plan: 1 of 3 in Phase 11 (complete)
+Status: Plan 1 complete -- per-repo cache with three-layer invalidation, backoff, and actionable warnings
+Last activity: 2026-03-20 --- Completed Phase 11 Plan 1 (per-repo cache refactor)
 
-Progress: [██████████] 100%
+Progress: [████████░░] 78%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 6 (v1.1)
-- Average duration: ~6.7 minutes
-- Total execution time: ~40 minutes
+- Total plans completed: 7 (v1.1)
+- Average duration: ~6.3 minutes
+- Total execution time: ~44 minutes
+
+| Phase | Plan | Duration | Tasks | Files |
+|-------|------|----------|-------|-------|
+| 11 | 01 | 4min | 2 | 3 |
 
 ## Accumulated Context
 
@@ -65,6 +69,11 @@ Recent decisions affecting current work:
 - [Phase 10-fileMap-fix]: Cache key uses only repos config hash, not full options hash -- detection-only options (overrides, negations) don't invalidate extraction cache
 - [Phase 10-fileMap-fix]: Cross-repo edges target project nodes directly (not externalNodes) because nx graph --print prunes externalNodes from output
 
+- [Phase 11-daemon-cache]: Per-repo hash uses hashArray([reposConfigHash, alias, headSha, dirtyFiles]) -- lockfile hash unnecessary
+- [Phase 11-daemon-cache]: Backoff formula min(2000 * 2^(attempt-1), 30000)ms with immediate reset on hash change
+- [Phase 11-daemon-cache]: Global gate checks both hash match and all-repos-cached to retry failed repos
+- [Phase 11-daemon-cache]: RepoGraphData uses interface instead of type alias for consistency
+
 ### Pending Todos
 
 2 pending:
@@ -84,6 +93,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-03-20T11:46:19.812Z
-Stopped at: Phase 11 context gathered
-Resume: Milestone v1.1 complete -- /gsd:audit-milestone
+Last session: 2026-03-20T12:55:00Z
+Stopped at: Completed 11-01-PLAN.md
+Resume: Continue with Phase 11 Plan 02 (sync pre-caching)

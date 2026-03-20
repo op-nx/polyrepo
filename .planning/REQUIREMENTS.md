@@ -23,6 +23,20 @@ Requirements for cross-repo dependency detection. Each maps to roadmap phases.
 - [x] **OVRD-02**: User can negate auto-detected edges via override config (suppress false positives)
 - [x] **OVRD-03**: Plugin fails at load time when override references a project not present in the graph
 
+### Nx Daemon Support
+
+- [x] **DAEMON-01**: Global in-memory hash gate returns instantly when no repo has changed
+- [x] **DAEMON-02**: Per-repo disk cache restores individual repo data on cold start without full re-extraction
+- [x] **DAEMON-03**: Changed repo re-extracts while unchanged repos remain cached (selective invalidation)
+- [ ] **DAEMON-04**: After polyrepo-sync, per-repo disk cache is warm (first daemon invocation reads from disk)
+- [ ] **DAEMON-05**: Sync executor logs progress during extraction for user feedback
+- [x] **DAEMON-06**: Exponential backoff skips re-extraction during cooldown period after failure
+- [x] **DAEMON-07**: Hash change in a failing repo resets backoff immediately
+- [x] **DAEMON-08**: Actionable troubleshooting warning logged on extraction failure
+- [ ] **DAEMON-09**: Old monolithic cache file deleted on first invocation
+- [ ] **DAEMON-10**: E2e tests pass under NX_DAEMON=true
+- [ ] **DAEMON-11**: E2e tests pass under NX_DAEMON=false
+
 ## Future Requirements
 
 ### Generators
@@ -66,12 +80,23 @@ Which phases cover which requirements. Updated during roadmap creation.
 | OVRD-01 | Phase 9 | Complete |
 | OVRD-02 | Phase 9 | Complete |
 | OVRD-03 | Phase 9 | Complete |
+| DAEMON-01 | Phase 11 | Complete |
+| DAEMON-02 | Phase 11 | Complete |
+| DAEMON-03 | Phase 11 | Complete |
+| DAEMON-04 | Phase 11 | Planned |
+| DAEMON-05 | Phase 11 | Planned |
+| DAEMON-06 | Phase 11 | Complete |
+| DAEMON-07 | Phase 11 | Complete |
+| DAEMON-08 | Phase 11 | Complete |
+| DAEMON-09 | Phase 11 | Planned |
+| DAEMON-10 | Phase 11 | Planned |
+| DAEMON-11 | Phase 11 | Planned |
 
 **Coverage:**
-- v1.1 requirements: 10 total
-- Mapped to phases: 10
+- v1.1 requirements: 21 total
+- Mapped to phases: 21
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-17*
-*Last updated: 2026-03-17 after roadmap creation*
+*Last updated: 2026-03-20 after Phase 11 Plan 1 completion*
