@@ -68,16 +68,14 @@ async function publishPlugin(registryPort: number, registryUrl: string): Promise
 
 /**
  * Remove stale resources from previous crashed/killed runs.
- * Keeps the base image (op-nx-e2e-workspace) and pulled images
- * (node:22-slim, hertzg/verdaccio) to speed up the next run.
+ *
+ * Testcontainers' Ryuk reaper handles containers it manages, but
+ * hard crashes (SIGKILL, power loss) can leave named containers
+ * behind. The image removal ensures a fresh snapshot each run.
  */
 function cleanupStaleResources(): void {
   const commands = [
-    // Remove any containers from previous e2e runs
     'docker rm -f $(docker ps -aq --filter name=op-nx-polyrepo-e2e) 2>/dev/null || true',
-    // Remove stale network (no longer created, but clean up old ones)
-    'docker network rm op-nx-polyrepo-e2e 2>/dev/null || true',
-    // Remove previous snapshot image (single-use, rebuilt each run)
     'docker rmi op-nx-e2e-snapshot:latest 2>/dev/null || true',
   ];
 
