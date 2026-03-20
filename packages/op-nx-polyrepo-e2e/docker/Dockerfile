@@ -51,11 +51,13 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get update && apt-get install -y --no-install-recommends \
     git ca-certificates default-jre-headless
 
-# NX_DAEMON=false: prevent file locks and timeouts in container.
 # CI=true: bypass nrwl/nx preinstall script that requires Rust compiler.
 # Must be ENV (not inline) so the sync executor's `corepack pnpm install`
 # inherits it at test time.
-ENV NX_DAEMON=false CI=true
+# NX_DAEMON is NOT set here -- controlled by test environment via
+# container.ts withEnvironment(). Build-time RUN commands that invoke Nx
+# use inline NX_DAEMON=false prefixes.
+ENV CI=true
 
 RUN git config --global user.email "e2e@test.local" && \
     git config --global user.name "e2e"

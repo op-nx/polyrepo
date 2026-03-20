@@ -10,12 +10,25 @@ export const nxVersion: string = require('nx/package.json').version;
 /**
  * Start a test container from the snapshot image. The snapshot includes
  * node_modules and a warm graph cache — no npm install restore needed.
+ *
+ * Forwards the host's `NX_DAEMON` env var to the container so the CI
+ * matrix can run e2e tests under both daemon modes. When `NX_DAEMON`
+ * is unset on the host, the container uses the Nx default (daemon enabled).
  */
 export async function startContainer(snapshotImage: string, name: string): Promise<StartedTestContainer> {
-  return new GenericContainer(snapshotImage)
+  let container = new GenericContainer(snapshotImage)
     .withName(`op-nx-polyrepo-e2e-${name}`)
-    .withCommand(['sleep', 'infinity'])
-    .start();
+    .withCommand(['sleep', 'infinity']);
+
+  // Forward NX_DAEMON from host environment to container.
+  // If unset, container uses Nx default (daemon enabled).
+  const nxDaemon = process.env['NX_DAEMON'];
+
+  if (nxDaemon !== undefined) {
+    container = container.withEnvironment({ NX_DAEMON: nxDaemon });
+  }
+
+  return container.start();
 }
 
 /**
