@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Cross-repo Dependencies
 status: completed
-stopped_at: Completed 10-integration-and-end-to-end-validation-03-PLAN.md
-last_updated: "2026-03-19T17:30:00Z"
-last_activity: 2026-03-19 --- Resolved fileMap guard with namedInputs override; all 7 e2e tests pass
+stopped_at: fileMap guard resolved, all e2e pass
+last_updated: "2026-03-20T09:29:16.391Z"
+last_activity: 2026-03-18 --- Completed Phase 10 Plan 3 (gap closure -- fileMap guard fix and e2e restoration)
 progress:
   total_phases: 3
   completed_phases: 3
@@ -25,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-03-17)
 
 ## Current Position
 
-Phase: 10 of 10 (Integration and End-to-End Validation)
+Phase: 10 of 9 (Integration and End-to-End Validation)
 Plan: 3 of 3 in Phase 10 (complete)
 Status: Milestone v1.1 complete -- all 6 plans across 3 phases executed (including gap closure)
 Last activity: 2026-03-18 --- Completed Phase 10 Plan 3 (gap closure -- fileMap guard fix and e2e restoration)
@@ -70,10 +70,6 @@ Recent decisions affecting current work:
 2 pending:
 - [sync] Parse pnpm ndjson reporter for concise install progress
 - [detection] Migrate auto-detected edges from implicit to static
-
-### Roadmap Evolution
-
-- Phase 10.1 inserted after Phase 10: Make the plugin work both with and without the Nx Daemon (URGENT)
 
 ### Blockers/Concerns
 

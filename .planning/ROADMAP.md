@@ -90,13 +90,3 @@ Phases execute in numeric order: 8 -> 9 -> 10
 
 ---
 *Full v1.0 details: [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)*
-
-### Phase 10.1: Make the plugin work both with and without the Nx Daemon (INSERTED)
-
-**Goal:** [Urgent work - to be planned]
-**Requirements**: TBD
-**Depends on:** Phase 10
-**Plans:** 0 plans
-
-Plans:
-- [ ] TBD (run /gsd:plan-phase 10.1 to break down)
