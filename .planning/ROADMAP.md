@@ -104,7 +104,7 @@ Phases execute in numeric order: 8 -> 9 -> 10 -> 11
 | 8. Schema Extension and Data Extraction | v1.1 | 1/1 | Complete | 2026-03-17 |
 | 9. Cross-repo Dependency Detection | v1.1 | 2/2 | Complete | 2026-03-17 |
 | 10. Integration and End-to-End Validation | v1.1 | 3/3 | Complete | 2026-03-18 |
-| 11. Full Nx Daemon Support | 1/3 | In Progress|  | - |
+| 11. Full Nx Daemon Support | 2/3 | In Progress|  | - |
 
 ---
 *Full v1.0 details: [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)*

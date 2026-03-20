@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Cross-repo Dependencies
 status: in-progress
-stopped_at: Completed Phase 11 Plan 1 (per-repo cache refactor)
-last_updated: "2026-03-20T12:55:58.747Z"
-last_activity: 2026-03-20 --- Completed Phase 11 Plan 1 (per-repo cache refactor with three-layer invalidation and backoff)
+stopped_at: Completed Phase 11 Plan 2 (sync pre-caching)
+last_updated: "2026-03-20T13:05:26Z"
+last_activity: 2026-03-20 --- Completed Phase 11 Plan 2 (sync pre-caching for warm daemon startup)
 progress:
   total_phases: 4
   completed_phases: 3
   total_plans: 9
-  completed_plans: 7
-  percent: 78
+  completed_plans: 8
+  percent: 89
 ---
 
 # Project State
@@ -26,22 +26,23 @@ See: .planning/PROJECT.md (updated 2026-03-17)
 ## Current Position
 
 Phase: 11 of 11 (Full Nx Daemon Support)
-Plan: 1 of 3 in Phase 11 (complete)
-Status: Plan 1 complete -- per-repo cache with three-layer invalidation, backoff, and actionable warnings
-Last activity: 2026-03-20 --- Completed Phase 11 Plan 1 (per-repo cache refactor)
+Plan: 2 of 3 in Phase 11 (complete)
+Status: Plan 2 complete -- sync pre-caching for warm daemon startup
+Last activity: 2026-03-20 --- Completed Phase 11 Plan 2 (sync pre-caching)
 
-Progress: [████████░░] 78%
+Progress: [█████████░] 89%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 7 (v1.1)
+- Total plans completed: 8 (v1.1)
 - Average duration: ~6.3 minutes
-- Total execution time: ~44 minutes
+- Total execution time: ~50 minutes
 
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
 | 11 | 01 | 4min | 2 | 3 |
+| 11 | 02 | 6min | 1 | 2 |
 
 ## Accumulated Context
 
@@ -74,6 +75,10 @@ Recent decisions affecting current work:
 - [Phase 11-daemon-cache]: Global gate checks both hash match and all-repos-cached to retry failed repos
 - [Phase 11-daemon-cache]: RepoGraphData uses interface instead of type alias for consistency
 
+- [Phase 11-sync-precache]: Pre-cache at every syncRepo exit point where repo was updated, not just when install runs
+- [Phase 11-sync-precache]: hashObject(config.repos) computes reposConfigHash identically to index.ts for hash consistency
+- [Phase 11-sync-precache]: Pre-cache failure is non-blocking -- warns and continues, plugin extracts on next Nx command
+
 ### Pending Todos
 
 2 pending:
@@ -93,6 +98,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-03-20T12:55:00Z
-Stopped at: Completed 11-01-PLAN.md
-Resume: Continue with Phase 11 Plan 02 (sync pre-caching)
+Last session: 2026-03-20T13:05:00Z
+Stopped at: Completed 11-02-PLAN.md
+Resume: Continue with Phase 11 Plan 03 (e2e daemon verification)

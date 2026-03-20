@@ -28,8 +28,8 @@ Requirements for cross-repo dependency detection. Each maps to roadmap phases.
 - [x] **DAEMON-01**: Global in-memory hash gate returns instantly when no repo has changed
 - [x] **DAEMON-02**: Per-repo disk cache restores individual repo data on cold start without full re-extraction
 - [x] **DAEMON-03**: Changed repo re-extracts while unchanged repos remain cached (selective invalidation)
-- [ ] **DAEMON-04**: After polyrepo-sync, per-repo disk cache is warm (first daemon invocation reads from disk)
-- [ ] **DAEMON-05**: Sync executor logs progress during extraction for user feedback
+- [x] **DAEMON-04**: After polyrepo-sync, per-repo disk cache is warm (first daemon invocation reads from disk)
+- [x] **DAEMON-05**: Sync executor logs progress during extraction for user feedback
 - [x] **DAEMON-06**: Exponential backoff skips re-extraction during cooldown period after failure
 - [x] **DAEMON-07**: Hash change in a failing repo resets backoff immediately
 - [x] **DAEMON-08**: Actionable troubleshooting warning logged on extraction failure
