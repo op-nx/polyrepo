@@ -1711,7 +1711,7 @@ describe(syncExecutor, () => {
       await syncExecutor({}, createTestContext());
 
       expect(mockExtractGraphFromRepo).toHaveBeenCalledWith(
-        expect.stringContaining('.repos/repo-a'),
+        expect.stringMatching(/\.repos[\\/]repo-a/),
       );
     });
 
@@ -1759,7 +1759,7 @@ describe(syncExecutor, () => {
       expect(mockComputeRepoHash).toHaveBeenCalledWith(
         'mock-repos-config-hash',
         'repo-a',
-        expect.stringContaining('.repos/repo-a'),
+        expect.stringMatching(/\.repos[\\/]repo-a/),
       );
     });
 
@@ -1968,7 +1968,7 @@ describe(syncExecutor, () => {
 
       expect(mockSpawn).not.toHaveBeenCalled();
       expect(mockExtractGraphFromRepo).toHaveBeenCalledWith(
-        expect.stringContaining('.repos/repo-a'),
+        expect.stringMatching(/\.repos[\\/]repo-a/),
       );
     });
 
