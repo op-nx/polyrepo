@@ -4,8 +4,8 @@
  * Orchestrates the full container lifecycle:
  * 1. Build prebaked workspace Docker image + start Verdaccio (parallel)
  * 2. Publish plugin to Verdaccio (on host)
- * 3. Build snapshot image via `docker build --network=host` (installs
- *    plugin from Verdaccio, warms graph cache — no docker commit needed)
+ * 3. Build snapshot image via testcontainers fromDockerfile (installs
+ *    plugin from Verdaccio via host.docker.internal, warms graph cache)
  * 4. Provide snapshot image to test files
  * 5. Return teardown function
  */
@@ -91,18 +91,6 @@ export default async function setup(project: TestProject) {
   cleanupStaleResources();
 
   try {
-    function timedSync<T>(label: string, fn: () => T): T {
-      const start = performance.now();
-      const result = fn();
-      const sec = (performance.now() - start) / 1000;
-      const m = Math.floor(sec / 60);
-      const s = sec % 60;
-      const duration = m > 0 ? `${String(m)}m${s.toFixed(1)}s` : `${s.toFixed(1)}s`;
-      console.log(`[e2e] ${label} (${duration})`);
-
-      return result;
-    }
-
     async function timed<T>(label: string, fn: () => Promise<T>): Promise<T> {
       const start = performance.now();
       const result = await fn();
@@ -141,27 +129,24 @@ export default async function setup(project: TestProject) {
     // Phase 2: Publish plugin to Verdaccio
     await timed('Plugin published', () => publishPlugin(registryPort, registryUrl));
 
-    // Phase 3: Build snapshot image via docker build --network=host.
-    // This installs the plugin from Verdaccio and warms the graph cache
-    // in a single Docker build step — no docker commit needed.
-    const snapshotDockerfile = resolve(__dirname, '../../docker/Dockerfile.snapshot').replaceAll('\\', '/');
+    // Phase 3: Build snapshot image. Installs the plugin from Verdaccio
+    // and warms the graph cache. Uses host.docker.internal so the build
+    // can reach Verdaccio's mapped port without --network=host.
+    const snapshotImageName = 'op-nx-e2e-snapshot';
 
-    timedSync('Snapshot built', () => {
-      execSync(
-        [
-          'docker build --network=host',
-          `-f "${snapshotDockerfile}"`,
-          `--build-arg REGISTRY_URL=${registryUrl}`,
-          '--build-arg PLUGIN_TAG=e2e',
-          `-t op-nx-e2e-snapshot:latest`,
-          `"${dockerfilePath}"`,
-        ].join(' '),
-        { stdio: 'inherit', windowsHide: true },
-      );
-    });
+    await timed(
+      'Snapshot built',
+      () => GenericContainer.fromDockerfile(dockerfilePath, 'Dockerfile.snapshot')
+        .withBuildArgs({
+          REGISTRY_URL: `http://host.docker.internal:${String(registryPort)}`,
+          PLUGIN_TAG: 'e2e',
+        })
+        .withBuildkit()
+        .build(snapshotImageName, { deleteOnExit: true }),
+    );
 
     // Phase 4: Provide snapshot image to test files
-    project.provide('snapshotImage', 'op-nx-e2e-snapshot:latest');
+    project.provide('snapshotImage', snapshotImageName);
 
     // Stop Verdaccio (no longer needed after build)
     await timed('Verdaccio stopped', async () => {
@@ -169,20 +154,13 @@ export default async function setup(project: TestProject) {
       verdaccio = undefined;
     });
 
-    // Return teardown function
+    // Return teardown function (snapshot image cleaned up by testcontainers Ryuk)
     return async function teardown() {
       console.log('[e2e] Tearing down...');
 
       if (verdaccio) {
         await verdaccio.stop();
       }
-
-      // Remove the snapshot image (single-use, rebuilt each run).
-      // Keep the base image and BuildKit cache for faster rebuilds.
-      execSync('docker rmi op-nx-e2e-snapshot:latest 2>/dev/null || true', {
-        stdio: 'ignore',
-        windowsHide: true,
-      });
 
       console.log('[e2e] Teardown complete.');
     };
