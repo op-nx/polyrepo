@@ -167,12 +167,9 @@ describe('cache', () => {
     });
     mocks.getHeadSha.mockResolvedValue('abc123');
     mocks.getDirtyFiles.mockResolvedValue('');
-    // Return distinct hashes per repo so per-repo hash computation is testable
-    let hashCallCount = 0;
-    mocks.hashArray.mockImplementation((_parts: unknown) => {
-      hashCallCount++;
-
-      return `hash-${hashCallCount}`;
+    // Deterministic hash: same inputs produce same output across calls
+    mocks.hashArray.mockImplementation((parts: unknown) => {
+      return `hash-${JSON.stringify(parts)}`;
     });
     mocks.extractGraphFromRepo.mockResolvedValue(rawGraph);
     mocks.transformGraphForRepo.mockImplementation(
@@ -603,9 +600,13 @@ describe('cache', () => {
           return true;
         }
 
-        // The old monolithic cache path: .repos/.polyrepo-graph-cache.json (not under an alias)
-        if (ps.endsWith('.repos/.polyrepo-graph-cache.json') ||
-            ps.endsWith('.repos\\.polyrepo-graph-cache.json')) {
+        // The old monolithic cache path: .repos/.polyrepo-graph-cache.json
+        // Must NOT match per-repo paths like .repos/repo-a/.polyrepo-graph-cache.json
+        if (
+          ps.includes('.polyrepo-graph-cache.json') &&
+          !ps.includes('repo-a') &&
+          !ps.includes('repo-b')
+        ) {
           return true;
         }
 
