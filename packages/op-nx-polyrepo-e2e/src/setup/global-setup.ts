@@ -87,13 +87,23 @@ async function publishPlugin(registryPort: number, registryUrl: string): Promise
  * behind. The image removal ensures a fresh snapshot each run.
  */
 function cleanupStaleResources(): void {
-  const commands = [
-    'docker rm -f $(docker ps -aq --filter name=op-nx-polyrepo-e2e) 2>/dev/null || true',
-    'docker rmi op-nx-e2e-snapshot:latest 2>/dev/null || true',
-  ];
+  try {
+    const stale = execSync(
+      'docker ps -aq --filter name=op-nx-polyrepo-e2e',
+      { encoding: 'utf-8', windowsHide: true },
+    ).trim();
 
-  for (const cmd of commands) {
-    execSync(cmd, { stdio: 'ignore', windowsHide: true });
+    if (stale) {
+      execSync(`docker rm -f ${stale}`, { stdio: 'ignore', windowsHide: true });
+    }
+  } catch {
+    // Docker not running or command failed — continue
+  }
+
+  try {
+    execSync('docker rmi op-nx-e2e-snapshot:latest', { stdio: 'ignore', windowsHide: true });
+  } catch {
+    // Image doesn't exist — continue
   }
 }
 

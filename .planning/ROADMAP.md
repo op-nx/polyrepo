@@ -88,5 +88,15 @@ Phases execute in numeric order: 8 -> 9 -> 10
 | 9. Cross-repo Dependency Detection | v1.1 | 2/2 | Complete | 2026-03-17 |
 | 10. Integration and End-to-End Validation | 3/3 | Complete   | 2026-03-18 | - |
 
+### Phase 11: Full Nx Daemon Support
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 10
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 11 to break down)
+
 ---
 *Full v1.0 details: [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)*
