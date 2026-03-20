@@ -65,7 +65,8 @@ COPY --link --from=nx-prep /repos/nx /repos/nx
 
 # Create workspace (--skip-git: we init after adding .repos/ to .gitignore)
 ARG NX_VERSION=22.5.4
-RUN npx --yes create-nx-workspace@${NX_VERSION} workspace \
+RUN --mount=type=cache,target=/root/.npm \
+    npx --yes create-nx-workspace@${NX_VERSION} workspace \
     --preset=apps --interactive=false --nx-cloud=skip --skip-git
 
 # Add .repos/ to .gitignore before git init — matches local dev setup
@@ -84,7 +85,8 @@ WORKDIR /workspace
 # project graph. When the polyrepo plugin is installed later (in
 # global-setup), Nx incrementally updates the cached graph instead of
 # rebuilding from scratch.
-RUN NX_DAEMON=false npx nx show projects 2>/dev/null || true
+RUN --mount=type=cache,target=/root/.npm \
+    NX_DAEMON=false npx nx show projects 2>/dev/null || true
 
 CMD ["sleep", "infinity"]
 
@@ -102,7 +104,8 @@ RUN printf '{\n  "plugins": [\n    {\n      "plugin": "@op-nx/polyrepo",\n      
 ARG REGISTRY_URL
 
 # Install plugin from Verdaccio (running on host, reached via host.docker.internal)
-RUN npm install -D "@op-nx/polyrepo@${PLUGIN_TAG}" --registry "${REGISTRY_URL}" --no-audit
+RUN --mount=type=cache,target=/root/.npm \
+    npm install -D "@op-nx/polyrepo@${PLUGIN_TAG}" --registry "${REGISTRY_URL}" --no-audit
 
 # Warm the plugin's graph cache. The plugin reads the pre-computed
 # .nx-graph-output.json (from the workspace stage) instead of spawning a
