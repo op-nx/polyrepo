@@ -11,6 +11,9 @@ node_modules
 # polyrepo synced repos
 .repos
 
+# polyrepo workspace data (NX_WORKSPACE_DATA_DIRECTORY redirect for synced repos)
+.polyrepo-ws-data
+
 # IDEs and editors
 /.idea
 .project

@@ -57,7 +57,7 @@
           "nx": {
             "url": "https://github.com/nrwl/nx.git",
             "depth": 1,
-            "ref": "master"
+            "ref": "22.5.4"
           }
         }
       }
