@@ -71,6 +71,10 @@ Recent decisions affecting current work:
 - [sync] Parse pnpm ndjson reporter for concise install progress
 - [detection] Migrate auto-detected edges from implicit to static
 
+### Roadmap Evolution
+
+- Phase 10.1 inserted after Phase 10: Make the plugin work both with and without the Nx Daemon (URGENT)
+
 ### Blockers/Concerns
 
 - **Cold start with daemon**: First extraction after sync needs `NX_DAEMON=false`
