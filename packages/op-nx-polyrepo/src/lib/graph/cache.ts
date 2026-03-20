@@ -11,10 +11,10 @@ import type { TransformedNode, PolyrepoGraphReport } from './types';
 /**
  * Per-repo graph data stored in both in-memory and disk caches.
  */
-type RepoGraphData = {
+interface RepoGraphData {
   nodes: Record<string, TransformedNode>;
   dependencies: Array<{ source: string; target: string; type: string }>;
-};
+}
 
 /**
  * Module-level state shared between createNodesV2 and createDependencies.
@@ -287,7 +287,7 @@ export async function populateGraphReport(
     // Layer 1: Per-repo in-memory cache
     const cached = perRepoCache.get(alias);
 
-    if (cached && cached.hash === repoHash) {
+    if (cached?.hash === repoHash) {
       report.repos[alias] = cached.report;
       continue;
     }
@@ -295,7 +295,7 @@ export async function populateGraphReport(
     // Layer 2: Per-repo disk cache
     const diskCache = tryReadPerRepoCache(workspaceRoot, alias);
 
-    if (diskCache && diskCache.hash === repoHash) {
+    if (diskCache?.hash === repoHash) {
       perRepoCache.set(alias, diskCache);
       report.repos[alias] = diskCache.report;
       continue;
