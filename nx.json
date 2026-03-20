@@ -93,5 +93,6 @@
     "lint": {
       "command": "eslint . --max-warnings=0"
     }
-  }
+  },
+  "analytics": false
 }
