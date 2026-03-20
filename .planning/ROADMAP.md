@@ -70,10 +70,27 @@ Plans:
 - [x] 10-02-PLAN.md -- E2e tests for cross-repo auto-detection, overrides, and negation suppression
 - [x] 10-03-PLAN.md -- Gap closure: fix fileMap guard dropping cross-repo edges, restore auto-detect and negation e2e tests
 
+### Phase 11: Full Nx Daemon Support
+**Goal:** Plugin works seamlessly with NX_DAEMON=true (default), NX_DAEMON=false, and unset via per-repo cache architecture, sync pre-caching, error recovery with exponential backoff, and e2e verification under both daemon modes
+**Depends on:** Phase 10
+**Requirements**: DAEMON-01, DAEMON-02, DAEMON-03, DAEMON-04, DAEMON-05, DAEMON-06, DAEMON-07, DAEMON-08, DAEMON-09, DAEMON-10, DAEMON-11
+**Success Criteria** (what must be TRUE):
+  1. Global in-memory hash gate returns instantly when no repo has changed
+  2. Per-repo disk cache at `.repos/<alias>/.polyrepo-graph-cache.json` restores individual repo data on cold start
+  3. Changed repo re-extracts while unchanged repos remain cached (selective invalidation)
+  4. After polyrepo-sync, per-repo disk cache is warm (first daemon invocation reads from disk, not extraction)
+  5. Extraction failure for one repo does not block others; exponential backoff prevents repeated extraction penalties
+  6. E2e tests pass under both NX_DAEMON=true and NX_DAEMON=false
+**Plans**: 3 plans
+Plans:
+- [ ] 11-01-PLAN.md -- Per-repo cache refactor with three-layer invalidation, exponential backoff, and actionable warnings
+- [ ] 11-02-PLAN.md -- Pre-caching graph data during polyrepo-sync after install
+- [ ] 11-03-PLAN.md -- E2e daemon mode verification (Dockerfile, container env forwarding, --skip-nx-cache test)
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 8 -> 9 -> 10
+Phases execute in numeric order: 8 -> 9 -> 10 -> 11
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -86,17 +103,8 @@ Phases execute in numeric order: 8 -> 9 -> 10
 | 7. v1.0 Tech Debt Cleanup | v1.0 | 2/2 | Complete | 2026-03-16 |
 | 8. Schema Extension and Data Extraction | v1.1 | 1/1 | Complete | 2026-03-17 |
 | 9. Cross-repo Dependency Detection | v1.1 | 2/2 | Complete | 2026-03-17 |
-| 10. Integration and End-to-End Validation | 3/3 | Complete   | 2026-03-18 | - |
-
-### Phase 11: Full Nx Daemon Support
-
-**Goal:** [To be planned]
-**Requirements**: TBD
-**Depends on:** Phase 10
-**Plans:** 0 plans
-
-Plans:
-- [ ] TBD (run /gsd:plan-phase 11 to break down)
+| 10. Integration and End-to-End Validation | v1.1 | 3/3 | Complete | 2026-03-18 |
+| 11. Full Nx Daemon Support | v1.1 | 0/3 | Planned | - |
 
 ---
 *Full v1.0 details: [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)*
