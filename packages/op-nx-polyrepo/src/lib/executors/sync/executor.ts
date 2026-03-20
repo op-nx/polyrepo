@@ -504,7 +504,7 @@ export default async function syncExecutor(
     return executeDryRun(entries, context.root, strategy);
   }
 
-  const reposConfigHash = hashObject(config.repos ?? {});
+  const reposConfigHash = hashObject(config.repos);
 
   const results = await Promise.allSettled(
     entries.map((entry) => syncRepo(entry, context.root, strategy, verbose, reposConfigHash)),
