@@ -112,14 +112,11 @@ async function computeGlobalHash(
   reposConfigHash: string,
 ): Promise<{
   globalHash: string;
-  repoHashes: Map<string, { alias: string; repoPath: string; hash: string }>;
+  repoHashes: Map<string, { repoPath: string; hash: string }>;
 }> {
   const entries = normalizeRepos(config);
   const parts: string[] = [reposConfigHash];
-  const repoHashes = new Map<
-    string,
-    { alias: string; repoPath: string; hash: string }
-  >();
+  const repoHashes = new Map<string, { repoPath: string; hash: string }>();
 
   for (const entry of entries) {
     const repoPath =
@@ -131,14 +128,14 @@ async function computeGlobalHash(
       continue;
     }
 
-    const repoHash = await computeRepoHash(reposConfigHash, entry.alias, repoPath);
+    const repoHash = await computeRepoHash(
+      reposConfigHash,
+      entry.alias,
+      repoPath,
+    );
 
     parts.push(repoHash);
-    repoHashes.set(entry.alias, {
-      alias: entry.alias,
-      repoPath,
-      hash: repoHash,
-    });
+    repoHashes.set(entry.alias, { repoPath, hash: repoHash });
   }
 
   return { globalHash: hashArray(parts), repoHashes };
