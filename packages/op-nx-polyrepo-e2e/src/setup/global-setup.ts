@@ -37,7 +37,7 @@ async function publishPlugin(registryPort: number, registryUrl: string): Promise
 
   writeFileSync(
     npmrcPath,
-    `//localhost:${String(registryPort)}/:_authToken=secretVerdaccioToken\n`,
+    `//localhost:${String(registryPort)}/:_authToken=secretVerdaccioToken\nregistry=${registryUrl}\n`,
   );
 
   process.env['npm_config_userconfig'] = npmrcPath;
@@ -129,7 +129,7 @@ export default async function setup(project: TestProject) {
           .withCache(true)
           .build('op-nx-e2e-workspace', { deleteOnExit: false }),
         new GenericContainer('hertzg/verdaccio')
-          .withExposedPorts(4873)
+          .withExposedPorts({ container: 4873, host: 4873 })
           .withName('op-nx-polyrepo-e2e-verdaccio')
           .withCopyFilesToContainer([{ source: verdaccioConfig, target: '/verdaccio/conf/config.yaml' }])
           .withWaitStrategy(Wait.forListeningPorts())
@@ -138,15 +138,24 @@ export default async function setup(project: TestProject) {
     );
 
     verdaccio = startedVerdaccio;
-    const registryPort = verdaccio.getMappedPort(4873);
+    const registryPort = 4873;
     const registryUrl = `http://localhost:${String(registryPort)}`;
 
     // Phase 2: Publish plugin to Verdaccio
     await timed('Plugin published', () => publishPlugin(registryPort, registryUrl));
 
-    // Phase 3: Build snapshot image. Installs the plugin from Verdaccio
-    // and warms the graph cache. Uses host.docker.internal so the build
-    // can reach Verdaccio's mapped port without --network=host.
+    // Get the published tarball's shasum for content-based cache busting.
+    // When plugin source is unchanged, the shasum is the same → BuildKit
+    // cache hit for the snapshot layers. When source changes → new shasum
+    // → cache miss → snapshot rebuilds with the new plugin.
+    const metadata: { dist?: { shasum?: string } } = await fetch(
+      `${registryUrl}/@op-nx%2fpolyrepo/0.0.0-e2e`,
+    ).then((r) => r.json() as Promise<{ dist?: { shasum?: string } }>);
+    const pluginHash = metadata.dist?.shasum ?? Date.now().toString();
+
+    // Phase 3: Build snapshot image. REGISTRY_URL is fixed (port 4873),
+    // so the npm install command string is stable across runs. PLUGIN_HASH
+    // busts cache only when the tarball content changes.
     const snapshotImageName = 'op-nx-e2e-snapshot';
 
     await timed(
@@ -154,8 +163,7 @@ export default async function setup(project: TestProject) {
       () => GenericContainer.fromDockerfile(dockerfilePath)
         .withTarget('snapshot')
         .withBuildArgs({
-          REGISTRY_URL: `http://host.docker.internal:${String(registryPort)}`,
-          PLUGIN_TAG: 'e2e',
+          PLUGIN_HASH: pluginHash,
         })
         .withBuildkit()
         .build(snapshotImageName, { deleteOnExit: true }),

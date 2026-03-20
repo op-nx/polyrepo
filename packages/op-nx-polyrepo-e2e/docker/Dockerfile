@@ -90,18 +90,21 @@ RUN --mount=type=cache,target=/root/.npm \
 
 CMD ["sleep", "infinity"]
 
-# ─── Stage 3: snapshot (rebuilds on every plugin source change) ──────────────
+# ─── Stage 3: snapshot (rebuilds only when plugin content changes) ────────────
 FROM workspace AS snapshot
 
-# Stable args first — don't bust cache for the nx.json write
+# Stable args — don't bust cache for the nx.json write
 ARG NX_VERSION=22.5.4
 ARG PLUGIN_TAG=e2e
+ARG REGISTRY_URL=http://host.docker.internal:4873
 
 # Write nx.json with polyrepo plugin config
 RUN printf '{\n  "plugins": [\n    {\n      "plugin": "@op-nx/polyrepo",\n      "options": {\n        "repos": {\n          "nx": { "url": "file:///repos/nx", "depth": 1, "ref": "%s" }\n        }\n      }\n    }\n  ]\n}\n' "${NX_VERSION}" > /workspace/nx.json
 
-# Volatile arg last — only busts cache from here onwards
-ARG REGISTRY_URL
+# Content-derived hash of the published tarball — busts cache only when
+# the plugin source changes. Declared after the nx.json write (which is
+# stable) and before npm install (which depends on plugin content).
+ARG PLUGIN_HASH
 
 # Install plugin from Verdaccio (running on host, reached via host.docker.internal)
 RUN --mount=type=cache,target=/root/.npm \
