@@ -92,4 +92,12 @@ export async function writeNxJson(
   if (exitCode !== 0) {
     throw new Error(`Failed to write nx.json: ${output}`);
   }
+
+  // Stop the daemon so the next graph call picks up the new config.
+  // The daemon caches the project graph in memory; file watchers inside
+  // Docker containers may not detect nx.json changes reliably (overlayfs
+  // + inotify race). Stopping ensures a fresh daemon reads the new config.
+  await ctr.exec(['npx', 'nx', 'daemon', '--stop'], {
+    workingDir: '/workspace',
+  });
 }
