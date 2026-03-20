@@ -124,6 +124,7 @@ export default async function setup(project: TestProject) {
       'Base image + Verdaccio ready',
       () => Promise.all([
         GenericContainer.fromDockerfile(dockerfilePath)
+          .withBuildkit()
           .withCache(true)
           .build('op-nx-e2e-workspace', { deleteOnExit: false }),
         new GenericContainer('hertzg/verdaccio')
