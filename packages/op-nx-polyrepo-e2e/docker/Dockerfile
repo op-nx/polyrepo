@@ -2,9 +2,14 @@
 # ─── Stage 1: expensive nrwl/nx preparation (cached independently) ───────────
 FROM node:22-slim AS nx-prep
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git ca-certificates default-jre-headless && \
-    rm -rf /var/lib/apt/lists/*
+# Remove docker-clean config that deletes cached .deb files after install,
+# defeating the BuildKit cache mount below.
+RUN rm -f /etc/apt/apt.conf.d/docker-clean
+
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
+    git ca-certificates default-jre-headless
 
 ENV NX_DAEMON=false CI=true
 
@@ -39,9 +44,12 @@ RUN cd /synced-nx && npx nx graph --print > /synced-nx/.nx-graph-output.json 2>/
 # ─── Stage 2: workspace setup (cached, changes on NX_VERSION bump) ───────────
 FROM node:22-slim AS workspace
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git ca-certificates default-jre-headless && \
-    rm -rf /var/lib/apt/lists/*
+RUN rm -f /etc/apt/apt.conf.d/docker-clean
+
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
+    git ca-certificates default-jre-headless
 
 # NX_DAEMON=false: prevent file locks and timeouts in container.
 # CI=true: bypass nrwl/nx preinstall script that requires Rust compiler.
