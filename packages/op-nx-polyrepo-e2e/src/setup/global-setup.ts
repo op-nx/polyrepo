@@ -13,22 +13,36 @@ import './provided-context.js';
 
 import { execSync } from 'node:child_process';
 import { resolve } from 'node:path';
+import { unlinkSync, writeFileSync } from 'node:fs';
 
 import { GenericContainer, type StartedTestContainer, Wait } from 'testcontainers';
 import type { TestProject } from 'vitest/node';
 
 import { releasePublish, releaseVersion } from 'nx/release';
 
+/**
+ * Publish the plugin to a local Verdaccio registry.
+ *
+ * Uses a project-scoped .npmrc file to avoid polluting the user's
+ * global npm config. The env vars npm_config_userconfig and
+ * npm_config_registry direct npm to use the temporary config.
+ */
 async function publishPlugin(registryPort: number, registryUrl: string): Promise<void> {
-  const originalRegistry = process.env['npm_config_registry'];
-  const originalNxDaemon = process.env['NX_DAEMON'];
+  const npmrcPath = resolve(process.cwd(), '.npmrc.e2e');
+  const saved = {
+    registry: process.env['npm_config_registry'],
+    userconfig: process.env['npm_config_userconfig'],
+    nxDaemon: process.env['NX_DAEMON'],
+  };
+
+  writeFileSync(
+    npmrcPath,
+    `//localhost:${String(registryPort)}/:_authToken=secretVerdaccioToken\n`,
+  );
+
+  process.env['npm_config_userconfig'] = npmrcPath;
   process.env['npm_config_registry'] = registryUrl;
   process.env['NX_DAEMON'] = 'false';
-
-  execSync(
-    `npm config set //localhost:${String(registryPort)}/:_authToken "secretVerdaccioToken" --ws=false`,
-    { stdio: 'inherit', windowsHide: true },
-  );
 
   try {
     await releaseVersion({
@@ -47,21 +61,20 @@ async function publishPlugin(registryPort: number, registryUrl: string): Promise
       firstRelease: true,
     });
   } finally {
-    execSync(
-      `npm config delete //localhost:${String(registryPort)}/:_authToken --ws=false`,
-      { stdio: 'ignore', windowsHide: true },
-    );
-
-    if (originalRegistry === undefined) {
-      delete process.env['npm_config_registry'];
-    } else {
-      process.env['npm_config_registry'] = originalRegistry;
+    try {
+      unlinkSync(npmrcPath);
+    } catch {
+      // File may not exist if writeFileSync failed
     }
 
-    if (originalNxDaemon === undefined) {
-      delete process.env['NX_DAEMON'];
-    } else {
-      process.env['NX_DAEMON'] = originalNxDaemon;
+    for (const [key, value] of Object.entries(saved)) {
+      const envKey = key === 'nxDaemon' ? 'NX_DAEMON' : `npm_config_${key}`;
+
+      if (value === undefined) {
+        delete process.env[envKey];
+      } else {
+        process.env[envKey] = value;
+      }
     }
   }
 }

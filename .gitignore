@@ -27,6 +27,9 @@ node_modules
 !.vscode/launch.json
 !.vscode/extensions.json
 
+# e2e temporary npmrc (cleaned up after run, gitignored as safeguard)
+.npmrc.e2e
+
 # misc
 /.sass-cache
 /connect.lock
