@@ -101,18 +101,17 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DAEMON-09 | Phase 11 | Complete |
 | DAEMON-10 | Phase 11 | Complete |
 | DAEMON-11 | Phase 11 | Complete |
-| TDEF-01 | Phase 12 | Planned |
-| TDEF-02 | Phase 12 | Planned |
-| TDEF-03 | Phase 12 | Planned |
-| BUILD-01 | Phase 12 | Planned |
-| BUILD-02 | Phase 12 | Planned |
+| TDEF-01 | Phase 12 | Complete |
+| TDEF-02 | Phase 12 | Complete |
+| TDEF-03 | Phase 12 | Complete |
+| BUILD-01 | Phase 12 | Complete |
+| BUILD-02 | Phase 12 | Complete |
 
 **Coverage:**
-- v1.1 requirements: 21 total, 21 complete
-- Phase 12 requirements: 5 total, 0 complete
+- v1.1 requirements: 26 total, 26 complete
 - Total mapped: 26
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-17*
-*Last updated: 2026-03-21 after Phase 12 planning*
+*Last updated: 2026-03-21 after Phase 13 gap closure planning*

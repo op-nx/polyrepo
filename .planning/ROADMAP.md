@@ -3,7 +3,7 @@
 ## Milestones
 
 - [x] **v1.0 MVP** -- Phases 1-7 (shipped 2026-03-16)
-- [x] **v1.1 Cross-repo Dependencies** -- Phases 8-11 (completed 2026-03-21)
+- [ ] **v1.1 Cross-repo Dependencies** -- Phases 8-13 (audit: gaps_found)
 
 ## Phases
 
@@ -87,10 +87,23 @@ Plans:
 - [x] 11-02-PLAN.md -- Pre-caching graph data during polyrepo-sync after install
 - [x] 11-03-PLAN.md -- E2e daemon mode verification (Dockerfile, container env forwarding, --skip-nx-cache test)
 
+### Phase 13: Verification and Tech Debt Cleanup
+**Goal:** Close all audit gaps: generate missing VERIFICATION.md for Phases 10 and 11, fix stale traceability, and resolve minor code/test debt
+**Depends on:** Phase 12
+**Requirements**: DETECT-06, DETECT-07, DAEMON-01, DAEMON-02, DAEMON-03, DAEMON-04, DAEMON-05, DAEMON-06, DAEMON-07, DAEMON-08, DAEMON-09, DAEMON-10, DAEMON-11
+**Gap Closure:** Closes gaps from v1.1 audit
+**Success Criteria** (what must be TRUE):
+  1. Phase 10 has a VERIFICATION.md with passed or gaps_found status
+  2. Phase 11 has a VERIFICATION.md with passed or gaps_found status
+  3. REQUIREMENTS.md traceability table shows Phase 12 requirements as "Complete" (not "Planned")
+  4. detect.ts:416 uses `String()` instead of `as string` cast
+  5. sync executor spec asserts rmSync calls for stale cache clearing
+**Plans**: TBD
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 8 -> 9 -> 10 -> 11 -> 12
+Phases execute in numeric order: 8 -> 9 -> 10 -> 11 -> 12 -> 13
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -105,7 +118,8 @@ Phases execute in numeric order: 8 -> 9 -> 10 -> 11 -> 12
 | 9. Cross-repo Dependency Detection | v1.1 | 2/2 | Complete | 2026-03-17 |
 | 10. Integration and End-to-End Validation | v1.1 | 3/3 | Complete | 2026-03-18 |
 | 11. Full Nx Daemon Support | v1.1 | 3/3 | Complete | 2026-03-21 |
-| 12. Resolve cross-repo build cascade | 2/2 | Complete   | 2026-03-21 | - |
+| 12. Resolve cross-repo build cascade | v1.1 | 2/2 | Complete | 2026-03-21 |
+| 13. Verification and Tech Debt Cleanup | v1.1 | 0/0 | Planned | - |
 
 ### Phase 12: Resolve the cross-repo build cascade issue when syncing external nrwl/nx repo on Windows
 **Goal:** Host targetDefaults no longer leak into external project proxy targets, and nx/devkit:build succeeds via proxy executor on Windows, so nx test @op-nx/polyrepo works without --exclude-task-dependencies
