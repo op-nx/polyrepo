@@ -10,15 +10,6 @@ function normalizePath(p: string): string {
   return p.replace(/\\/g, '/');
 }
 
-/**
- * Rewrite a single target configuration to use the `@op-nx/polyrepo:run`
- * proxy executor. Inputs, outputs, cache, and dependsOn are intentionally
- * omitted: the child repo resolves its own named inputs, manages its own
- * cache, and handles its own task dependency ordering. Copying dependsOn
- * would cause the host Nx to build a cascading task graph across all
- * external projects, triggering the native task hasher on projects whose
- * source files are not meaningful in the host context.
- */
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -36,9 +27,59 @@ function isRecordOfRecords(
 }
 
 /**
+ * Rewrite dependsOn entries from an external repo's resolved target config
+ * for the host context. String entries (caret and bare target refs) pass
+ * through unchanged. Object entries with a `projects` array have project
+ * names namespaced with the repo alias; entries starting with `"tag:"` are
+ * tag selectors and pass through unchanged. Object entries with string
+ * `projects` values (`"self"`, `"dependencies"`) pass through unchanged.
+ *
+ * When `rawDependsOn` is not an array (absent or invalid), returns `[]`
+ * so the proxy target has an explicit empty value that blocks the host's
+ * `targetDefaults` from merging in.
+ */
+function rewriteDependsOn(
+  rawDependsOn: unknown,
+  repoAlias: string,
+): TargetConfiguration['dependsOn'] {
+  if (!Array.isArray(rawDependsOn)) {
+    return [];
+  }
+
+  return rawDependsOn.map((entry: unknown) => {
+    if (typeof entry === 'string') {
+      return entry;
+    }
+
+    if (isRecord(entry) && typeof entry['target'] === 'string') {
+      const result: Record<string, unknown> = { ...entry };
+
+      if (Array.isArray(entry['projects'])) {
+        result['projects'] = (entry['projects'] as unknown[]).map(
+          (p: unknown) =>
+            typeof p === 'string' && !p.startsWith('tag:')
+              ? `${repoAlias}/${p}`
+              : p,
+        );
+      }
+
+      return result;
+    }
+
+    return entry;
+  });
+}
+
+/**
  * Create a proxy target configuration from raw (unknown) target data.
- * Safely extracts configurations, parallelism, and metadata from the
- * unvalidated target config (typed as z.unknown() in the Zod schema).
+ * Safely extracts configurations, parallelism, metadata, and dependsOn
+ * from the unvalidated target config (typed as z.unknown() in the Zod
+ * schema).
+ *
+ * dependsOn is preserved from the external repo's resolved config (which
+ * already has targetDefaults baked in). Setting an explicit value blocks
+ * host targetDefaults from merging. Targets without dependsOn get an
+ * explicit empty array.
  */
 function createProxyTarget(
   repoAlias: string,
@@ -53,6 +94,7 @@ function createProxyTarget(
     options: { repoAlias, originalProject, targetName },
     inputs: [],
     cache: false,
+    dependsOn: rewriteDependsOn(config['dependsOn'], repoAlias),
     configurations: isRecordOfRecords(config['configurations'])
       ? config['configurations']
       : undefined,

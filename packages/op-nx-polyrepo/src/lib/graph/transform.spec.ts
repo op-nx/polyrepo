@@ -389,23 +389,38 @@ describe(transformGraphForRepo, () => {
     });
   });
 
-  describe('dependsOn omission', () => {
-    it('omits dependsOn from proxy targets (child repo handles its own task graph)', () => {
+  describe('dependsOn preservation', () => {
+    it('preserves caret string dependsOn entries unchanged', () => {
       const graph = makeFixtureGraph();
       const result = transformGraphForRepo(repoAlias, graph, workspaceRoot);
 
       // my-lib:build originally had dependsOn: ['^build']
-      expect(
-        getTarget(getNode(result.nodes, 'repo-b/my-lib').targets, 'build').dependsOn,
-      ).toBeUndefined();
+      const buildTarget = getTarget(getNode(result.nodes, 'repo-b/my-lib').targets, 'build');
 
-      // my-app:build originally had dependsOn: ['^build', 'generate-api']
-      expect(
-        getTarget(getNode(result.nodes, 'repo-b/my-app').targets, 'build').dependsOn,
-      ).toBeUndefined();
+      expect(buildTarget.dependsOn).toStrictEqual(['^build']);
     });
 
-    it('omits dependsOn even when original has object entries with projects', () => {
+    it('preserves both caret and bare string dependsOn entries unchanged', () => {
+      const graph = makeFixtureGraph();
+      const result = transformGraphForRepo(repoAlias, graph, workspaceRoot);
+
+      // my-app:build originally had dependsOn: ['^build', 'generate-api']
+      const buildTarget = getTarget(getNode(result.nodes, 'repo-b/my-app').targets, 'build');
+
+      expect(buildTarget.dependsOn).toStrictEqual(['^build', 'generate-api']);
+    });
+
+    it('sets dependsOn to empty array when absent from raw config (blocks targetDefaults merge)', () => {
+      const graph = makeFixtureGraph();
+      const result = transformGraphForRepo(repoAlias, graph, workspaceRoot);
+
+      // my-lib:test has no dependsOn in fixture
+      const testTarget = getTarget(getNode(result.nodes, 'repo-b/my-lib').targets, 'test');
+
+      expect(testTarget.dependsOn).toStrictEqual([]);
+    });
+
+    it('namespaces project names in object dependsOn entries with projects array', () => {
       const graph: ExternalGraphJson = {
         graph: {
           nodes: {
@@ -433,10 +448,175 @@ describe(transformGraphForRepo, () => {
       };
 
       const result = transformGraphForRepo(repoAlias, graph, workspaceRoot);
+      const buildTarget = getTarget(getNode(result.nodes, 'repo-b/lib-a').targets, 'build');
 
-      expect(
-        getTarget(getNode(result.nodes, 'repo-b/lib-a').targets, 'build').dependsOn,
-      ).toBeUndefined();
+      expect(buildTarget.dependsOn).toStrictEqual([
+        { projects: ['repo-b/lib-b', 'repo-b/lib-c'], target: 'build' },
+      ]);
+    });
+
+    it('passes through object dependsOn entries with projects: "self" unchanged', () => {
+      const graph: ExternalGraphJson = {
+        graph: {
+          nodes: {
+            'lib-a': {
+              name: 'lib-a',
+              type: 'lib',
+              data: {
+                root: 'libs/lib-a',
+                targets: {
+                  build: {
+                    executor: '@nx/js:tsc',
+                    dependsOn: [
+                      { target: 'build', projects: 'self' },
+                    ],
+                  },
+                },
+              },
+            },
+          },
+          dependencies: {},
+        },
+      };
+
+      const result = transformGraphForRepo(repoAlias, graph, workspaceRoot);
+      const buildTarget = getTarget(getNode(result.nodes, 'repo-b/lib-a').targets, 'build');
+
+      expect(buildTarget.dependsOn).toStrictEqual([
+        { target: 'build', projects: 'self' },
+      ]);
+    });
+
+    it('passes through object dependsOn entries with projects: "dependencies" unchanged', () => {
+      const graph: ExternalGraphJson = {
+        graph: {
+          nodes: {
+            'lib-a': {
+              name: 'lib-a',
+              type: 'lib',
+              data: {
+                root: 'libs/lib-a',
+                targets: {
+                  build: {
+                    executor: '@nx/js:tsc',
+                    dependsOn: [
+                      { target: 'build', projects: 'dependencies' },
+                    ],
+                  },
+                },
+              },
+            },
+          },
+          dependencies: {},
+        },
+      };
+
+      const result = transformGraphForRepo(repoAlias, graph, workspaceRoot);
+      const buildTarget = getTarget(getNode(result.nodes, 'repo-b/lib-a').targets, 'build');
+
+      expect(buildTarget.dependsOn).toStrictEqual([
+        { target: 'build', projects: 'dependencies' },
+      ]);
+    });
+
+    it('passes through tag selectors in projects arrays unchanged', () => {
+      const graph: ExternalGraphJson = {
+        graph: {
+          nodes: {
+            'nx-source': {
+              name: 'nx-source',
+              type: 'lib',
+              data: {
+                root: 'packages/nx-source',
+                targets: {
+                  build: {
+                    executor: '@nx/js:tsc',
+                    dependsOn: [
+                      { target: 'build', projects: ['tag:npm:public'] },
+                    ],
+                  },
+                },
+              },
+            },
+          },
+          dependencies: {},
+        },
+      };
+
+      const result = transformGraphForRepo(repoAlias, graph, workspaceRoot);
+      const buildTarget = getTarget(getNode(result.nodes, 'repo-b/nx-source').targets, 'build');
+
+      expect(buildTarget.dependsOn).toStrictEqual([
+        { target: 'build', projects: ['tag:npm:public'] },
+      ]);
+    });
+
+    it('treats non-array dependsOn value as absent and returns empty array', () => {
+      const graph: ExternalGraphJson = {
+        graph: {
+          nodes: {
+            'lib-a': {
+              name: 'lib-a',
+              type: 'lib',
+              data: {
+                root: 'libs/lib-a',
+                targets: {
+                  build: {
+                    executor: '@nx/js:tsc',
+                    dependsOn: 'invalid-string-value',
+                  },
+                },
+              },
+            },
+          },
+          dependencies: {},
+        },
+      };
+
+      const result = transformGraphForRepo(repoAlias, graph, workspaceRoot);
+      const buildTarget = getTarget(getNode(result.nodes, 'repo-b/lib-a').targets, 'build');
+
+      expect(buildTarget.dependsOn).toStrictEqual([]);
+    });
+
+    it('handles mixed array with string entries and object entries correctly', () => {
+      const graph: ExternalGraphJson = {
+        graph: {
+          nodes: {
+            'lib-a': {
+              name: 'lib-a',
+              type: 'lib',
+              data: {
+                root: 'libs/lib-a',
+                targets: {
+                  build: {
+                    executor: '@nx/js:tsc',
+                    dependsOn: [
+                      '^build',
+                      'build-base',
+                      { target: 'compile', projects: ['lib-b'] },
+                      { target: 'test', projects: 'self' },
+                      { target: 'pack', projects: ['tag:npm:public', 'lib-c'] },
+                    ],
+                  },
+                },
+              },
+            },
+          },
+          dependencies: {},
+        },
+      };
+
+      const result = transformGraphForRepo(repoAlias, graph, workspaceRoot);
+      const buildTarget = getTarget(getNode(result.nodes, 'repo-b/lib-a').targets, 'build');
+
+      expect(buildTarget.dependsOn).toStrictEqual([
+        '^build',
+        'build-base',
+        { target: 'compile', projects: ['repo-b/lib-b'] },
+        { target: 'test', projects: 'self' },
+        { target: 'pack', projects: ['tag:npm:public', 'repo-b/lib-c'] },
+      ]);
     });
   });
 
