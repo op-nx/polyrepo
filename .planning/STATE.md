@@ -30,11 +30,11 @@ Next: `/gsd:new-milestone` to start next milestone cycle.
 
 ## Pending Todos
 
-4 pending from v1.1:
+4 pending:
 - [sync] Parse pnpm ndjson reporter for concise install progress
 - [detection] Migrate auto-detected edges from implicit to static
-- [proxy] Enable host-level caching for proxy targets using runtime inputs tied to child repo git HEAD
 - [executor] Rename .tmp to tmp in child repo temp directories
+- [executor] Run external repo Nx commands in devcontainer sidecar
 
 ## Session Continuity
 
