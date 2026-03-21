@@ -38,6 +38,12 @@ export default async function runExecutor(
       {
         command,
         cwd: repoPath,
+        env: {
+          NX_DAEMON: 'false',
+          NX_WORKSPACE_DATA_DIRECTORY: normalizePath(
+            join(repoPath, '.nx', 'workspace-data'),
+          ),
+        },
         __unparsed__: options.__unparsed__ ?? [],
       },
       context,

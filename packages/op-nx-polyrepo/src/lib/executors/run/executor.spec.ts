@@ -261,4 +261,76 @@ describe(runExecutor, () => {
 
     expect(options.__unparsed__).toStrictEqual([]);
   });
+
+  it('passes NX_DAEMON=false and NX_WORKSPACE_DATA_DIRECTORY env vars to runCommandsImpl', async () => {
+    expect.hasAssertions();
+
+    const { context } = setup();
+    mockedRunCommandsImpl.mockResolvedValue({
+      success: true,
+      terminalOutput: '',
+    });
+
+    await runExecutor(
+      {
+        repoAlias: 'repo-a',
+        originalProject: 'my-lib',
+        targetName: 'build',
+      },
+      context,
+    );
+
+    const callArgs = mockedRunCommandsImpl.mock.calls[0];
+    assertDefined(callArgs, 'runCommandsImpl was not called');
+
+    const options = callArgs[0];
+
+    expect(options).toHaveProperty('env');
+
+    const env = options.env;
+    assertDefined(env, 'env should be defined');
+
+    expect(env['NX_DAEMON']).toBe('false');
+    expect(env['NX_WORKSPACE_DATA_DIRECTORY']).toBe(
+      '/workspace/.repos/repo-a/.nx/workspace-data',
+    );
+  });
+
+  it('uses forward slashes in NX_WORKSPACE_DATA_DIRECTORY on Windows', async () => {
+    expect.hasAssertions();
+
+    setup();
+    mockedRunCommandsImpl.mockResolvedValue({
+      success: true,
+      terminalOutput: '',
+    });
+
+    const windowsContext = createTestContext({
+      root: 'C:\\Users\\dev\\workspace',
+    });
+
+    await runExecutor(
+      {
+        repoAlias: 'repo-a',
+        originalProject: 'my-lib',
+        targetName: 'build',
+      },
+      windowsContext,
+    );
+
+    const callArgs = mockedRunCommandsImpl.mock.calls[0];
+    assertDefined(callArgs, 'runCommandsImpl was not called');
+
+    const options = callArgs[0];
+
+    expect(options).toHaveProperty('env');
+
+    const env = options.env;
+    assertDefined(env, 'env should be defined');
+
+    expect(env['NX_WORKSPACE_DATA_DIRECTORY']).not.toContain('\\');
+    expect(env['NX_WORKSPACE_DATA_DIRECTORY']).toBe(
+      'C:/Users/dev/workspace/.repos/repo-a/.nx/workspace-data',
+    );
+  });
 });
