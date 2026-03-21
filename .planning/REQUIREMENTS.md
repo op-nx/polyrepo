@@ -37,6 +37,17 @@ Requirements for cross-repo dependency detection. Each maps to roadmap phases.
 - [x] **DAEMON-10**: E2e tests pass under NX_DAEMON=true
 - [x] **DAEMON-11**: E2e tests pass under NX_DAEMON=false
 
+### targetDefaults Isolation
+
+- [ ] **TDEF-01**: Proxy targets preserve dependsOn from external repo's resolved graph output (with project name namespacing)
+- [ ] **TDEF-02**: Proxy targets without dependsOn in raw config get explicit empty array (blocks host targetDefaults merge)
+- [ ] **TDEF-03**: Object-style dependsOn entries with projects arrays have project names namespaced to repo alias
+
+### Cross-repo Build Support
+
+- [ ] **BUILD-01**: Proxy executor passes NX_DAEMON=false and NX_WORKSPACE_DATA_DIRECTORY to child Nx processes for SQLite isolation
+- [ ] **BUILD-02**: `nx test @op-nx/polyrepo` succeeds without `--exclude-task-dependencies` workaround
+
 ## Future Requirements
 
 ### Generators
@@ -60,7 +71,6 @@ Requirements for cross-repo dependency detection. Each maps to roadmap phases.
 | TypeScript import analysis across repos | Enormous complexity; package.json + tsconfig paths sufficient for dependency contracts |
 | Lock file analysis | Lockfile formats vary; package name is sufficient for graph edges |
 | Automatic version conflict detection | Belongs to conformance/consistency milestone (v2+) |
-| Cross-repo `dependsOn` task chaining | v1.0 intentionally strips dependsOn from proxy targets; separate high-complexity feature |
 | Runtime dependency inference | Too heuristic-heavy; manual overrides cover non-declarative relationships |
 | Unresolved dependency warnings | Most package.json deps are public npm packages, not synced repos; would flood console |
 
@@ -91,13 +101,18 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DAEMON-09 | Phase 11 | Complete |
 | DAEMON-10 | Phase 11 | Complete |
 | DAEMON-11 | Phase 11 | Complete |
+| TDEF-01 | Phase 12 | Planned |
+| TDEF-02 | Phase 12 | Planned |
+| TDEF-03 | Phase 12 | Planned |
+| BUILD-01 | Phase 12 | Planned |
+| BUILD-02 | Phase 12 | Planned |
 
 **Coverage:**
-- v1.1 requirements: 21 total
-- Mapped to phases: 21
+- v1.1 requirements: 21 total, 21 complete
+- Phase 12 requirements: 5 total, 0 complete
+- Total mapped: 26
 - Unmapped: 0
-- Complete: 21/21
 
 ---
 *Requirements defined: 2026-03-17*
-*Last updated: 2026-03-21 after Phase 11 Plan 3 completion (v1.1 milestone complete)*
+*Last updated: 2026-03-21 after Phase 12 planning*

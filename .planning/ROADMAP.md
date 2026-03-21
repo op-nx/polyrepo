@@ -90,7 +90,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 8 -> 9 -> 10 -> 11
+Phases execute in numeric order: 8 -> 9 -> 10 -> 11 -> 12
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -107,14 +107,18 @@ Phases execute in numeric order: 8 -> 9 -> 10 -> 11
 | 11. Full Nx Daemon Support | v1.1 | 3/3 | Complete | 2026-03-21 |
 
 ### Phase 12: Resolve the cross-repo build cascade issue when syncing external nrwl/nx repo on Windows
-
-**Goal:** [To be planned]
-**Requirements**: TBD
+**Goal:** Host targetDefaults no longer leak into external project proxy targets, and nx/devkit:build succeeds via proxy executor on Windows, so nx test @op-nx/polyrepo works without --exclude-task-dependencies
+**Requirements**: TDEF-01, TDEF-02, TDEF-03, BUILD-01, BUILD-02
 **Depends on:** Phase 11
-**Plans:** 0 plans
-
+**Success Criteria** (what must be TRUE):
+  1. Proxy targets with dependsOn in the external repo's graph output preserve that dependsOn (with namespaced project references)
+  2. Proxy targets without dependsOn get explicit empty array (blocks host targetDefaults merge)
+  3. Proxy executor passes NX_DAEMON=false and NX_WORKSPACE_DATA_DIRECTORY to child processes
+  4. `nx test @op-nx/polyrepo` succeeds without `--exclude-task-dependencies`
+**Plans**: 2 plans
 Plans:
-- [ ] TBD (run /gsd:plan-phase 12 to break down)
+- [ ] 12-01-PLAN.md -- Preserve dependsOn in proxy targets and add env isolation to proxy executor
+- [ ] 12-02-PLAN.md -- Verify end-to-end fix and clean up --exclude-task-dependencies workaround
 
 ---
 *Full v1.0 details: [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)*
