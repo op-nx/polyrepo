@@ -1,8 +1,8 @@
 ---
 phase: 12-resolve-the-cross-repo-build-cascade-issue-when-syncing-external-nrwl-nx-repo-on-windows
 plan: 02
-subsystem: graph
-tags: [nx, targetDefaults, preVersionCommand, exclude-task-dependencies, verification]
+subsystem: graph, executor, sync
+tags: [nx, targetDefaults, proxy-executor, env-isolation, cache-coherence, windows]
 
 # Dependency graph
 requires:
@@ -10,102 +10,114 @@ requires:
     provides: dependsOn preservation and env isolation in proxy targets and executor
 provides:
   - removal of --exclude-task-dependencies workaround from preVersionCommand
-  - verified end-to-end cross-repo build cascade via proxy executor on Windows
-affects: [e2e tests, release workflow]
+  - targetDefaults shield auto-injection (@op-nx/polyrepo:run executor-scoped entry)
+  - general TEMP/TMP/TMPDIR isolation for proxy executor and graph extraction
+  - NX_NO_CLOUD=true in proxy executor and extraction (prevents stale cross-platform Cloud cache)
+  - needsInstall detection of missing node_modules
+  - stale child cache clearing on reinstall
+  - cache:false on sync/status targets
+affects: [e2e tests, release workflow, sync executor, graph extraction]
 
 # Tech tracking
 tech-stack:
   added: []
   patterns:
-    - "preVersionCommand uses --exclude tag:polyrepo:external alone (no --exclude-task-dependencies) since proxy executor handles cascade correctly"
+    - "Proxy executor env isolation: NX_DAEMON=false + NX_NO_CLOUD=true + NX_WORKSPACE_DATA_DIRECTORY + TEMP/TMP/TMPDIR per-repo"
+    - "targetDefaults shield: empty executor-scoped entry intercepts Nx name-based lookup, blocks host overrides"
+    - "needsInstall checks node_modules existence before lockfile hash comparison"
 
 key-files:
-  created: []
+  created:
+    - .planning/research/windows-lock-contention.md
   modified:
     - nx.json
+    - packages/op-nx-polyrepo/src/index.ts
+    - packages/op-nx-polyrepo/src/index.spec.ts
+    - packages/op-nx-polyrepo/src/lib/executors/run/executor.ts
+    - packages/op-nx-polyrepo/src/lib/executors/run/executor.spec.ts
+    - packages/op-nx-polyrepo/src/lib/executors/sync/executor.ts
+    - packages/op-nx-polyrepo/src/lib/executors/sync/executor.spec.ts
+    - packages/op-nx-polyrepo/src/lib/graph/extract.ts
 
 key-decisions:
-  - "--exclude-task-dependencies removed from preVersionCommand: proxy executor with env isolation handles cross-repo cascade correctly, making the overly aggressive flag unnecessary"
-  - "Stale disk cache (.polyrepo-graph-cache.json) must be cleared after plugin transform logic changes: cache hash is based on repo state (git SHA), not plugin code version, so transform changes are invisible to cache invalidation"
-  - "Host targetDefaults.test.dependsOn still overwrites plugin dependsOn on external test targets due to Nx mergeTargetDefaultWithTargetDefinition behavior: functionally harmless since proxy executor delegates to child repo"
+  - "targetDefaults shield: Nx resolves targetDefaults by executor key first (readTargetDefaultsForTarget line 1225). Empty @op-nx/polyrepo:run entry intercepts lookup, returns nothing to merge. Auto-injected by createNodesV2."
+  - "NX_NO_CLOUD=true: external repo Cloud config points to wrong workspace. Remote cache entries from CI (Linux) have incomplete output restoration on Windows. Fundamental correctness requirement, not per-tool bandaid."
+  - "TEMP/TMP/TMPDIR per-repo: general isolation layer catching ~80% of lock contention (Nx Cloud, npm, pnpm, Gradle, NuGet). All tools using os.tmpdir()/GetTempPath()/$TMPDIR get isolated paths."
+  - "needsInstall node_modules check: git clean -fdx deletes node_modules but lockfile hash matches stored hash. Sync skipped install, leaving proxy executor without nx binary."
+  - "Stale child cache clearing: tryInstallDeps clears .nx/cache/ and dist/ when node_modules missing. Prevents Cloud remote cache from backfilling stale entries whose output files are gone."
+  - "cache:false on sync/status targets: these depend on external filesystem state (.repos/ contents) that Nx input hashing cannot track."
 
 patterns-established:
-  - "After plugin transform logic changes: clear .repos/<alias>/.polyrepo-graph-cache.json and run nx reset to force re-extraction"
+  - "Proxy executor env block is the single place for child process isolation"
+  - "Sync executor validates node_modules existence, not just lockfile hash"
+  - "External repo operations use per-repo .tmp/ for temp files"
 
 requirements-completed: [BUILD-02]
 
 # Metrics
-duration: 18min
+duration: extended (multi-session with user verification and iterative fixes)
 completed: 2026-03-21
 ---
 
-# Phase 12 Plan 02: End-to-end Verification and --exclude-task-dependencies Cleanup Summary
+# Phase 12 Plan 02: End-to-end Verification and Workaround Cleanup Summary
 
-**Removed --exclude-task-dependencies workaround from preVersionCommand after verifying cross-repo build cascade works end-to-end via proxy executor with dependsOn preservation and env isolation**
-
-## Performance
-
-- **Duration:** 18 min
-- **Started:** 2026-03-21T11:20:48Z
-- **Completed:** 2026-03-21T11:39:01Z
-- **Tasks:** 1 of 2 (Task 2 is human-verify checkpoint)
-- **Files modified:** 1
+**Verified cross-repo build cascade works end-to-end, added targetDefaults shield, general TEMP isolation, Cloud cache isolation, and scorched-earth recovery**
 
 ## Accomplishments
-- Verified `nx test @op-nx/polyrepo` passes without `--exclude-task-dependencies` (359 tests green)
-- Verified `nx build @op-nx/polyrepo` succeeds with full cross-repo cascade through proxy executor (8 dependent tasks including nx:build-native, nx:build-base, devkit:build-base, devkit:build)
-- Verified `nx run-many -t build --exclude tag:polyrepo:external` succeeds without `--exclude-task-dependencies`
+
+- Verified `nx test @op-nx/polyrepo` passes without `--exclude-task-dependencies` (359 tests, 8 proxy tasks)
 - Removed `--exclude-task-dependencies` from preVersionCommand in nx.json
-- Discovered and fixed stale disk cache issue (Rule 1 auto-fix): old cache from before Plan 12-01 had `dependsOn: undefined` on all targets, causing host targetDefaults to leak despite the new rewriteDependsOn function
+- Added targetDefaults shield (`@op-nx/polyrepo:run: {}`) auto-injected by createNodesV2
+- Replaced per-tool NX_NO_CLOUD with general TEMP/TMP/TMPDIR per-repo isolation
+- Restored NX_NO_CLOUD=true for Cloud remote cache correctness (cross-platform stale entries)
+- Fixed needsInstall to detect missing node_modules after git clean -fdx
+- Added stale child cache clearing (.nx/cache/ + dist/) when node_modules missing
+- Set cache:false on sync/status targets (depend on external filesystem state)
+- Added TEMP/TMP/TMPDIR isolation to graph extraction exec call
+- Researched general Windows lock contention solution (.planning/research/windows-lock-contention.md)
 
 ## Task Commits
 
-Each task was committed atomically:
+1. **Task 1: Verification + preVersionCommand cleanup** - `2da3471`
+2. **targetDefaults shield** - `8491ad8`
+3. **NX_NO_CLOUD in proxy executor** - `5e35ec1` (initial), `48be760` (restored after TEMP experiment)
+4. **General TEMP/TMP isolation** - `7d958b6`
+5. **Windows lock contention research** - `4e3fb39`
+6. **needsInstall node_modules check + extraction TEMP** - `f8af24a`
+7. **Stale child cache clearing** - `2cddf4d`
+8. **cache:false on sync/status** - `2770e42`
 
-1. **Task 1: Verify nx test works without --exclude-task-dependencies and evaluate preVersionCommand** - `2da3471` (fix)
-2. **Task 2: Human verification of end-to-end fix** - awaiting checkpoint
+## Proxy Executor Final Env Block
 
-## Files Created/Modified
-- `nx.json` - Removed `--exclude-task-dependencies` from preVersionCommand (line 74)
+```typescript
+env: {
+  TEMP: repoTmpDir,       // General lock contention isolation
+  TMP: repoTmpDir,
+  TMPDIR: repoTmpDir,
+  NX_DAEMON: 'false',     // SQLite WAL lock isolation
+  NX_NO_CLOUD: 'true',    // Cross-platform stale remote cache
+  NX_WORKSPACE_DATA_DIRECTORY: '.../.nx/workspace-data',
+}
+```
 
-## Decisions Made
-- **Removed --exclude-task-dependencies:** Testing proved it redundant. The `--exclude tag:polyrepo:external` flag already filters external projects from `run-many`. The only remaining cascade is `@op-nx/polyrepo -> nx/devkit:build` via `^build`, which now works correctly through the proxy executor with env isolation.
-- **Stale cache cleared, not code-fixed:** The disk cache hash is based on repo state (git SHA, dirty files, config hash) not plugin code version. Clearing the cache file was the appropriate fix for this one-time transition. A more robust solution (including plugin version in cache hash) is a potential future enhancement but out of scope.
-- **Host targetDefaults.test.dependsOn override accepted:** Nx's `mergeTargetDefaultWithTargetDefinition` overwrites plugin-registered `dependsOn` on test targets with the host's `targetDefaults.test.dependsOn: ["^build"]`. This is cosmetically incorrect (external test targets show `["^build"]` instead of their native dependsOn) but functionally harmless -- the proxy executor delegates to the child repo regardless.
+## Verified Results
 
-## Deviations from Plan
+| Check | Result |
+|-------|--------|
+| `nx test @op-nx/polyrepo` (no workarounds) | 359 tests, 8 proxy tasks pass |
+| Scorched earth recovery (nuke + sync + test) | Pass on first run |
+| Second run child cache | `[local cache]` hits on all child tasks |
+| `nx/devkit:build.dependsOn` | `["^build","build-base","legacy-post-build"]` (preserved) |
+| `nx/devkit:test.dependsOn` | `["test-native","build-native","^build-native"]` (preserved) |
+| `nx/devkit:lint.executor` | `@op-nx/polyrepo:run` (correct, not nx:run-commands) |
+| targetDefaults shield in nx.json | `{}` present |
 
-### Auto-fixed Issues
+## Self-Check: PASSED
 
-**1. [Rule 1 - Bug] Stale disk cache blocked dependsOn preservation**
-- **Found during:** Task 1 (verification of targetDefaults isolation)
-- **Issue:** `.repos/nx/.polyrepo-graph-cache.json` contained cached proxy targets from before Plan 12-01 with `dependsOn: undefined` on all targets. The cache hash (based on repo git state) still matched, so the plugin loaded stale data instead of re-extracting with the new `rewriteDependsOn` function.
-- **Fix:** Deleted the stale cache file and ran `nx reset` to clear in-memory state. Re-extraction produced correct cache with preserved dependsOn values.
-- **Files modified:** `.repos/nx/.polyrepo-graph-cache.json` (deleted and regenerated)
-- **Verification:** Post-fix cache shows `test.dependsOn: ["test-native","build-native","^build-native"]`, `build.dependsOn: ["^build","build-base","legacy-post-build"]`, `lint.dependsOn: ["build-native","^build-native"]` -- all correct.
-- **Committed in:** Not committed (runtime operation on gitignored cache file)
-
----
-
-**Total deviations:** 1 auto-fixed (1 bug)
-**Impact on plan:** Cache fix was necessary to verify the dependsOn preservation feature actually works end-to-end. No scope creep.
-
-## Issues Encountered
-- First test run after fresh graph extraction timed out (exit code 130) due to full dependency cascade through the external repo (8 tasks instead of 1). Adding `NX_PLUGIN_NO_TIMEOUTS=true` resolved the timeout. Subsequent runs use Nx cache and are fast.
-- `lint.executor` on external projects shows `nx:run-commands` instead of `@op-nx/polyrepo:run` -- this is the host `targetDefaults.lint.command` leaking the `command` field which causes Nx to infer `nx:run-commands` as the executor. The `dependsOn` fix doesn't address this because `command` is a separate field. Noted as a potential future enhancement (setting explicit `command: undefined` or empty on proxy targets) but out of scope for this plan.
-
-## User Setup Required
-
-None - no external service configuration required.
-
-## Next Phase Readiness
-- Phase 12 is functionally complete: dependsOn preservation, env isolation, and preVersionCommand cleanup all verified
-- Task 2 checkpoint awaiting user verification of end-to-end fix
-- The "Task cascading via ^build" blocker in STATE.md can be removed once user confirms
-
-## Self-Check: PENDING
-
-Self-check will be completed after Task 2 checkpoint is resolved.
+- [x] All verification criteria met
+- [x] 359 tests pass
+- [x] Scorched earth recovery works without NX_DAEMON=false
+- [x] User approved checkpoint
 
 ---
 *Phase: 12-resolve-the-cross-repo-build-cascade-issue-when-syncing-external-nrwl-nx-repo-on-windows*

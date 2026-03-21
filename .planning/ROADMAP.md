@@ -119,7 +119,7 @@ Phases execute in numeric order: 8 -> 9 -> 10 -> 11 -> 12
 **Plans**: 2 plans
 Plans:
 - [x] 12-01-PLAN.md -- Preserve dependsOn in proxy targets and add env isolation to proxy executor
-- [ ] 12-02-PLAN.md -- Verify end-to-end fix and clean up --exclude-task-dependencies workaround
+- [x] 12-02-PLAN.md -- Verify end-to-end fix and clean up --exclude-task-dependencies workaround
 
 ---
 *Full v1.0 details: [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)*
