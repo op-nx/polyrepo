@@ -1,4 +1,4 @@
-import { readFileSync, existsSync, writeFileSync } from 'node:fs';
+import { readFileSync, existsSync, rmSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
@@ -243,6 +243,15 @@ async function tryInstallDeps(
   verbose: boolean,
   workspaceRoot: string,
 ): Promise<boolean> {
+  // Clear stale Nx cache when node_modules was missing. Without this,
+  // the child Nx hits remote/local cache entries whose output files
+  // (dist/) were deleted alongside node_modules, causing ENOENT errors
+  // in post-build scripts.
+  if (!existsSync(join(repoPath, 'node_modules'))) {
+    rmSync(join(repoPath, '.nx', 'cache'), { recursive: true, force: true });
+    rmSync(join(repoPath, 'dist'), { recursive: true, force: true });
+  }
+
   try {
     await installDeps(repoPath, alias, verbose);
     const hash = hashLockfile(repoPath);

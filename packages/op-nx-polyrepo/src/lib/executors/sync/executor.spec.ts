@@ -18,6 +18,7 @@ import { assertDefined } from '../../testing/asserts';
 vi.mock('node:fs', () => ({
   readFileSync: vi.fn<(path: string, options?: unknown) => string>(),
   existsSync: vi.fn<(path: string) => boolean>(),
+  rmSync: vi.fn(),
   writeFileSync: vi.fn<(path: string, data: string) => void>(),
 }));
 
