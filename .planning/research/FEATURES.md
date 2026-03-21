@@ -1,178 +1,149 @@
-# Feature Research
+# Feature Landscape
 
-**Domain:** Synthetic monorepo / polyrepo management tooling (Nx plugin)
-**Researched:** 2026-03-10
-**Confidence:** MEDIUM-HIGH
+**Domain:** Cross-repo dependency detection and manual dependency overrides for Nx polyrepo plugin
+**Researched:** 2026-03-17
+**Milestone:** v1.1 Cross-repo Dependencies
 
-## Feature Landscape
+## Context
 
-### Table Stakes (Users Expect These)
+The v1.0 plugin already merges project graphs from multiple repos into a unified Nx workspace. The `createDependencies` hook currently exports **intra-repo** edges only (dependencies that existed within each child repo's own graph). There are zero **inter-repo** edges today -- if repo A's `@acme/api` depends on repo B's `@acme/shared-utils` via package.json, that edge is invisible. This means `nx affected` cannot trace changes across repo boundaries, which undermines the core value proposition of a synthetic monorepo.
 
-Features users assume exist. Missing these = product feels incomplete. These are what every polyrepo management tool (meta, mu-repo, git-multi, myrepos) provides at minimum.
+v1.1 closes this gap with two complementary features: automatic detection from package.json and manual override wiring.
 
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| **Repo assembly (clone/pull)** | Every multi-repo tool does this (meta, mu-repo, myrepos). Without it, there's nothing to work with. Users configure repos and the tool materializes them locally. | MEDIUM | Config in `nx.json` plugin options. Must handle branch/tag/commit pinning, shallow clones for speed, and graceful failure when a repo is unavailable. Git clone is cross-platform and avoids Windows symlink issues. |
-| **Unified project graph** | This IS the core value prop. Nx users expect `nx graph` to show everything. If cross-repo projects don't appear in the graph, the plugin is useless. | HIGH | Requires implementing `createNodesV2` to inject projects from external repos into the host workspace graph. Must read each repo's project graph (via `nx show projects --json` or direct graph construction) and merge it. |
-| **Cross-repo dependency detection (package.json)** | Users expect the graph to show actual dependency edges, not just isolated project nodes. Auto-detection from package.json `dependencies`/`devDependencies` matching project names across repos is the zero-config path. | MEDIUM | Parse package.json across all synced repos, match npm package names to project names in other repos, create dependency edges via `createDependencies`. |
-| **Affected analysis across repos** | `nx affected` is the killer feature of Nx. If it doesn't work across repo boundaries, users will question why they're using the plugin at all. | HIGH | Depends on unified graph + cross-repo dependency edges. Nx's built-in affected analysis should work automatically once the graph is correct -- but git diff detection needs to span multiple repo working directories. |
-| **Project namespacing** | Without namespacing, two repos with a project named `shared-utils` will collide. Every multi-workspace tool handles this (Polygraph uses workspace-level separation). | MEDIUM | Prefix external project names with repo name (e.g., `repo-a/shared-utils`). Must be consistent in graph, CLI output, and target references. Only applied when viewing from a specific repo's perspective. |
-| **Multi-repo git status** | meta (`meta git status`), mu-repo (`mu st`), git-multi all provide combined status across repos. Users need to see what's changed across all repos at a glance. | LOW | Run `git status` in each synced repo directory, aggregate output. Straightforward to implement. |
-| **Bulk git operations (pull, fetch)** | meta, mu-repo, myrepos all support running git commands across all repos. `pull --all` is the most common operation -- keeping synced repos up to date. | LOW | Iterate repos, run git command in each. Support parallel execution for speed. Error handling per-repo (one failure shouldn't abort all). |
+## Table Stakes
 
-### Differentiators (Competitive Advantage)
+Features users expect when cross-repo dependencies are advertised. Missing = product feels incomplete.
 
-Features that set the product apart from manual scripts, meta, mu-repo, and even Nx Polygraph.
+| Feature | Why Expected | Complexity | Dependencies on Existing |
+|---------|--------------|------------|--------------------------|
+| **Auto-detect cross-repo deps from package.json** | This is how JS/TS projects declare dependencies. Every monorepo tool (Lerna, Turborepo, Nx itself) resolves package.json `dependencies`/`devDependencies` to project graph edges. Users will assume this works. | Medium | Requires reading each external repo's per-project package.json files, building a package-name-to-namespaced-project lookup, and matching against host + all external projects. Extends `createDependencies` in `index.ts`. |
+| **Support dependencies AND devDependencies** | Both are meaningful dependency edges. `devDependencies` like `@acme/test-utils` still mean "changes in that package affect this project." Ignoring devDependencies would miss real dependency chains. | Low | Straightforward -- iterate both fields in the same scanning pass. |
+| **Namespaced resolution** | External projects are namespaced as `repoAlias/projectName`. The dependency resolver must map npm package names (e.g., `@acme/shared-utils`) to their namespaced graph names (e.g., `nx/shared-utils`). | Medium | Depends on existing `transformGraphForRepo` output and the `PolyrepoGraphReport` structure. Needs a reverse lookup: package.json `name` field -> namespaced project name. Must also handle host workspace projects (no namespace prefix). |
+| **Cross-repo edges visible in `nx graph`** | The whole point. Dependencies returned from `createDependencies` appear as edges in `nx graph` visualization. | Low | Already works -- `createDependencies` return value is rendered by Nx. Just need to return inter-repo edges alongside existing intra-repo edges. |
+| **`nx affected` respects cross-repo deps** | When repo B changes, projects in repo A that depend on repo B projects must be marked affected. This is the primary practical value of cross-repo edges. | Low | Automatic once edges are in the graph. Nx's affected algorithm traverses the full project graph. No additional work beyond returning correct edges. |
+| **Explicit dependency overrides in config** | Not all dependencies are in package.json. Infrastructure repos, shared CI configs, data contracts (protobuf, OpenAPI) have implicit relationships. Users need a way to manually wire these. Nx itself supports `implicitDependencies` in project.json for this reason. | Low-Medium | Extends the Zod config schema in `schema.ts`. Processed alongside auto-detected deps in `createDependencies`. |
 
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| **Nx-native integration (zero custom CLI)** | Unlike meta/mu-repo which are separate CLI tools, this works inside Nx. No context switching. `nx graph`, `nx affected`, `nx run-many` just work. This is the single biggest differentiator vs standalone multi-repo tools. | HIGH | The entire plugin architecture must conform to Nx plugin API (createNodesV2, createDependencies). This is not a wrapper around Nx -- it extends Nx. |
-| **Explicit cross-repo dependency overrides** | Auto-detection covers 80% of cases. Manual wiring covers the rest: internal APIs that aren't published to npm, services that communicate via HTTP/gRPC, implicit contracts. No other open-source tool does this for Nx. | LOW | Config in `nx.json` plugin options. Simple mapping: `{ "source": "repo-a/app", "target": "repo-b/api", "type": "implicit" }`. |
-| **Sync generator for cross-repo tsconfig paths** | After repo assembly, TypeScript projects need path mappings to import from other repos. A sync generator can auto-generate tsconfig path entries, making cross-repo imports work without manual config. | MEDIUM | Uses Nx sync generator API (19.8+). Reads synced repo locations, generates `paths` entries in root tsconfig. Runs before build/typecheck targets. |
-| **Selective repo assembly** | Not every developer needs every repo. Let users configure which repos to assemble (profiles/groups), so a frontend dev doesn't clone backend repos. Reduces clone time and disk usage. | LOW | Config-driven: named groups of repos in `nx.json`. `nx run open-polyrepo:assemble --group=frontend`. meta supports this loosely via `.meta` file editing. |
-| **Stale repo detection** | Warn when an synced repo is behind its remote, on a different branch than expected, or has uncommitted changes that might affect the graph. Prevents "works on my machine" issues. | LOW | Check git status + `git rev-list HEAD..origin/main --count` for each repo. Surface warnings in `nx sync:check` or as part of graph construction. |
-| **Free/open-source alternative to Polygraph** | Polygraph requires Nx Enterprise license. This plugin is MIT-licensed and works with any self-hosted remote cache. For teams that want cross-repo visibility without enterprise contracts, this is the only option. | N/A | Not a feature per se, but the core market positioning. |
-| **Cross-repo task orchestration awareness** | When running `nx run-many --target=build`, the task graph should respect cross-repo dependency order. Repo B's app that depends on Repo A's lib should build Repo A's lib first. | MEDIUM | Should work automatically if the dependency graph is correct. The key challenge is ensuring task inputs/outputs across repos are correctly wired for caching. |
-| **Workspace-level caching with self-hosted remote cache** | Cross-repo builds can be cached. If Repo A's lib hasn't changed, Repo B's app build can reuse the cached artifact. Works with any Nx-compatible remote cache (custom, S3, etc.). | LOW | Nx handles this natively once the graph is correct. The plugin just needs to ensure cache keys incorporate the correct file inputs from external repo directories. |
+## Differentiators
 
-### Anti-Features (Commonly Requested, Often Problematic)
+Features that set the product apart. Not expected by default, but valued.
 
-Features that seem good but create problems. Deliberately NOT building these for v1.
+| Feature | Value Proposition | Complexity | Dependencies on Existing |
+|---------|-------------------|------------|--------------------------|
+| **Dependency negation (override to remove)** | Nx's own `implicitDependencies` supports `!projectName` to explicitly remove a detected dependency. Package.json may list a dependency that is not actually consumed at runtime (e.g., version-only peer dep alignment). Letting users negate false positives prevents noisy `nx affected` results. | Low | Config schema addition: `{ "source": "repoA/app", "target": "!repoB/lib" }` or `negate: true` flag. Filter logic in createDependencies. |
+| **peerDependencies detection** | Some cross-repo relationships are expressed as peer deps (e.g., plugin-host patterns). Detecting these catches edges that dependencies/devDependencies miss. | Low | Same package.json scanning pass, just add `peerDependencies` field. |
+| **Wildcard/glob overrides** | Instead of wiring individual project pairs, allow patterns like `{ "source": "repoA/*", "target": "repoB/shared-core" }` meaning "all projects in repoA depend on shared-core." Useful for foundation libraries. | Medium | Requires glob matching (minimatch) against project names. Nx uses minimatch for its own implicitDependencies, so there is precedent. |
+| **Dependency edge type control** | Let users specify whether an override creates an `implicit`, `static`, or `dynamic` edge. Different edge types affect Nx's task scheduling differently. Default to `implicit` (safest). | Low | Enum field in override config, passed through to `RawProjectGraphDependency.type`. |
+| **Diagnostic: unresolved dependency warnings** | When a package.json lists `@acme/shared-utils` and no project in any synced repo publishes that package name, emit a warning. Helps users understand why expected edges are missing. | Low | Compare resolved set against all package.json dependency keys. Log unresolved ones via `logger.warn`. |
 
-| Feature | Why Requested | Why Problematic | Alternative |
-|---------|---------------|-----------------|-------------|
-| **Cross-repo code editing/committing** | "I want to edit code in Repo B while working in the host workspace and commit it back." | Synced repos are clones with their own git state. Editing creates invisible coupling, merge conflicts, and unclear ownership. meta tried this and it's the most confusing part of the tool. | Users should `cd` into the synced repo and use normal git workflow there. The plugin provides visibility, not a unified VCS. |
-| **Automatic cross-repo PR creation** | "When I change a shared lib, auto-create PRs in dependent repos." | Requires deep CI/CD integration, GitHub/GitLab API auth, and making assumptions about branching strategy. Massive scope creep. Polygraph does this but it's an enterprise feature for a reason. | Provide affected analysis output that CI can consume. Let teams wire their own PR automation using `nx affected --base=... --head=...` output. |
-| **Custom task runner / build system** | "I need a special build pipeline for cross-repo builds." | Nx already has a task runner, task graph, and caching. Reimplementing this is a multi-year effort and will always be worse than Nx native. | Leverage Nx's built-in task orchestration. The plugin only contributes to the project/dependency graph. |
-| **GUI / web dashboard** | "I want a visual dashboard to manage all my repos." | Massive scope, orthogonal to the core problem, and `nx graph` already provides visualization. A dashboard is a separate product. | `nx graph` for visualization. CLI/TUI for management commands. |
-| **Nx Cloud integration** | "Can this work with Nx Cloud?" | Explicitly out of scope. Nx Cloud already has Polygraph for this. Building Nx Cloud integration defeats the purpose of being a free alternative. | Self-hosted remote cache (S3, custom HTTP, etc.). |
-| **Git submodule/subtree approach** | "Use git submodules instead of cloning." | Submodules are notoriously painful: recursive clones, detached HEAD state, version pinning friction, poor Windows support. Subtrees pollute git history. Every experienced developer has submodule horror stories. | Plain git clone/pull into a configurable directory. Simple, predictable, debuggable. |
-| **Non-Nx repo support** | "I want to include repos that don't use Nx in the graph." | Polygraph supports this via "metadata-only workspaces" but it requires inferring a project graph from non-Nx repos (package.json workspaces, file structure). Huge complexity for v1. | v1 requires all synced repos to be Nx workspaces. Non-Nx support can be a v2 feature if there's demand. |
-| **Monorepo consolidation / migration tool** | "Help me merge polyrepos into a real monorepo." | Completely different problem space. Migration tools need git history preservation, CI rewriting, dependency deduplication. | Point users to `lerna import` or custom scripts. The plugin assumes you WANT to stay polyrepo. |
+## Anti-Features
+
+Features to explicitly NOT build in this milestone.
+
+| Anti-Feature | Why Avoid | What to Do Instead |
+|--------------|-----------|-------------------|
+| **TypeScript import analysis across repos** | Each external repo's source files are in `.repos/` and are not part of the host workspace's TypeScript program. Analyzing imports would require parsing every source file from every repo, understanding their path aliases, and resolving cross-repo references. Enormous complexity for marginal gain over package.json detection. | Rely on package.json as the dependency contract. If projects publish packages, their consumers declare deps in package.json. |
+| **Lock file analysis** | Parsing pnpm-lock.yaml, package-lock.json, or yarn.lock to resolve exact versions and transitive deps across repos. Lockfile formats differ between package managers and change between versions. | Use package.json `dependencies`/`devDependencies` keys only. Exact version resolution is not needed for graph edges -- only the package name matters. |
+| **Automatic version conflict detection** | Detecting when repo A depends on `lodash@4.x` and repo B depends on `lodash@3.x`. This is a valuable feature but belongs to a conformance/consistency milestone, not dependency detection. | Defer to v2+ conformance rules (listed in PROJECT.md as out-of-scope). |
+| **Cross-repo `dependsOn` task chaining** | The v1.0 design intentionally strips `dependsOn` from proxy targets to avoid cascading task graphs. Enabling cross-repo task ordering (e.g., "build repoB/lib before building repoA/app") is a separate, high-complexity feature that triggers the native task hasher on external projects. | Keep existing behavior: proxy targets have empty `dependsOn`. Cross-repo edges inform `affected` and `graph` but do not create task-level ordering. Document this as a known limitation. |
+| **Runtime dependency inference** | Detecting dependencies via dynamic `require()`, environment variable references, or config file analysis. Too heuristic-heavy and error-prone. | Manual overrides cover non-package.json relationships. |
+| **GUI for dependency management** | A web UI to visualize and edit cross-repo dependencies. | `nx graph` already visualizes. Config editing is in nx.json. |
 
 ## Feature Dependencies
 
 ```
-[Repo Assembly (clone/pull)]
-    |
-    +--requires--> [Config in nx.json]
-    |
-    +--enables--> [Unified Project Graph]
-    |                 |
-    |                 +--requires--> [Project Namespacing]
-    |                 |
-    |                 +--enables--> [Cross-repo Dependency Detection]
-    |                 |                 |
-    |                 |                 +--enables--> [Affected Analysis]
-    |                 |                 |
-    |                 |                 +--enables--> [Cross-repo Task Orchestration]
-    |                 |
-    |                 +--enables--> [Explicit Dependency Overrides]
-    |
-    +--enables--> [Multi-repo Git Status]
-    |
-    +--enables--> [Bulk Git Operations]
-    |
-    +--enables--> [Stale Repo Detection]
-    |
-    +--enables--> [Sync Generator (tsconfig paths)]
-                      |
-                      +--requires--> [Unified Project Graph]
+Namespaced resolution (package name -> project name lookup)
+  -> Auto-detect cross-repo deps from package.json (uses the lookup)
+  -> peerDependencies detection (same lookup, different field)
+
+Zod config schema extension
+  -> Explicit dependency overrides (config parsing)
+  -> Dependency negation (override with negation flag)
+  -> Wildcard/glob overrides (pattern matching in overrides)
+
+Auto-detect + Explicit overrides
+  -> Diagnostic: unresolved dependency warnings (needs full resolved set)
 ```
 
-### Dependency Notes
+Critical dependency: the **package-name-to-project lookup** is the foundation for auto-detection. It must map npm package names (from package.json `name` field) to namespaced Nx project names for both host workspace projects and external repo projects. This lookup is read from the graph report nodes (which already contain root paths from which package.json can be located) and from `context.projects` in the `CreateDependenciesContext`.
 
-- **Unified Project Graph requires Repo Assembly:** The graph plugin reads project configurations from synced repo directories. Without repos on disk, there's nothing to graph.
-- **Unified Project Graph requires Project Namespacing:** Must be built into graph construction from day one. Retrofitting namespacing after projects are in the graph causes breaking changes.
-- **Cross-repo Dependency Detection requires Unified Project Graph:** Dependencies are edges between nodes. Nodes must exist first.
-- **Affected Analysis requires Cross-repo Dependency Detection:** `nx affected` traverses dependency edges to find impacted projects. Without edges, affected analysis only finds projects with direct file changes.
-- **Sync Generator requires both Repo Assembly and Unified Project Graph:** It reads repo locations (assembly) and project structure (graph) to generate tsconfig paths.
-- **Multi-repo Git Status and Bulk Git Operations are independent:** They only need repo assembly. They don't depend on the Nx graph at all.
+## MVP Recommendation
 
-## MVP Definition
+**Phase 1 -- Auto-detection (Table Stakes):**
 
-### Launch With (v1.0)
+1. **Build package-name-to-project lookup** -- For each project in the graph (host and external), read its package.json `name` field. Map that to the Nx project name. Host projects use their own name; external projects use their namespaced name (`repoAlias/originalName`). Store in `Map<packageName, projectName>`.
+2. **Scan package.json for cross-repo edges** -- For each project, read its package.json `dependencies` and `devDependencies`. For each dep key that maps to a project in a *different* repo (or host-to-external / external-to-host), emit a cross-repo edge with `DependencyType.implicit`.
+3. **Return inter-repo edges from createDependencies** -- Alongside existing intra-repo edges from the graph report, return the newly detected cross-repo edges.
 
-Minimum viable product -- what's needed to validate the core concept of "polyrepo feels like monorepo."
+**Phase 2 -- Manual Overrides:**
 
-- [ ] **Repo assembly via git clone/pull** -- configured in `nx.json` plugin options (repo URL, branch, target directory). Without this, nothing else works.
-- [ ] **Unified project graph via createNodesV2** -- external repo projects appear in `nx graph`. This is the proof of concept.
-- [ ] **Project namespacing** -- prefix external projects with repo name to avoid collisions. Must be built in from the start.
-- [ ] **Cross-repo dependency detection from package.json** -- auto-detect edges so `nx graph` shows real relationships.
-- [ ] **Affected analysis across repos** -- `nx affected` works across repo boundaries. This is what makes the tool useful beyond visualization.
-- [ ] **Multi-repo git status** -- combined status view across synced repos. Quick win, high DX value.
+4. **Extend Zod config schema** -- Add optional `dependencies` array to plugin options. Each entry: `{ source: string, target: string }`. Source/target are namespaced project names.
+5. **Process overrides in createDependencies** -- After auto-detection, add explicit override edges. Validate that source and target exist in `context.projects`.
+6. **Dependency negation** -- Support `negate: true` on overrides to suppress auto-detected edges.
+7. **Diagnostic warnings** -- Warn on unresolved package names and on override targets that don't match any project.
 
-### Add After Validation (v1.x)
+**Defer:**
+- Wildcard/glob overrides: useful but adds complexity; start with exact project names
+- Dependency edge type control: default to `implicit`, revisit if users request granularity
+- peerDependencies: add in a fast follow-up once the core detection works
 
-Features to add once core is working and users provide feedback.
+## Complexity Assessment
 
-- [ ] **Bulk git operations (pull, fetch, checkout)** -- triggered by user demand for multi-repo coordination
-- [ ] **Explicit cross-repo dependency overrides** -- triggered by users with non-npm dependencies (APIs, services)
-- [ ] **Stale repo detection** -- triggered by "works on my machine" reports from teams
-- [ ] **Selective repo assembly (profiles/groups)** -- triggered by teams with many repos where not everyone needs everything
-- [ ] **Sync generator for tsconfig paths** -- triggered by TypeScript users wanting cross-repo imports without manual config
+| Feature | Estimated Effort | Risk |
+|---------|-----------------|------|
+| Package name lookup table | Small (1-2 hours) | Low -- straightforward Map construction from project roots |
+| package.json scanning for cross-repo edges | Medium (2-4 hours) | Medium -- must handle missing package.json, monorepo project names vs package names, scoped packages, and projects without package.json (e.g., app projects) |
+| Inter-repo edge emission in createDependencies | Small (1 hour) | Low -- createDependencies already works, just more edges |
+| Config schema extension for overrides | Small (1-2 hours) | Low -- Zod schema, well-established pattern in codebase |
+| Override processing logic | Medium (2-3 hours) | Low -- filter/add logic on dependency array |
+| Negation support | Small (1 hour) | Low -- filter step after all edges collected |
+| Diagnostic warnings | Small (1 hour) | Low -- logger.warn on unmatched names |
+| Unit tests (SIFERS) for all above | Medium (3-5 hours) | Low -- SIFERS pattern is well-established, 282 existing tests as reference |
+| e2e test additions | Medium (2-3 hours) | Medium -- testcontainers setup already exists, but need fixture repos with cross-deps |
 
-### Future Consideration (v2+)
+**Total estimated effort:** 2-3 days for full feature set including tests.
 
-Features to defer until product-market fit is established.
+## How It Works in Practice
 
-- [ ] **Non-Nx repo support** -- requires inferring project graphs from arbitrary repo structures. Wait for demand.
-- [ ] **Cross-repo conformance rules** -- Polygraph territory. Only if users need organizational-level standards.
-- [ ] **Watch mode across repos** -- file watching across multiple repo directories. Complex and potentially resource-heavy.
-- [ ] **Custom workspace visualization** -- enhanced graph views showing repo boundaries, ownership. Wait for `nx graph` limitations to surface.
+### Auto-detection flow
 
-## Feature Prioritization Matrix
+```
+Host workspace                 External repo "nx"
++-------------------+          +-------------------+
+| my-app            |          | nx/core           |
+|  package.json:    |          |  package.json:    |
+|    dependencies:  |          |    name: "@nx/devkit" |
+|      "@nx/devkit" |------->  |                   |
++-------------------+          +-------------------+
 
-| Feature | User Value | Implementation Cost | Priority |
-|---------|------------|---------------------|----------|
-| Repo assembly (clone/pull) | HIGH | MEDIUM | P1 |
-| Unified project graph (createNodesV2) | HIGH | HIGH | P1 |
-| Project namespacing | HIGH | MEDIUM | P1 |
-| Cross-repo dep detection (package.json) | HIGH | MEDIUM | P1 |
-| Affected analysis across repos | HIGH | HIGH | P1 |
-| Multi-repo git status | MEDIUM | LOW | P1 |
-| Bulk git operations | MEDIUM | LOW | P2 |
-| Explicit dependency overrides | MEDIUM | LOW | P2 |
-| Stale repo detection | MEDIUM | LOW | P2 |
-| Selective repo assembly | MEDIUM | LOW | P2 |
-| Sync generator (tsconfig paths) | MEDIUM | MEDIUM | P2 |
-| Cross-repo task orchestration awareness | HIGH | MEDIUM | P1 |
-| Non-Nx repo support | LOW | HIGH | P3 |
+1. Build lookup: "@nx/devkit" -> "nx/core" (namespaced)
+2. Scan my-app's package.json: "@nx/devkit" found in lookup
+3. Different repos? my-app is host, nx/core is external -> YES
+4. Emit edge: { source: "my-app", target: "nx/core", type: "implicit" }
+```
 
-**Priority key:**
-- P1: Must have for launch -- without these the plugin doesn't deliver its core value
-- P2: Should have, add when possible -- these improve DX significantly
-- P3: Nice to have, future consideration
+### Manual override flow
 
-## Competitor Feature Analysis
-
-| Feature | meta | mu-repo | Nx Polygraph | git-multi / myrepos | Our Approach (nx-openpolyrepo) |
-|---------|------|---------|--------------|---------------------|-------------------------------|
-| Repo assembly | `.meta` JSON file, `meta git clone` | `.mu_repo` file, `mu register` | N/A (Nx Cloud manages) | Manual config files | `nx.json` plugin options, git clone/pull on demand |
-| Unified dependency graph | None | None | Workspace Graph (Nx Cloud UI) | None | Nx project graph plugin (createNodesV2 + createDependencies) |
-| Cross-repo dep detection | None (just runs commands) | None | Auto via Nx Cloud metadata | None | package.json analysis + explicit overrides |
-| Affected analysis | None | None | Yes (via Nx Cloud) | None | Nx-native `nx affected` (works automatically with correct graph) |
-| Multi-repo git commands | `meta git <cmd>` (full git wrapper) | `mu <cmd>` (parallel by default) | None | `git multi <cmd>`, `mr <cmd>` | Nx executor or standalone commands |
-| Plugin/extension system | Node module plugins (`meta-*`) | None | Nx Cloud features | None | Nx plugin architecture (composable with other Nx plugins) |
-| Parallel execution | Yes | Yes (configurable serial/parallel) | Yes (Nx DTE) | myrepos: `mr -j5` | Yes (Nx parallel task execution) |
-| Project namespacing | None (repos are independent) | None | Workspace-level separation | None | Repo name prefix on project names |
-| CI/CD integration | None built-in | None built-in | Deep (Nx Cloud CI) | None | `nx sync:check` in CI, `nx affected` for selective builds |
-| Cost | Free (MIT) | Free (MIT) | Nx Enterprise license | Free | Free (MIT) |
-| Nx integration | None | None | Native (IS Nx Cloud) | None | Native Nx plugin |
+```json
+// nx.json plugin options
+{
+  "repos": { "nx": { "url": "..." } },
+  "dependencies": [
+    { "source": "my-app", "target": "nx/nx-dev" },
+    { "source": "my-app", "target": "nx/unused-lib", "negate": true }
+  ]
+}
+```
 
 ## Sources
 
-- [meta - GitHub](https://github.com/mateodelnorte/meta) -- multi-repo management tool with plugin system
-- [mu-repo](https://fabioz.github.io/mu-repo/) -- parallel git command execution across repos
-- [Nx Polygraph introduction](https://nx.dev/blog/nx-cloud-introducing-polygraph) -- enterprise synthetic monorepo features
-- [Nx Polygraph docs](https://nx.dev/docs/enterprise/polygraph) -- Workspace Graph, Conformance Rules, Custom Workflows
-- [Nx Project Graph Plugins](https://nx.dev/docs/extending-nx/project-graph-plugins) -- createNodesV2 and createDependencies API
-- [Nx Sync Generators](https://nx.dev/docs/concepts/sync-generators) -- sync generator API for file system updates from graph
-- [git-multi - GitHub](https://github.com/pvdb/git-multi) -- execute git commands across repos
-- [myrepos](https://myrepos.branchable.com/) -- multi-VCS repo management
-- [monorepo.tools](https://monorepo.tools/) -- monorepo tool comparison
-- [Rush](https://rushjs.io/) -- Microsoft's monorepo tool with affected analysis and dependency graph
+- [Nx: Extending the Project Graph](https://nx.dev/docs/extending-nx/project-graph-plugins) -- createDependencies API, CandidateDependency shape, filesToProcess
+- [Nx: DependencyType enum](https://nx.dev/nx-api/devkit/documents/DependencyType) -- static, dynamic, implicit values
+- [Nx: Project Configuration](https://nx.dev/docs/reference/project-configuration) -- implicitDependencies with negation support
+- [Nx: Dependency Management Strategies](https://nx.dev/docs/concepts/decisions/dependency-management) -- single-version vs independent policies
+- [Implicit Dependencies Management with Nx](https://dev.to/this-is-learning/implicit-dependencies-management-with-nx-a-practical-guide-through-real-world-case-studies-59kd) -- practical patterns for implicit deps, negation syntax
+- [Poly Monorepos with Nx](https://gelinjo.hashnode.dev/poly-monorepos-with-nx) -- poly-monorepo architecture patterns
+- Existing codebase: `index.ts` (createDependencies), `schema.ts` (Zod config), `transform.ts` (namespacing), `types.ts` (graph report structure)
 
 ---
-*Feature research for: Synthetic monorepo Nx plugin (polyrepo management)*
-*Researched: 2026-03-10*
+*Feature research for v1.1: Cross-repo dependency detection and manual overrides*
+*Researched: 2026-03-17*

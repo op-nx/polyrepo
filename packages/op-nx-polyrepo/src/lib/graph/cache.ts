@@ -1,48 +1,122 @@
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
-import { hashArray, readJsonFile, writeJsonFile } from '@nx/devkit';
+import { hashArray, readJsonFile, writeJsonFile, logger } from '@nx/devkit';
 import { getHeadSha, getDirtyFiles } from '../git/detect';
 import { normalizeRepos } from '../config/schema';
 import { extractGraphFromRepo } from './extract';
 import { transformGraphForRepo } from './transform';
 import type { PolyrepoConfig } from '../config/schema';
-import type { PolyrepoGraphReport } from './types';
+import type { TransformedNode, PolyrepoGraphReport } from './types';
 
 /**
- * Module-level state shared between createNodesV2 and createDependencies.
- * Follows the @nx/gradle pattern of a single cached report per process.
+ * Per-repo graph data stored in both in-memory and disk caches.
  */
-let graphReport: PolyrepoGraphReport | undefined;
-let currentHash: string | undefined;
-
-export const CACHE_FILENAME = '.polyrepo-graph-cache.json';
-
-interface CacheFile {
-  hash: string;
-  report: PolyrepoGraphReport;
+interface RepoGraphData {
+  nodes: Record<string, TransformedNode>;
+  dependencies: Array<{ source: string; target: string; type: string }>;
 }
 
 /**
- * Store cache in `.repos/` rather than `.nx/workspace-data/`.
- * `nx reset` wipes `.nx/`, which forces a costly re-extraction
- * that exceeds the daemon's plugin worker timeout for large repos.
- * `.repos/` is already gitignored and survives resets.
+ * Module-level state shared between createNodesV2 and createDependencies.
+ * Under the Nx daemon, the plugin worker process persists, so these
+ * survive across Nx commands within the same daemon session.
  */
-function getCachePath(workspaceRoot: string): string {
+const perRepoCache: Map<string, { hash: string; report: RepoGraphData }> =
+  new Map();
+let globalHash: string | undefined;
+
+/**
+ * Per-repo extraction failure tracking for exponential backoff.
+ */
+interface FailureState {
+  lastAttemptTime: number;
+  attemptCount: number;
+  lastHash: string;
+}
+
+const failureStates: Map<string, FailureState> = new Map();
+
+let oldCacheCleaned = false;
+
+export const CACHE_FILENAME = '.polyrepo-graph-cache.json';
+
+/**
+ * Returns the per-repo cache file path at `.repos/<alias>/.polyrepo-graph-cache.json`.
+ */
+function getPerRepoCachePath(workspaceRoot: string, alias: string): string {
+  return join(workspaceRoot, '.repos', alias, CACHE_FILENAME);
+}
+
+/**
+ * Returns the old monolithic cache file path at `.repos/.polyrepo-graph-cache.json`.
+ */
+function getOldCachePath(workspaceRoot: string): string {
   return join(workspaceRoot, '.repos', CACHE_FILENAME);
 }
 
 /**
- * Compute an outer-layer hash from plugin options + each repo's git state.
- * Repos without a `.git` directory (unsynced) are skipped.
+ * Read per-repo cache from disk. Returns undefined if file missing or corrupt.
  */
-async function computeOuterHash(
+function tryReadPerRepoCache(
+  workspaceRoot: string,
+  alias: string,
+): { hash: string; report: RepoGraphData } | undefined {
+  try {
+    return readJsonFile<{ hash: string; report: RepoGraphData }>(
+      getPerRepoCachePath(workspaceRoot, alias),
+    );
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Write per-repo cache to disk. Non-fatal on failure.
+ * Exported for the sync executor to pre-cache after install.
+ */
+export function writePerRepoCache(
+  workspaceRoot: string,
+  alias: string,
+  hash: string,
+  report: RepoGraphData,
+): void {
+  try {
+    writeJsonFile(getPerRepoCachePath(workspaceRoot, alias), { hash, report });
+  } catch {
+    // Non-fatal -- in-memory cache is still valid
+  }
+}
+
+/**
+ * Compute a per-repo hash from the repos config hash, alias, HEAD SHA, and dirty files.
+ * Exported for the sync executor to pre-cache after install.
+ */
+export async function computeRepoHash(
+  reposConfigHash: string,
+  alias: string,
+  repoPath: string,
+): Promise<string> {
+  const headSha = await getHeadSha(repoPath);
+  const dirtyFiles = await getDirtyFiles(repoPath);
+
+  return hashArray([reposConfigHash, alias, headSha, dirtyFiles]);
+}
+
+/**
+ * Compute a global hash that combines all per-repo hashes.
+ * When unchanged, the global gate returns instantly from in-memory cache.
+ */
+async function computeGlobalHash(
   config: PolyrepoConfig,
   workspaceRoot: string,
-  optionsHash: string,
-): Promise<string> {
+  reposConfigHash: string,
+): Promise<{
+  globalHash: string;
+  repoHashes: Map<string, { repoPath: string; hash: string }>;
+}> {
   const entries = normalizeRepos(config);
-  const parts: string[] = [optionsHash];
+  const parts: string[] = [reposConfigHash];
+  const repoHashes = new Map<string, { repoPath: string; hash: string }>();
 
   for (const entry of entries) {
     const repoPath =
@@ -54,102 +128,208 @@ async function computeOuterHash(
       continue;
     }
 
-    const headSha = await getHeadSha(repoPath);
-    const dirtyFiles = await getDirtyFiles(repoPath);
+    const repoHash = await computeRepoHash(
+      reposConfigHash,
+      entry.alias,
+      repoPath,
+    );
 
-    parts.push(entry.alias, headSha, dirtyFiles);
+    parts.push(repoHash);
+    repoHashes.set(entry.alias, { repoPath, hash: repoHash });
   }
 
-  return hashArray(parts);
+  return { globalHash: hashArray(parts), repoHashes };
 }
 
 /**
- * Populate the module-level graph report. Uses two-layer cache invalidation:
+ * Check whether extraction should be skipped due to exponential backoff.
+ * Returns true if the repo is within its cooldown period and hash hasn't changed.
+ */
+function shouldSkipExtraction(alias: string, currentHash: string): boolean {
+  const state = failureStates.get(alias);
+
+  if (!state) {
+    return false;
+  }
+
+  // Hash changed = user made changes = reset backoff
+  if (state.lastHash !== currentHash) {
+    failureStates.delete(alias);
+
+    return false;
+  }
+
+  // Exponential backoff: 2s, 4s, 8s, 16s, 30s cap
+  const backoffMs = Math.min(
+    2000 * Math.pow(2, state.attemptCount - 1),
+    30000,
+  );
+  const elapsed = Date.now() - state.lastAttemptTime;
+
+  return elapsed < backoffMs;
+}
+
+/**
+ * Record an extraction failure for exponential backoff tracking.
+ */
+function recordFailure(alias: string, currentHash: string): void {
+  const existing = failureStates.get(alias);
+  const attemptCount = (existing?.attemptCount ?? 0) + 1;
+
+  failureStates.set(alias, {
+    lastAttemptTime: Date.now(),
+    attemptCount,
+    lastHash: currentHash,
+  });
+}
+
+/**
+ * Log an actionable warning with 4 troubleshooting steps when extraction fails.
+ */
+function logExtractionFailure(alias: string, error: unknown): void {
+  const msg = error instanceof Error ? error.message : String(error);
+
+  logger.warn(`Graph extraction failed for ${alias}: ${msg}`);
+  logger.warn('Troubleshooting steps:');
+  logger.warn('  1. Run: nx polyrepo-sync');
+  logger.warn('  2. Run: NX_DAEMON=false nx graph');
+  logger.warn(`  3. Check: .repos/${alias}/ (nx.json, node_modules)`);
+  logger.warn('  4. Run: NX_PLUGIN_NO_TIMEOUTS=true nx graph');
+}
+
+/**
+ * Delete the old monolithic cache file if it exists (one-time cleanup).
+ */
+function cleanupOldCache(workspaceRoot: string): void {
+  if (oldCacheCleaned) {
+    return;
+  }
+
+  oldCacheCleaned = true;
+
+  const oldPath = getOldCachePath(workspaceRoot);
+
+  if (existsSync(oldPath)) {
+    try {
+      unlinkSync(oldPath);
+    } catch {
+      // Non-fatal -- old file may already be gone
+    }
+  }
+}
+
+/**
+ * Assemble a PolyrepoGraphReport from the per-repo cache Map.
+ */
+function assembleReport(
+  cache: Map<string, { hash: string; report: RepoGraphData }>,
+): PolyrepoGraphReport {
+  const report: PolyrepoGraphReport = { repos: {} };
+
+  for (const [alias, entry] of cache) {
+    report.repos[alias] = entry.report;
+  }
+
+  return report;
+}
+
+/**
+ * Populate the module-level graph report. Uses three-layer cache invalidation:
  *
- * 1. **Outer gate:** Hash of plugin options + each repo's HEAD SHA + dirty files.
- *    If unchanged, returns in-memory cache instantly.
- * 2. **Disk cache:** On cold start, reads from `workspaceDataDirectory` and
- *    restores if the hash matches (avoids extraction after Nx daemon restart).
+ * 1. **Global gate:** Combined hash of all per-repo hashes.
+ *    If unchanged, returns assembled report from in-memory cache instantly.
+ * 2. **Per-repo disk cache:** On per-repo miss, reads from
+ *    `.repos/<alias>/.polyrepo-graph-cache.json`.
+ * 3. **Per-repo extraction:** Extracts graph JSON from the repo (expensive).
  *
- * When the hash changes, extracts graph JSON from each synced repo in parallel,
- * transforms nodes/deps, and persists the result.
+ * When a repo's hash changes, only that repo re-extracts. Unchanged repos
+ * return from in-memory cache. Extraction failures are isolated per-repo
+ * with exponential backoff.
  */
 export async function populateGraphReport(
   config: PolyrepoConfig,
   workspaceRoot: string,
-  pluginOptionsHash: string,
+  reposConfigHash: string,
 ): Promise<PolyrepoGraphReport> {
-  const hash = await computeOuterHash(config, workspaceRoot, pluginOptionsHash);
+  // One-time cleanup of old monolithic cache
+  cleanupOldCache(workspaceRoot);
 
-  // Layer 1: in-memory cache
-  if (hash === currentHash && graphReport !== undefined) {
-    return graphReport;
-  }
+  // Compute global hash from all per-repo hashes
+  const { globalHash: newGlobalHash, repoHashes } = await computeGlobalHash(
+    config,
+    workspaceRoot,
+    reposConfigHash,
+  );
 
-  // Layer 2: disk cache (cold start)
-  try {
-    const cached = readJsonFile<CacheFile>(getCachePath(workspaceRoot));
+  // Layer 0: Global gate -- nothing changed across all repos AND
+  // every expected repo is present in the in-memory cache. If a repo
+  // previously failed extraction, it won't be in perRepoCache, so the
+  // gate misses and we retry that repo (respecting backoff).
+  if (newGlobalHash === globalHash) {
+    let allCached = true;
 
-    if (cached.hash === hash) {
-      currentHash = hash;
-      graphReport = cached.report;
-
-      return graphReport;
+    for (const alias of repoHashes.keys()) {
+      if (!perRepoCache.has(alias)) {
+        allCached = false;
+        break;
+      }
     }
-  } catch {
-    // Cache file missing or corrupt -- continue to extraction
+
+    if (allCached) {
+      return assembleReport(perRepoCache);
+    }
   }
 
-  // Extract and transform
-  const entries = normalizeRepos(config);
-  const syncedEntries = entries.filter((entry) => {
-    const repoPath =
-      entry.type === 'remote'
-        ? join(workspaceRoot, '.repos', entry.alias)
-        : entry.path;
+  // Something changed -- check per-repo
+  const report: PolyrepoGraphReport = { repos: {} };
 
-    return existsSync(join(repoPath, '.git'));
-  });
+  for (const [alias, { repoPath, hash: repoHash }] of repoHashes) {
+    // Layer 1: Per-repo in-memory cache
+    const cached = perRepoCache.get(alias);
 
-  const results = await Promise.all(
-    syncedEntries.map(async (entry) => {
-      const repoPath =
-        entry.type === 'remote'
-          ? join(workspaceRoot, '.repos', entry.alias)
-          : entry.path;
+    if (cached?.hash === repoHash) {
+      report.repos[alias] = cached.report;
+      continue;
+    }
+
+    // Layer 2: Per-repo disk cache
+    const diskCache = tryReadPerRepoCache(workspaceRoot, alias);
+
+    if (diskCache?.hash === repoHash) {
+      perRepoCache.set(alias, diskCache);
+      report.repos[alias] = diskCache.report;
+      continue;
+    }
+
+    // Layer 3: Extract (expensive)
+    // Check backoff first
+    if (shouldSkipExtraction(alias, repoHash)) {
+      logger.warn(
+        `Skipping graph extraction for ${alias} (backoff after previous failure)`,
+      );
+      continue;
+    }
+
+    try {
       const rawGraph = await extractGraphFromRepo(repoPath);
       const transformed = transformGraphForRepo(
-        entry.alias,
+        alias,
         rawGraph,
         workspaceRoot,
       );
 
-      return { alias: entry.alias, transformed };
-    }),
-  );
-
-  const report: PolyrepoGraphReport = { repos: {} };
-
-  for (const { alias, transformed } of results) {
-    report.repos[alias] = transformed;
-  }
-
-  // Update module-level state
-  currentHash = hash;
-  graphReport = report;
-
-  // Persist to disk (ensure .repos/ directory exists)
-  try {
-    const reposDir = join(workspaceRoot, '.repos');
-
-    if (!existsSync(reposDir)) {
-      mkdirSync(reposDir, { recursive: true });
+      perRepoCache.set(alias, { hash: repoHash, report: transformed });
+      writePerRepoCache(workspaceRoot, alias, repoHash, transformed);
+      report.repos[alias] = transformed;
+    } catch (error) {
+      recordFailure(alias, repoHash);
+      logExtractionFailure(alias, error);
+      // Continue without this repo -- other repos unaffected
     }
-
-    writeJsonFile(getCachePath(workspaceRoot), { hash, report });
-  } catch {
-    // Non-fatal -- in-memory cache is still valid
   }
+
+  // Update global hash
+  globalHash = newGlobalHash;
 
   return report;
 }

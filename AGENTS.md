@@ -2,10 +2,6 @@
 
 Never stage `.planning/config.json` fields prefixed with `_` (e.g., `workflow._auto_chain_active`). These are transient runtime state injected by the GSD workflow system. If the file has been modified only by the addition or change of `_`-prefixed fields, do not stage it at all.
 
-## Nx output style
-
-- Always pass `--output-style=static` when running `nx run`, `nx run-many`, `nx affected`, and shorthand aliases (`nx build`, `nx test`, `nx lint`, `nx e2e`, etc.). This ensures full stdout/stderr is printed sequentially, which is required for non-interactive environments like AI agents and CI.
-
 <!-- nx configuration start-->
 <!-- Leave the start & end comments to automatically receive updates. -->
 
@@ -17,6 +13,7 @@ Never stage `.planning/config.json` fields prefixed with `_` (e.g., `workflow._a
 - You have access to the Nx MCP server and its tools, use them to help the user
 - For Nx plugin best practices, check `node_modules/@nx/<plugin>/PLUGIN.md`. Not all plugins have this file - proceed without it if unavailable.
 - NEVER guess CLI flags - always check nx_docs or `--help` first when unsure
+- **Always use kebab-case for Nx CLI options** (e.g., `--skip-sync`, `--skip-git`, `--nx-cloud`, `--exclude-task-dependencies`). Never use camelCase (e.g., ~~`--skipSync`~~, ~~`--skipGit`~~). Exception: when flags are passed through to a tool that requires camelCase (e.g., Jest).
 
 ## Scaffolding & Generators
 

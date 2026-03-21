@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { TargetConfiguration } from '@nx/devkit';
 import type { ExternalGraphJson, TransformedNode } from './types';
 
@@ -8,15 +10,6 @@ function normalizePath(p: string): string {
   return p.replace(/\\/g, '/');
 }
 
-/**
- * Rewrite a single target configuration to use the `@op-nx/polyrepo:run`
- * proxy executor. Inputs, outputs, cache, and dependsOn are intentionally
- * omitted: the child repo resolves its own named inputs, manages its own
- * cache, and handles its own task dependency ordering. Copying dependsOn
- * would cause the host Nx to build a cascading task graph across all
- * external projects, triggering the native task hasher on projects whose
- * source files are not meaningful in the host context.
- */
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -34,9 +27,85 @@ function isRecordOfRecords(
 }
 
 /**
+ * Rewrite dependsOn entries from an external repo's resolved target config
+ * for the host context. String entries (caret and bare target refs) pass
+ * through unchanged. Object entries with a `projects` array have project
+ * names namespaced with the repo alias; entries starting with `"tag:"` are
+ * tag selectors and pass through unchanged. Object entries with string
+ * `projects` values (`"self"`, `"dependencies"`) pass through unchanged.
+ *
+ * When `rawDependsOn` is not an array (absent or invalid), returns `[]`
+ * so the proxy target has an explicit empty value that blocks the host's
+ * `targetDefaults` from merging in.
+ */
+function rewriteDependsOn(
+  rawDependsOn: unknown,
+  repoAlias: string,
+): NonNullable<TargetConfiguration['dependsOn']> {
+  if (!Array.isArray(rawDependsOn)) {
+    return [];
+  }
+
+  const result: NonNullable<TargetConfiguration['dependsOn']> = [];
+  const entries: unknown[] = rawDependsOn;
+
+  for (const entry of entries) {
+    if (typeof entry === 'string') {
+      result.push(entry);
+      continue;
+    }
+
+    if (isRecord(entry) && typeof entry['target'] === 'string') {
+      const dep: {
+        target: string;
+        projects?: string | string[];
+        params?: 'ignore' | 'forward';
+        dependencies?: boolean;
+      } = {
+        target: entry['target'],
+      };
+
+      if (Array.isArray(entry['projects'])) {
+        const projects: unknown[] = entry['projects'];
+        dep.projects = projects
+          .filter((p): p is string => typeof p === 'string')
+          .map((p) =>
+            p.startsWith('tag:') ? p : `${repoAlias}/${p}`,
+          );
+      } else if (typeof entry['projects'] === 'string') {
+        dep.projects = entry['projects'];
+      }
+
+      if (
+        entry['params'] === 'ignore' ||
+        entry['params'] === 'forward'
+      ) {
+        dep.params = entry['params'];
+      }
+
+      if (typeof entry['dependencies'] === 'boolean') {
+        dep.dependencies = entry['dependencies'];
+      }
+
+      result.push(dep);
+      continue;
+    }
+    // Unknown shapes silently dropped
+  }
+
+  return result;
+}
+
+/**
  * Create a proxy target configuration from raw (unknown) target data.
- * Safely extracts configurations, parallelism, and metadata from the
- * unvalidated target config (typed as z.unknown() in the Zod schema).
+ * Safely extracts configurations, parallelism, metadata, and dependsOn
+ * from the unvalidated target config (typed as z.unknown() in the Zod
+ * schema).
+ *
+ * dependsOn is preserved from the external repo's resolved config (which
+ * already has targetDefaults baked in). Setting an explicit value blocks
+ * host targetDefaults from merging. Targets without dependsOn get an
+ * explicit empty array.
  */
 function createProxyTarget(
   repoAlias: string,
@@ -51,6 +120,7 @@ function createProxyTarget(
     options: { repoAlias, originalProject, targetName },
     inputs: [],
     cache: false,
+    dependsOn: rewriteDependsOn(config['dependsOn'], repoAlias),
     configurations: isRecordOfRecords(config['configurations'])
       ? config['configurations']
       : undefined,
@@ -78,7 +148,7 @@ function createProxyTarget(
 export function transformGraphForRepo(
   repoAlias: string,
   rawGraph: ExternalGraphJson,
-  _workspaceRoot: string,
+  workspaceRoot: string,
 ): {
   nodes: Record<string, TransformedNode>;
   dependencies: Array<{ source: string; target: string; type: string }>;
@@ -97,6 +167,35 @@ export function transformGraphForRepo(
     const hostSourceRoot = node.data.sourceRoot
       ? normalizePath(`.repos/${repoAlias}/${node.data.sourceRoot}`)
       : undefined;
+
+    // Extract package name from typed metadata
+    const packageName = node.data.metadata?.js?.packageName;
+
+    // Read dependency lists from package.json on disk
+    // Use original node.data.root (not rewritten hostRoot) to avoid double-path
+    const repoBasePath = join(workspaceRoot, '.repos', repoAlias);
+    const pkgJsonPath = join(repoBasePath, node.data.root, 'package.json');
+    let nodeDependencies: string[] | undefined;
+    let nodeDevDependencies: string[] | undefined;
+    let nodePeerDependencies: string[] | undefined;
+
+    try {
+      const raw = JSON.parse(readFileSync(pkgJsonPath, 'utf-8') as string);
+
+      if (raw.dependencies && typeof raw.dependencies === 'object') {
+        nodeDependencies = Object.keys(raw.dependencies);
+      }
+
+      if (raw.devDependencies && typeof raw.devDependencies === 'object') {
+        nodeDevDependencies = Object.keys(raw.devDependencies);
+      }
+
+      if (raw.peerDependencies && typeof raw.peerDependencies === 'object') {
+        nodePeerDependencies = Object.keys(raw.peerDependencies);
+      }
+    } catch {
+      // No package.json or parse error -- silent skip
+    }
 
     // Rewrite targets
     const proxyTargets: Record<string, TargetConfiguration> = {};
@@ -127,6 +226,10 @@ export function transformGraphForRepo(
       targets: proxyTargets,
       tags,
       metadata: node.data.metadata,
+      packageName: typeof packageName === 'string' ? packageName : undefined,
+      dependencies: nodeDependencies,
+      devDependencies: nodeDevDependencies,
+      peerDependencies: nodePeerDependencies,
     };
   }
 

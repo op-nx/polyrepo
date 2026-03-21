@@ -62,6 +62,7 @@
   },
   "dependencies": {
     "@nx/devkit": ">=20.0.0",
+    "minimatch": "^10.0.0",
     "tslib": "^2.3.0",
     "zod": "^4.0.0"
   }

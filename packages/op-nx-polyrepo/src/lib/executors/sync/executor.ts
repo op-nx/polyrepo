@@ -1,12 +1,16 @@
-import { readFileSync, existsSync, writeFileSync } from 'node:fs';
+import { readFileSync, existsSync, rmSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
 import { z } from 'zod';
 import { logger } from '@nx/devkit';
 import type { ExecutorContext } from '@nx/devkit';
+import { hashObject } from 'nx/src/devkit-internals';
 import { resolvePluginConfig } from '../../config/resolve';
 import type { NormalizedRepoEntry } from '../../config/schema';
+import { computeRepoHash, writePerRepoCache } from '../../graph/cache';
+import { extractGraphFromRepo } from '../../graph/extract';
+import { transformGraphForRepo } from '../../graph/transform';
 import {
   gitClone,
   gitPull,
@@ -217,6 +221,12 @@ function writeInstalledHash(workspaceRoot: string, alias: string, hash: string):
 }
 
 function needsInstall(repoPath: string, workspaceRoot: string, alias: string): boolean {
+  // If node_modules is missing (e.g., after git clean -fdx), always install
+  // regardless of lockfile hash match.
+  if (!existsSync(join(repoPath, 'node_modules'))) {
+    return true;
+  }
+
   const currentHash = hashLockfile(repoPath);
   const installedHash = readInstalledHash(workspaceRoot, alias);
 
@@ -233,6 +243,15 @@ async function tryInstallDeps(
   verbose: boolean,
   workspaceRoot: string,
 ): Promise<boolean> {
+  // Clear stale Nx cache when node_modules was missing. Without this,
+  // the child Nx hits remote/local cache entries whose output files
+  // (dist/) were deleted alongside node_modules, causing ENOENT errors
+  // in post-build scripts.
+  if (!existsSync(join(repoPath, 'node_modules'))) {
+    rmSync(join(repoPath, '.nx', 'cache'), { recursive: true, force: true });
+    rmSync(join(repoPath, 'dist'), { recursive: true, force: true });
+  }
+
   try {
     await installDeps(repoPath, alias, verbose);
     const hash = hashLockfile(repoPath);
@@ -251,6 +270,34 @@ async function tryInstallDeps(
   }
 }
 
+async function preCacheGraph(
+  repoPath: string,
+  alias: string,
+  workspaceRoot: string,
+  reposConfigHash: string,
+): Promise<void> {
+  logger.info(`Extracting graph for ${alias}...`);
+
+  try {
+    const rawGraph = await extractGraphFromRepo(repoPath);
+    const transformed = transformGraphForRepo(alias, rawGraph, workspaceRoot);
+    const hash = await computeRepoHash(reposConfigHash, alias, repoPath);
+
+    writePerRepoCache(workspaceRoot, alias, hash, {
+      nodes: transformed.nodes,
+      dependencies: transformed.dependencies,
+    });
+
+    const projectCount = Object.keys(transformed.nodes).length;
+    logger.info(`Cached graph for ${alias} (${String(projectCount)} projects)`);
+  } catch (error) {
+    logger.warn(
+      `Failed to pre-cache graph for ${alias}: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    logger.warn('Plugin will extract on next Nx command.');
+  }
+}
+
 interface SyncResult {
   action: string;
   installFailed?: boolean;
@@ -261,6 +308,7 @@ async function syncRepo(
   workspaceRoot: string,
   strategy: SyncExecutorOptions['strategy'],
   verbose: boolean,
+  reposConfigHash: string,
 ): Promise<SyncResult> {
   const state = detectRepoState(entry.alias, entry, workspaceRoot);
 
@@ -277,6 +325,10 @@ async function syncRepo(
       logger.info(`Done: ${entry.alias} cloned.`);
       const installed = await tryInstallDeps(repoPath, entry.alias, verbose, workspaceRoot);
 
+      if (installed) {
+        await preCacheGraph(repoPath, entry.alias, workspaceRoot, reposConfigHash);
+      }
+
       return { action: 'cloned', installFailed: !installed };
     }
 
@@ -288,8 +340,14 @@ async function syncRepo(
       if (needsInstall(repoPath, workspaceRoot, entry.alias)) {
         const installed = await tryInstallDeps(repoPath, entry.alias, verbose, workspaceRoot);
 
+        if (installed) {
+          await preCacheGraph(repoPath, entry.alias, workspaceRoot, reposConfigHash);
+        }
+
         return { action: `synced to tag ${entry.ref}`, installFailed: !installed };
       }
+
+      await preCacheGraph(repoPath, entry.alias, workspaceRoot, reposConfigHash);
 
       return { action: `synced to tag ${entry.ref}` };
     }
@@ -310,8 +368,14 @@ async function syncRepo(
     if (needsInstall(repoPath, workspaceRoot, entry.alias)) {
       const installed = await tryInstallDeps(repoPath, entry.alias, verbose, workspaceRoot);
 
+      if (installed) {
+        await preCacheGraph(repoPath, entry.alias, workspaceRoot, reposConfigHash);
+      }
+
       return { action: strategy ?? 'pull', installFailed: !installed };
     }
+
+    await preCacheGraph(repoPath, entry.alias, workspaceRoot, reposConfigHash);
 
     return { action: strategy ?? 'pull' };
   }
@@ -333,8 +397,14 @@ async function syncRepo(
   if (needsInstall(entry.path, workspaceRoot, entry.alias)) {
     const installed = await tryInstallDeps(entry.path, entry.alias, verbose, workspaceRoot);
 
+    if (installed) {
+      await preCacheGraph(entry.path, entry.alias, workspaceRoot, reposConfigHash);
+    }
+
     return { action: strategy ?? 'pull', installFailed: !installed };
   }
+
+  await preCacheGraph(entry.path, entry.alias, workspaceRoot, reposConfigHash);
 
   return { action: strategy ?? 'pull' };
 }
@@ -441,7 +511,7 @@ export default async function syncExecutor(
   options: SyncExecutorOptions,
   context: ExecutorContext,
 ): Promise<{ success: boolean }> {
-  const { entries } = resolvePluginConfig(context.root);
+  const { config, entries } = resolvePluginConfig(context.root);
   const strategy = options.strategy;
   const verbose = options.verbose ?? false;
 
@@ -449,8 +519,10 @@ export default async function syncExecutor(
     return executeDryRun(entries, context.root, strategy);
   }
 
+  const reposConfigHash = hashObject(config.repos);
+
   const results = await Promise.allSettled(
-    entries.map((entry) => syncRepo(entry, context.root, strategy, verbose)),
+    entries.map((entry) => syncRepo(entry, context.root, strategy, verbose, reposConfigHash)),
   );
 
   let synced = 0;

@@ -2,138 +2,193 @@
  * Vitest globalSetup for e2e testing with testcontainers.
  *
  * Orchestrates the full container lifecycle:
- * 1. Build prebaked workspace Docker image
- * 2. Create shared network
- * 3. Start Verdaccio registry container
- * 4. Publish plugin to Verdaccio (on host)
- * 5. Start workspace container and install plugin
- * 6. Commit snapshot image
- * 7. Provide snapshot image to test files
- * 8. Return teardown function
+ * 1. Build prebaked workspace Docker image + start Verdaccio (parallel)
+ * 2. Publish plugin to Verdaccio (on host)
+ * 3. Build snapshot image via testcontainers fromDockerfile (installs
+ *    plugin from Verdaccio via host.docker.internal, warms graph cache)
+ * 4. Provide snapshot image to test files
+ * 5. Return teardown function
  */
 import './provided-context.js';
 
 import { execSync } from 'node:child_process';
 import { resolve } from 'node:path';
+import { unlinkSync, writeFileSync } from 'node:fs';
 
-import { GenericContainer, type StartedTestContainer, Network, type StartedNetwork, Wait } from 'testcontainers';
+import { GenericContainer, type StartedTestContainer, Wait } from 'testcontainers';
 import type { TestProject } from 'vitest/node';
 
 import { releasePublish, releaseVersion } from 'nx/release';
 
-export default async function setup(project: TestProject) {
-  let network: StartedNetwork | undefined;
-  let verdaccio: StartedTestContainer | undefined;
-  let workspace: StartedTestContainer | undefined;
+/**
+ * Publish the plugin to a local Verdaccio registry.
+ *
+ * Uses a project-scoped .npmrc file to avoid polluting the user's
+ * global npm config. The env vars npm_config_userconfig and
+ * npm_config_registry direct npm to use the temporary config.
+ */
+async function publishPlugin(registryPort: number, registryUrl: string): Promise<void> {
+  const npmrcPath = resolve(process.cwd(), '.npmrc.e2e');
+  const saved = {
+    registry: process.env['npm_config_registry'],
+    userconfig: process.env['npm_config_userconfig'],
+    nxDaemon: process.env['NX_DAEMON'],
+  };
+
+  writeFileSync(
+    npmrcPath,
+    `//localhost:${String(registryPort)}/:_authToken=secretVerdaccioToken\nregistry=${registryUrl}\n`,
+  );
+
+  process.env['npm_config_userconfig'] = npmrcPath;
+  process.env['npm_config_registry'] = registryUrl;
+  process.env['NX_DAEMON'] = 'false';
 
   try {
-    // 1. Build the prebaked workspace image using testcontainers API
-    console.log('[e2e] Building prebaked workspace Docker image...');
-    const dockerfilePath = resolve(__dirname, '../../docker').replaceAll('\\', '/');
-    const workspaceImage = await GenericContainer.fromDockerfile(dockerfilePath)
-      .withCache(true)
-      .build('op-nx-e2e-workspace', { deleteOnExit: false });
-
-    // 2. Create shared network
-    console.log('[e2e] Creating shared network...');
-    network = await new Network().start();
-
-    // 3. Start Verdaccio on the shared network with permissive config
-    // (default hertzg/verdaccio config requires auth for publish)
-    console.log('[e2e] Starting Verdaccio registry...');
-    const verdaccioConfig = resolve(__dirname, '../../docker/verdaccio.yaml').replaceAll('\\', '/');
-    verdaccio = await new GenericContainer('hertzg/verdaccio')
-      .withNetwork(network)
-      .withNetworkAliases('verdaccio')
-      .withExposedPorts(4873)
-      .withName('op-nx-polyrepo-e2e-verdaccio')
-      .withCopyFilesToContainer([{ source: verdaccioConfig, target: '/verdaccio/conf/config.yaml' }])
-      .withWaitStrategy(Wait.forListeningPorts())
-      .start();
-
-    const registryPort = verdaccio.getMappedPort(4873);
-    const registryUrl = `http://localhost:${String(registryPort)}`;
-
-    // 4. Publish plugin to Verdaccio (on host via mapped port)
-    // Set auth token — Verdaccio accepts any token when publish: $all,
-    // but npm CLI requires one to be configured
-    console.log(`[e2e] Publishing plugin to Verdaccio at ${registryUrl}...`);
-    const originalRegistry = process.env['npm_config_registry'];
-    process.env['npm_config_registry'] = registryUrl;
-    execSync(
-      `npm config set //localhost:${String(registryPort)}/:_authToken "secretVerdaccioToken" --ws=false`,
-      { stdio: 'inherit', windowsHide: true },
-    );
-
-    try {
-      await releaseVersion({
-        specifier: '0.0.0-e2e',
-        stageChanges: false,
-        gitCommit: false,
-        gitTag: false,
-        firstRelease: true,
-        versionActionsOptionsOverrides: {
-          skipLockFileUpdate: true,
-        },
-      });
-
-      await releasePublish({
-        tag: 'e2e',
-        firstRelease: true,
-      });
-    } finally {
-      // Clean up auth token and restore registry
-      execSync(
-        `npm config delete //localhost:${String(registryPort)}/:_authToken --ws=false`,
-        { stdio: 'ignore', windowsHide: true },
-      );
-
-      if (originalRegistry === undefined) {
-        delete process.env['npm_config_registry'];
-      } else {
-        process.env['npm_config_registry'] = originalRegistry;
-      }
-    }
-
-    // 5. Start workspace container and install plugin
-    console.log('[e2e] Starting workspace container...');
-    workspace = await workspaceImage
-      .withNetwork(network)
-      .withName('op-nx-polyrepo-e2e-workspace')
-      .withCommand(['sleep', 'infinity'])
-      .start();
-
-    console.log('[e2e] Installing plugin in workspace container...');
-    const installResult = await workspace.exec(
-      ['npm', 'install', '-D', '@op-nx/polyrepo@e2e', '--registry', 'http://verdaccio:4873'],
-      { workingDir: '/workspace' },
-    );
-
-    if (installResult.exitCode !== 0) {
-      throw new Error(
-        `Plugin install failed (exit ${String(installResult.exitCode)}):\n${installResult.stderr || installResult.output}`,
-      );
-    }
-
-    // 6. Commit snapshot image
-    console.log('[e2e] Committing workspace snapshot...');
-    const snapshotImage = await workspace.commit({
-      repo: 'op-nx-e2e-snapshot',
-      tag: 'latest',
-      deleteOnExit: true,
+    await releaseVersion({
+      specifier: '0.0.0-e2e',
+      stageChanges: false,
+      gitCommit: false,
+      gitTag: false,
+      firstRelease: true,
+      versionActionsOptionsOverrides: {
+        skipLockFileUpdate: true,
+      },
     });
 
-    // 7. Provide to test files via Vitest inject()
-    project.provide('snapshotImage', snapshotImage);
+    await releasePublish({
+      tag: 'e2e',
+      firstRelease: true,
+    });
+  } finally {
+    try {
+      unlinkSync(npmrcPath);
+    } catch {
+      // File may not exist if writeFileSync failed
+    }
 
-    // Stop the setup workspace (tests use snapshot, not this container)
-    console.log('[e2e] Stopping setup workspace container...');
-    await workspace.stop();
-    workspace = undefined;
+    for (const [key, value] of Object.entries(saved)) {
+      const envKey = key === 'nxDaemon' ? 'NX_DAEMON' : `npm_config_${key}`;
 
-    console.log('[e2e] Global setup complete.');
+      if (value === undefined) {
+        delete process.env[envKey];
+      } else {
+        process.env[envKey] = value;
+      }
+    }
+  }
+}
 
-    // 8. Return teardown function
+/**
+ * Remove stale resources from previous crashed/killed runs.
+ *
+ * Testcontainers' Ryuk reaper handles containers it manages, but
+ * hard crashes (SIGKILL, power loss) can leave named containers
+ * behind. The image removal ensures a fresh snapshot each run.
+ */
+function cleanupStaleResources(): void {
+  try {
+    const stale = execSync(
+      'docker ps -aq --filter name=op-nx-polyrepo-e2e',
+      { encoding: 'utf-8', windowsHide: true },
+    ).trim();
+
+    if (stale) {
+      execSync(`docker rm -f ${stale}`, { stdio: 'ignore', windowsHide: true });
+    }
+  } catch {
+    // Docker not running or command failed — continue
+  }
+
+  try {
+    execSync('docker rmi op-nx-e2e-snapshot:latest', { stdio: 'ignore', windowsHide: true });
+  } catch {
+    // Image doesn't exist — continue
+  }
+}
+
+export default async function setup(project: TestProject) {
+  let verdaccio: StartedTestContainer | undefined;
+
+  // Clean up stale resources from previous crashed/killed runs
+  cleanupStaleResources();
+
+  try {
+    async function timed<T>(label: string, fn: () => Promise<T>): Promise<T> {
+      const start = performance.now();
+      const result = await fn();
+      const sec = (performance.now() - start) / 1000;
+      const m = Math.floor(sec / 60);
+      const s = sec % 60;
+      const duration = m > 0 ? `${String(m)}m${s.toFixed(1)}s` : `${s.toFixed(1)}s`;
+      console.log(`[e2e] ${label} (${duration})`);
+
+      return result;
+    }
+
+    // Phase 1: Build base image and start Verdaccio in parallel
+    const dockerfilePath = resolve(__dirname, '../../docker').replaceAll('\\', '/');
+    const verdaccioConfig = resolve(__dirname, '../../docker/verdaccio.yaml').replaceAll('\\', '/');
+
+    const [_baseImage, startedVerdaccio] = await timed(
+      'Base image + Verdaccio ready',
+      () => Promise.all([
+        GenericContainer.fromDockerfile(dockerfilePath)
+          .withTarget('workspace')
+          .withBuildkit()
+          .withCache(true)
+          .build('op-nx-e2e-workspace', { deleteOnExit: false }),
+        new GenericContainer('hertzg/verdaccio')
+          .withExposedPorts({ container: 4873, host: 4873 })
+          .withName('op-nx-polyrepo-e2e-verdaccio')
+          .withCopyFilesToContainer([{ source: verdaccioConfig, target: '/verdaccio/conf/config.yaml' }])
+          .withWaitStrategy(Wait.forListeningPorts())
+          .start(),
+      ]),
+    );
+
+    verdaccio = startedVerdaccio;
+    const registryPort = 4873;
+    const registryUrl = `http://localhost:${String(registryPort)}`;
+
+    // Phase 2: Publish plugin to Verdaccio
+    await timed('Plugin published', () => publishPlugin(registryPort, registryUrl));
+
+    // Get the published tarball's shasum for content-based cache busting.
+    // When plugin source is unchanged, the shasum is the same → BuildKit
+    // cache hit for the snapshot layers. When source changes → new shasum
+    // → cache miss → snapshot rebuilds with the new plugin.
+    const metadata: { dist?: { shasum?: string } } = await fetch(
+      `${registryUrl}/@op-nx%2fpolyrepo/0.0.0-e2e`,
+    ).then((r) => r.json() as Promise<{ dist?: { shasum?: string } }>);
+    const pluginHash = metadata.dist?.shasum ?? Date.now().toString();
+
+    // Phase 3: Build snapshot image. REGISTRY_URL is fixed (port 4873),
+    // so the npm install command string is stable across runs. PLUGIN_HASH
+    // busts cache only when the tarball content changes.
+    const snapshotImageName = 'op-nx-e2e-snapshot';
+
+    await timed(
+      'Snapshot built',
+      () => GenericContainer.fromDockerfile(dockerfilePath)
+        .withTarget('snapshot')
+        .withBuildArgs({
+          PLUGIN_HASH: pluginHash,
+        })
+        .withBuildkit()
+        .build(snapshotImageName, { deleteOnExit: true }),
+    );
+
+    // Phase 4: Provide snapshot image to test files
+    project.provide('snapshotImage', snapshotImageName);
+
+    // Stop Verdaccio (no longer needed after build)
+    await timed('Verdaccio stopped', async () => {
+      await verdaccio?.stop();
+      verdaccio = undefined;
+    });
+
+    // Return teardown function (snapshot image cleaned up by testcontainers Ryuk)
     return async function teardown() {
       console.log('[e2e] Tearing down...');
 
@@ -141,35 +196,15 @@ export default async function setup(project: TestProject) {
         await verdaccio.stop();
       }
 
-      if (network) {
-        await network.stop();
-      }
-
       console.log('[e2e] Teardown complete.');
     };
   } catch (error: unknown) {
-    // Attempt to clean up any started containers/network before re-throwing
+    // Attempt to clean up any started containers before re-throwing
     console.error('[e2e] Global setup failed, cleaning up...');
-
-    if (workspace) {
-      try {
-        await workspace.stop();
-      } catch {
-        // Ignore cleanup errors
-      }
-    }
 
     if (verdaccio) {
       try {
         await verdaccio.stop();
-      } catch {
-        // Ignore cleanup errors
-      }
-    }
-
-    if (network) {
-      try {
-        await network.stop();
       } catch {
         // Ignore cleanup errors
       }

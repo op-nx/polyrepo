@@ -3,6 +3,7 @@
   "compilerOptions": {
     "outDir": "../../dist/packages/op-nx-polyrepo",
     "tsBuildInfoFile": "../../dist/packages/op-nx-polyrepo/tsconfig.lib.tsbuildinfo",
+    "baseUrl": ".",
     "emitDeclarationOnly": false,
     "module": "node16",
     "moduleResolution": "node16",

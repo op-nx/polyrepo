@@ -1,3 +1,4 @@
+import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import runCommandsImpl from 'nx/src/executors/run-commands/run-commands.impl';
 import type { ExecutorContext } from '@nx/devkit';
@@ -33,11 +34,28 @@ export default async function runExecutor(
 
   const command = `"${nxBin}" run ${options.originalProject}:${options.targetName}`;
 
+  // Per-repo temp directory prevents lock contention when multiple proxy
+  // targets for the same repo run concurrently. Tools that use os.tmpdir()
+  // (Node.js), GetTempPath() (Windows native), or $TMPDIR (POSIX) all
+  // resolve to this isolated path instead of the shared system %TEMP%.
+  const repoTmpDir = normalizePath(join(repoPath, '.tmp'));
+  mkdirSync(join(repoPath, '.tmp'), { recursive: true });
+
   try {
     const result = await runCommandsImpl(
       {
         command,
         cwd: repoPath,
+        env: {
+          TEMP: repoTmpDir,
+          TMP: repoTmpDir,
+          TMPDIR: repoTmpDir,
+          NX_DAEMON: 'false',
+          NX_NO_CLOUD: 'true',
+          NX_WORKSPACE_DATA_DIRECTORY: normalizePath(
+            join(repoPath, '.nx', 'workspace-data'),
+          ),
+        },
         __unparsed__: options.__unparsed__ ?? [],
       },
       context,

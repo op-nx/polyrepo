@@ -57,7 +57,7 @@
           "nx": {
             "url": "https://github.com/nrwl/nx.git",
             "depth": 1,
-            "ref": "master"
+            "ref": "22.5.4"
           }
         }
       }
@@ -71,10 +71,11 @@
   ],
   "release": {
     "version": {
-      "preVersionCommand": "npx nx run-many -t build --exclude tag:polyrepo:external --skipSync"
+      "preVersionCommand": "npx nx run-many -t build --exclude tag:polyrepo:external"
     }
   },
   "targetDefaults": {
+    "@op-nx/polyrepo:run": {},
     "@nx/vitest:test": {
       "cache": true,
       "inputs": ["default", "^production"]
@@ -93,5 +94,6 @@
     "lint": {
       "command": "eslint . --max-warnings=0"
     }
-  }
+  },
+  "analytics": false
 }

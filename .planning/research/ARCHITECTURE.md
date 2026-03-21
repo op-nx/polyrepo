@@ -1,217 +1,314 @@
-# Architecture Patterns
+# Architecture Research: Cross-repo Dependency Detection and Manual Overrides
 
-**Domain:** Nx plugin for synthetic monorepos (polyrepo graph merging)
-**Researched:** 2026-03-10
+**Domain:** Nx plugin for synthetic monorepos -- extending v1.0 graph pipeline with cross-repo dependency edges
+**Researched:** 2026-03-17
+**Confidence:** HIGH
 
-## Recommended Architecture
+## Existing Architecture (v1.0 baseline)
 
-The plugin comprises five major components organized around a central data flow: external repo configuration flows through repo assembly, into per-repo graph extraction, through graph merging, and finally into the host Nx workspace's project graph.
+Understanding the current system is essential before describing where new components integrate.
 
 ```
-nx.json plugin options
+nx.json plugin options (PolyrepoConfig)
         |
         v
 +------------------+      +---------------------+
-| Repo Assembler   |----->| Graph Extractor     |
-| (git clone/pull) |      | (per-repo nx graph) |
+| Config + Validate|----->| Graph Extract        |
+| (schema.ts,      |      | (extract.ts)         |
+|  validate.ts)    |      | nx graph --print     |
 +------------------+      +---------------------+
                                     |
                                     v
                           +---------------------+
-                          | Graph Merger        |
-                          | (namespace + merge) |
+                          | Graph Transform      |
+                          | (transform.ts)       |
+                          | namespace, tags,     |
+                          | proxy targets        |
                           +---------------------+
                                     |
                                     v
                           +---------------------+
-                          | createNodes +       |
-                          | createDependencies  |
-                          | (Nx plugin API)     |
+                          | Graph Cache          |
+                          | (cache.ts)           |
+                          | memory + disk,       |
+                          | hash invalidation    |
+                          +---------------------+
+                                    |
+                                    v
+                          +---------------------+
+                          | index.ts             |
+                          | createNodesV2:       |
+                          |   registers projects |
+                          | createDependencies:  |
+                          |   intra-repo edges   |
                           +---------------------+
                                     |
                                     v
                           Host workspace project graph
 ```
 
-### Component Boundaries
+### Key Existing Data Structures
 
-| Component | Responsibility | Communicates With |
-|-----------|---------------|-------------------|
-| **Plugin Entry** (`src/index.ts`) | Exports `createNodes`, `createDependencies`, generators, executors. Thin barrel file per feature to avoid bundling unrelated code. | Nx runtime |
-| **Repo Assembler** | Clones/pulls configured repos to a local assembly directory. Manages branch/commit/tag checkout. Detects staleness. | Git CLI, filesystem |
-| **Graph Extractor** | Reads each synced repo's `nx.json` and runs Nx project graph construction against it. Produces a `ProjectGraph` per repo. | `@nx/devkit` (`createProjectGraphAsync`), synced repo filesystem |
-| **Graph Merger** | Namespaces external projects (prefix with repo name), resolves cross-repo dependencies from `package.json` and explicit overrides, deduplicates external nodes (npm packages). | Graph Extractor output, host workspace graph context |
-| **Project Graph Plugin** (`createNodes` + `createDependencies`) | Surfaces merged projects and cross-repo dependencies to the host Nx workspace graph via the official plugin API. | Nx project graph construction pipeline |
-| **Sync Generator** | Keeps derived files (e.g., tsconfig paths for cross-repo imports) in sync with the merged graph. Runs via `nx sync`. | Nx sync infrastructure, merged graph |
-| **Generators** | `init` generator for first-time setup; `add-repo` generator for adding new repos to config. | `nx.json`, filesystem |
-| **Executors** | Optional: `assemble` executor to trigger repo assembly as an Nx target. May not be needed if assembly is implicit during graph construction. | Repo Assembler |
-
-### Data Flow
-
-**Phase 1: Configuration Reading**
-
-1. Nx loads `nx.json` and finds the `nx-openpolyrepo` plugin entry with options.
-2. Options contain an array of repo definitions: `{ url, branch?, path?, prefix? }`.
-3. Options also specify the assembly directory (default: `.repos/`).
-
-**Phase 2: Repo Assembly (on demand)**
-
-1. For each configured repo, the Repo Assembler checks if the local clone exists.
-2. If missing: `git clone --depth=1 --branch <branch> <url> <assembly-dir>/<repo-name>`.
-3. If present: `git fetch origin <branch> && git checkout FETCH_HEAD` (or skip if cache is fresh).
-4. Assembly is **not** triggered during every graph construction -- only when explicitly invoked or when the assembly cache is stale (configurable staleness threshold).
-
-**Phase 3: Graph Extraction**
-
-1. For each synced repo directory, the Graph Extractor constructs a project graph.
-2. **Critical constraint**: Cannot call `createProjectGraphAsync` inside `createNodes`/`createDependencies` -- this causes infinite recursion (protected by `global.NX_GRAPH_CREATION` guard).
-3. **Solution**: Use a lower-level approach. Read each repo's `nx.json`, enumerate its projects by scanning `project.json`/`package.json` files per the repo's workspaces config, and parse their configuration directly. This avoids invoking the full Nx graph pipeline recursively.
-4. Alternative: Run graph extraction as a **pre-step** (during assembly or via sync generator), serialize each repo's graph to a JSON cache file (`.repos/<repo-name>/.nx-graph-cache.json`), and read the cached graphs during `createNodes`.
-
-**Phase 4: Graph Merging**
-
-1. Each external project is namespaced: `<repo-prefix>/<original-project-name>`.
-2. Project roots are remapped: `<assembly-dir>/<repo-name>/<original-root>`.
-3. Targets are preserved as-is (they reference paths relative to the project root, which still works after remapping the root).
-4. Cross-repo dependencies are detected by:
-   a. Matching `package.json` dependency names to project names across all repos.
-   b. Reading explicit dependency overrides from plugin options.
-5. External nodes (npm packages) are deduplicated across repos -- same package name keeps the version from the host workspace.
-
-**Phase 5: Plugin API Integration**
-
-1. `createNodes` returns the merged project configurations keyed by a sentinel file in each synced repo (e.g., `<assembly-dir>/<repo-name>/nx.json` as the glob pattern).
-2. `createDependencies` returns cross-repo dependency edges as `CandidateDependency[]` with type `implicit` (since they are not file-associated within the host workspace).
-
-**Phase 6: Sync Generator (optional, post-graph)**
-
-1. A global sync generator reads the merged graph and updates host workspace files:
-   - `tsconfig.base.json` path mappings for cross-repo TypeScript imports.
-   - `.gitignore` entries for synced repos.
-2. Registered in `nx.json` under `sync.globalGenerators`.
-
-## Reference Plugins (Official Nx)
-
-Three official Nx plugins follow the same architectural pattern we need: trigger on config files, shell out to an external tool for project discovery, cache results, and serve via `createNodesV2` + `createDependencies`. Source code inspected from a local clone of the `nrwl/nx` repo (available on this machine).
-
-| Plugin | Glob trigger | External tool | Cache strategy | Key files |
-|--------|-------------|---------------|----------------|-----------|
-| `@nx/gradle` | `build.gradle*`, `settings.gradle*` | `gradlew nxProjectGraph` (custom Gradle task) | Module-level var + disk JSON with hash invalidation | `packages/gradle/src/plugin/nodes.ts`, `utils/get-project-graph-from-gradle-plugin.ts` |
-| `@nx/maven` | `**/pom.xml` | `mvn nx-maven-plugin:analyze` (Kotlin plugin) | `PluginCache` + module-level `setCurrentMavenData()` | `packages/maven/src/plugins/nodes.ts`, `maven-analyzer.ts` |
-| `@nx/dotnet` | `**/*.{csproj,fsproj,vbproj}` | C# MSBuild analyzer binary | `readCachedAnalysisResult()` shared between createNodes/createDependencies | `packages/dotnet/src/plugins/create-nodes.ts`, `create-dependencies.ts` |
-
-**Shared pattern across all three:**
-1. `createNodesV2` triggers on build system config files, delegates discovery to the native tool (subprocess), caches the result
-2. `createDependencies` reads from a cache populated by `createNodesV2` — never re-runs analysis
-3. Both functions share data via module-level variables or a shared cache utility
-4. Each uses hash-based cache invalidation (hashing config files + plugin options)
-
-**Key difference from our plugin:** These plugins integrate *one* external build system into an Nx workspace. Our plugin integrates *N* external Nx workspaces. The pattern is the same, applied per synced repo.
-
-**`@nx/dotnet` relevance:** .NET solutions reference projects across directories via `<ProjectReference>` in `.csproj`, analogous to cross-repo dependencies. Its `create-dependencies.ts` maps source roots to target roots using `referencesByRoot` — our cross-repo dep detection follows a similar pattern but matches on `package.json` dependency names.
-
-**None of these are polyrepo tools**, but they validate the "external tool + cached JSON + createNodesV2" architecture as the Nx-blessed approach for integrating non-JS build systems — and by extension, external Nx workspaces.
-
-## Patterns to Follow
-
-### Pattern 1: Separate Entry Points Per Feature
-
-**What:** Each plugin feature (graph plugin, generators, executors, sync generators) gets its own entry point file rather than one barrel export.
-**When:** Always. Nx compiles plugin code at runtime; a single barrel file forces loading all code even when only one feature is needed.
-**Example:**
+**PolyrepoConfig** (Zod schema in `schema.ts`):
 ```typescript
-// package.json
+{ repos: Record<string, string | RemoteRepoObject | LocalRepoObject> }
+```
+
+**PolyrepoGraphReport** (in `types.ts`):
+```typescript
 {
-  "nx-migrations": {
-    "migrations": "./src/migrations.json"
-  },
-  "generators": "./generators.json",
-  "executors": "./executors.json"
-}
-
-// src/index.ts -- graph plugin entry (registered in nx.json plugins)
-export { createNodes, createDependencies } from './graph/plugin';
-
-// src/generators/init/generator.ts -- standalone entry
-// src/generators/add-repo/generator.ts -- standalone entry
-// src/sync/sync-generator.ts -- standalone entry
-```
-
-### Pattern 2: Cached Graph Extraction
-
-**What:** Serialize each external repo's project graph to a JSON file during assembly. Read cached JSON during `createNodes` instead of running full graph construction.
-**When:** Always -- avoids the `createProjectGraphAsync` recursion problem and keeps graph construction fast.
-**Example:**
-```typescript
-// During assembly (executor or pre-step)
-import { execSync } from 'child_process';
-
-function extractAndCacheGraph(repoDir: string): void {
-  // Run nx graph in the synced repo as a subprocess
-  const result = execSync('npx nx graph --file=.nx-graph-cache.json', {
-    cwd: repoDir,
-    env: { ...process.env, NX_DAEMON: 'false' },
-  });
-}
-
-// During createNodes (plugin)
-function readCachedGraph(repoDir: string): ProjectGraph {
-  const cachePath = join(repoDir, '.nx-graph-cache.json');
-  return JSON.parse(readFileSync(cachePath, 'utf-8'));
+  repos: Record<string, {
+    nodes: Record<string, TransformedNode>;
+    dependencies: Array<{ source: string; target: string; type: string }>;
+  }>;
 }
 ```
 
-### Pattern 3: Namespace Prefixing
+**createDependencies** (in `index.ts`): Iterates `report.repos[*].dependencies` and emits `DependencyType.implicit` edges, filtering to only edges where both source and target exist in `context.projects`.
 
-**What:** Prefix all external repo projects with the repo name to avoid name collisions.
-**When:** Always when viewing from the host workspace. Projects keep original names when working within their own repo.
-**Example:**
+### Current Limitation
+
+Today, `createDependencies` only emits **intra-repo** edges (dependencies extracted from each child repo's own graph). If repo-a's project depends on a package published by repo-b, that cross-repo edge does not exist because each repo's `nx graph --print` only knows about its own projects.
+
+## New Components for v1.1
+
+### System Overview with New Components
+
+```
+nx.json plugin options (PolyrepoConfig v1.1)
+        |                          |
+        v                          v
++------------------+      +-----------------------+
+| Config + Validate|      | NEW: dependencyOverrides
+| (schema.ts v1.1) |      |   from config schema  |
++--------+---------+      +-----------+-----------+
+         |                            |
+         v                            |
++---------------------+               |
+| Graph Extract       |               |
+| (extract.ts)        |               |
+| + NEW: package.json |               |
+|   name extraction   |               |
++---------------------+               |
+         |                            |
+         v                            |
++---------------------+               |
+| Graph Transform     |               |
+| (transform.ts)      |               |
+| + NEW: packageName  |               |
+|   on TransformedNode|               |
++---------------------+               |
+         |                            |
+         v                            |
++---------------------+               |
+| Graph Cache         |               |
+| (cache.ts)          |               |
+| unchanged           |               |
++---------------------+               |
+         |                            |
+         v                            v
++-----------------------------------------------+
+| NEW: detect.ts (cross-repo dep detection)     |
+| - Build package-name-to-project lookup        |
+| - Read each project's package.json deps       |
+| - Match against lookup for auto-detection     |
+| - Merge with explicit overrides from config   |
+| - Emit RawProjectGraphDependency[] edges      |
++-----------------------------------------------+
+         |
+         v
++---------------------+
+| index.ts            |
+| createNodesV2:      |
+|   unchanged         |
+| createDependencies: |
+|   intra-repo edges  |
+|   + cross-repo edges|  <-- NEW
+|   + override edges  |  <-- NEW
++---------------------+
+         |
+         v
+Host workspace project graph
+```
+
+### New vs Modified Components
+
+| Component | Status | File | Change Description |
+|-----------|--------|------|--------------------|
+| `schema.ts` | **MODIFY** | `lib/config/schema.ts` | Add `dependencyOverrides` field to `polyrepoConfigSchema` |
+| `types.ts` | **MODIFY** | `lib/graph/types.ts` | Add `packageName` to `TransformedNode`, add `packageNames` to repo report |
+| `extract.ts` | **MODIFY** | `lib/graph/extract.ts` | Extract `package.json` `name` field per project during graph extraction |
+| `transform.ts` | **MODIFY** | `lib/graph/transform.ts` | Pass through `packageName` on `TransformedNode` |
+| `detect.ts` | **NEW** | `lib/graph/detect-cross-deps.ts` | Cross-repo dependency detection logic (auto + overrides) |
+| `index.ts` | **MODIFY** | `src/index.ts` | Wire `detect-cross-deps` into `createDependencies` |
+| `cache.ts` | **NO CHANGE** | `lib/graph/cache.ts` | Hash invalidation already covers config changes |
+
+## Detailed Component Design
+
+### 1. Config Schema Extension (`schema.ts`)
+
+Add an optional `dependencyOverrides` field for explicit manual wiring:
+
 ```typescript
-function namespaceProject(
-  repoPrefix: string,
-  projectName: string,
-  config: ProjectConfiguration
-): [string, ProjectConfiguration] {
-  return [
-    `${repoPrefix}/${projectName}`,
-    {
-      ...config,
-      root: `${assemblyDir}/${repoPrefix}/${config.root}`,
-      tags: [...(config.tags ?? []), `repo:${repoPrefix}`],
-    },
-  ];
+const dependencyOverride = z.object({
+  source: z.string().min(1),  // namespaced project: "repo-a/my-app"
+  target: z.string().min(1),  // namespaced project: "repo-b/shared-lib"
+});
+
+export const polyrepoConfigSchema = z.object({
+  repos: z.record(/* ... existing ... */),
+  dependencyOverrides: z.array(dependencyOverride).optional(),
+});
+```
+
+**Config in nx.json would look like:**
+```json
+{
+  "plugins": [{
+    "plugin": "@op-nx/polyrepo",
+    "options": {
+      "repos": {
+        "frontend": "git@github.com:org/frontend.git",
+        "backend": "git@github.com:org/backend.git",
+        "shared": "git@github.com:org/shared.git"
+      },
+      "dependencyOverrides": [
+        { "source": "frontend/web-app", "target": "shared/api-types" },
+        { "source": "backend/api", "target": "shared/api-types" }
+      ]
+    }
+  }]
 }
 ```
 
-### Pattern 4: Dependency Detection via Package Name Matching
+**Why this shape:**
+- Uses namespaced project names (`repo/project`) consistent with how projects appear in the host graph.
+- Array of explicit edges, not a map, because a single source can have multiple override targets.
+- No `type` field -- overrides are always `DependencyType.implicit` (same as existing intra-repo edges, consistent with cross-repo semantics where no source file exists in the host workspace).
 
-**What:** Match `package.json` dependency entries against known project package names across all synced repos to auto-wire cross-repo dependency edges.
-**When:** For detecting implicit cross-repo dependencies without manual configuration.
-**Example:**
+### 2. Package Name Extraction (`extract.ts` + `types.ts`)
+
+**Problem:** The current `ExternalGraphJson` schema captures nodes from `nx graph --print`, but Nx's graph output does not include `package.json` `name` fields. We need package names to match against other repos' dependency lists.
+
+**Solution:** Extend the extraction to also read each project's `package.json` and capture the `name` field.
+
+Two approaches, recommend approach A:
+
+**Approach A -- Post-extraction filesystem read (recommended):**
+After `extractGraphFromRepo` returns the graph JSON, read `package.json` for each project node using the project's `root` path. This keeps `extract.ts` focused on graph extraction and adds a thin layer for package name lookup.
+
 ```typescript
-function detectCrossRepoDependencies(
-  allProjects: Map<string, { packageName: string; repoPrefix: string }>,
-  projectDeps: Record<string, string[]>
-): CandidateDependency[] {
-  const packageToProject = new Map<string, string>();
+// New function in extract.ts or a new file
+async function readPackageNames(
+  repoPath: string,
+  nodes: Record<string, ExternalProjectNode>,
+): Promise<Record<string, string>> {
+  // Returns: { originalProjectName: packageJsonName }
+  const result: Record<string, string> = {};
 
-  for (const [projectName, info] of allProjects) {
-    packageToProject.set(info.packageName, projectName);
+  for (const [name, node] of Object.entries(nodes)) {
+    const pkgPath = join(repoPath, node.data.root, 'package.json');
+
+    try {
+      const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
+
+      if (typeof pkg.name === 'string') {
+        result[name] = pkg.name;
+      }
+    } catch {
+      // No package.json or invalid -- skip (not all projects are npm packages)
+    }
   }
 
-  const dependencies: CandidateDependency[] = [];
+  return result;
+}
+```
 
-  for (const [projectName, deps] of Object.entries(projectDeps)) {
-    for (const dep of deps) {
-      const target = packageToProject.get(dep);
+**Why not Approach B (modify the nx graph --print subprocess):** The `nx graph --print` output format is controlled by Nx, not by us. We cannot add fields to it. Shelling out a second command just for package names is wasteful when the files are on disk.
 
-      if (target && target !== projectName) {
-        dependencies.push({
-          source: projectName,
-          target,
-          type: DependencyType.implicit,
-        });
-      }
+### 3. TransformedNode Extension (`types.ts`)
+
+```typescript
+export interface TransformedNode {
+  name: string;
+  root: string;
+  projectType?: string;
+  sourceRoot?: string;
+  targets: Record<string, TargetConfiguration>;
+  tags: string[];
+  metadata?: Record<string, unknown>;
+  packageName?: string;  // NEW: npm package name from package.json
+}
+```
+
+The `PolyrepoGraphReport` type gains a package name map per repo:
+
+```typescript
+export interface PolyrepoGraphReport {
+  repos: Record<string, {
+    nodes: Record<string, TransformedNode>;
+    dependencies: Array<{ source: string; target: string; type: string }>;
+    packageNames: Record<string, string>;  // NEW: namespacedProject -> npmPackageName
+  }>;
+}
+```
+
+### 4. Cross-repo Dependency Detection (`detect-cross-deps.ts`) -- NEW FILE
+
+This is the core new logic. It is a pure function with no side effects, making it easily testable with SIFERS.
+
+```typescript
+import type { RawProjectGraphDependency } from '@nx/devkit';
+import { DependencyType } from '@nx/devkit';
+import type { PolyrepoGraphReport } from './types';
+import type { PolyrepoConfig } from '../config/schema';
+
+interface CrossDepDetectionContext {
+  /** All projects currently in the host graph (for existence checks) */
+  projectNames: Set<string>;
+}
+
+/**
+ * Detect cross-repo dependencies by matching npm package names
+ * against dependency declarations in each project's package.json.
+ *
+ * Also merges explicit dependency overrides from config.
+ */
+export function detectCrossRepoDependencies(
+  report: PolyrepoGraphReport,
+  config: PolyrepoConfig,
+  context: CrossDepDetectionContext,
+): RawProjectGraphDependency[] {
+  const dependencies: RawProjectGraphDependency[] = [];
+
+  // Step 1: Build reverse lookup: npmPackageName -> namespacedProjectName
+  const packageToProject = new Map<string, string>();
+
+  for (const [, repoData] of Object.entries(report.repos)) {
+    for (const [namespacedName, npmName] of Object.entries(repoData.packageNames)) {
+      packageToProject.set(npmName, namespacedName);
+    }
+  }
+
+  // Step 2: For each project, check if its package.json deps reference
+  // a package name that maps to a project in another repo
+  for (const [, repoData] of Object.entries(report.repos)) {
+    for (const [namespacedName, node] of Object.entries(repoData.nodes)) {
+      // node.packageDependencies would be read during extraction
+      // Match against packageToProject lookup
+      // Only emit if source and target are in DIFFERENT repos
+      // Only emit if both exist in context.projectNames
+    }
+  }
+
+  // Step 3: Merge explicit overrides
+  for (const override of config.dependencyOverrides ?? []) {
+    if (context.projectNames.has(override.source) && context.projectNames.has(override.target)) {
+      dependencies.push({
+        source: override.source,
+        target: override.target,
+        type: DependencyType.implicit,
+      });
     }
   }
 
@@ -219,140 +316,245 @@ function detectCrossRepoDependencies(
 }
 ```
 
+**Key design decisions:**
+- **Pure function:** Takes report + config + context, returns edges. No module-level state. No filesystem access.
+- **Same-repo edges excluded:** Cross-repo detection only matches dependencies where source and target are in different repos. Intra-repo edges are already handled by the existing `createDependencies` loop.
+- **Overrides are additive:** They do not replace auto-detected edges. They add edges that auto-detection cannot find (e.g., non-npm dependencies like shared proto files, API contracts).
+- **Existence guard:** Same pattern as existing code -- only emit edges where both projects exist in the host graph.
+
+### 5. Integration into `createDependencies` (`index.ts`)
+
+The existing `createDependencies` function gains one additional call:
+
+```typescript
+export const createDependencies: CreateDependencies<PolyrepoConfig> = async (
+  options, context,
+) => {
+  const dependencies: RawProjectGraphDependency[] = [];
+
+  let report: PolyrepoGraphReport | undefined;
+
+  try {
+    const config = validateConfig(options);
+    const optionsHash = hashObject(options ?? {});
+    report = await populateGraphReport(config, context.workspaceRoot, optionsHash);
+  } catch {
+    return dependencies;
+  }
+
+  // EXISTING: intra-repo edges
+  for (const [, repoReport] of Object.entries(report.repos)) {
+    for (const dep of repoReport.dependencies) {
+      if (context.projects[dep.source] && context.projects[dep.target]) {
+        dependencies.push({
+          source: dep.source,
+          target: dep.target,
+          type: DependencyType.implicit,
+        });
+      }
+    }
+  }
+
+  // NEW: cross-repo edges (auto-detected + overrides)
+  const config = validateConfig(options);
+  const crossRepoDeps = detectCrossRepoDependencies(
+    report,
+    config,
+    { projectNames: new Set(Object.keys(context.projects)) },
+  );
+  dependencies.push(...crossRepoDeps);
+
+  return dependencies;
+};
+```
+
+### 6. Package.json Dependency Reading
+
+To auto-detect cross-repo deps, we need each project's npm dependency list. Two options:
+
+**Option A -- Read during extraction (in cache pipeline, recommended):**
+Add package.json dependency reading alongside package name reading in the cache pipeline. This means the data is cached and does not require filesystem reads during `createDependencies`.
+
+The `PolyrepoGraphReport` per-repo object would store:
+```typescript
+{
+  nodes: Record<string, TransformedNode>;
+  dependencies: Array<{ source: string; target: string; type: string }>;
+  packageNames: Record<string, string>;           // NEW
+  packageDependencies: Record<string, string[]>;   // NEW: namespacedProject -> [npmPackageName, ...]
+}
+```
+
+**Option B -- Read during createDependencies (lazy):**
+Read package.json files on-the-fly during `createDependencies`. Simpler but slower (filesystem reads on every uncached invocation) and breaks the pattern of keeping all IO in the cache pipeline.
+
+**Recommendation:** Option A. It follows the existing pattern where all IO happens during `populateGraphReport` and the rest is pure transformation.
+
+## Data Flow Summary
+
+```
+[Extraction Phase - in populateGraphReport]
+  For each synced repo:
+    1. extractGraphFromRepo(repoPath) -> ExternalGraphJson
+    2. readPackageNames(repoPath, graph.nodes) -> Record<string, string>
+    3. readPackageDependencies(repoPath, graph.nodes) -> Record<string, string[]>
+    4. transformGraphForRepo(alias, graph, workspaceRoot) -> { nodes, dependencies }
+    5. Attach packageNames + packageDependencies to report
+
+[Dependency Phase - in createDependencies]
+  1. populateGraphReport() -> PolyrepoGraphReport (from cache, fast)
+  2. Emit intra-repo edges (existing loop)
+  3. detectCrossRepoDependencies(report, config, context) -> cross-repo edges
+     a. Build packageName -> namespacedProject lookup (all repos)
+     b. For each project, match its packageDependencies against lookup
+     c. Filter: different repos only, both exist in host graph
+     d. Merge explicit overrides from config
+  4. Return all edges
+```
+
+## Architectural Patterns
+
+### Pattern 1: Package Name as Cross-repo Join Key
+
+**What:** Use npm package names (from `package.json` `name` field) as the key to join dependencies across repos. If repo-a's project declares `"@org/shared-utils": "^1.0"` in its `package.json` and repo-b has a project whose `package.json` `name` is `"@org/shared-utils"`, emit an implicit dependency edge.
+
+**When to use:** Always for auto-detection. This is the natural join key because npm packages are how JavaScript projects declare dependencies.
+
+**Trade-offs:**
+- PRO: Works without any user configuration
+- PRO: Mirrors how Nx itself detects dependencies within a monorepo
+- CON: Only works for projects that publish npm packages (not all projects have package.json)
+- CON: Does not detect non-npm relationships (gRPC proto imports, shared API types via codegen)
+- Mitigation: The `dependencyOverrides` feature covers the CON cases
+
+### Pattern 2: Additive Override Merging
+
+**What:** Explicit `dependencyOverrides` are additive -- they add edges that auto-detection does not find. They never remove auto-detected edges.
+
+**When to use:** Always. If users need to suppress an auto-detected edge, they should fix the underlying package.json rather than adding a negation mechanism.
+
+**Trade-offs:**
+- PRO: Simple mental model -- overrides only add
+- PRO: Auto-detected edges are always truthful (package.json is source of truth)
+- CON: No way to suppress false positives from auto-detection
+- Mitigation: False positives should be rare (requires exact package name match). If needed, a future `ignoreDependencies` field could be added.
+
+### Pattern 3: Pure Detection Function
+
+**What:** `detectCrossRepoDependencies` is a pure function: input data in, edges out. No filesystem reads, no module state, no side effects.
+
+**When to use:** For all new dependency logic. Follows the existing SIFERS test pattern where test setup is explicit.
+
+**Trade-offs:**
+- PRO: Trivially testable with SIFERS
+- PRO: No mocking filesystem or module state
+- CON: Requires all data to be pre-loaded (package names, package deps)
+- Mitigation: Data loading happens in the cache pipeline, which already handles IO
+
 ## Anti-Patterns to Avoid
 
-### Anti-Pattern 1: Calling createProjectGraphAsync Inside createNodes
+### Anti-Pattern 1: Reading package.json in createDependencies
 
-**What:** Attempting to construct a child workspace's project graph by calling `createProjectGraphAsync` during the host workspace's graph construction.
-**Why bad:** Triggers infinite recursion. Nx guards against this with `global.NX_GRAPH_CREATION`. The call will either hang or throw.
-**Instead:** Extract graphs as a pre-step (subprocess, cached JSON) or parse project configs directly from the filesystem without invoking the Nx graph pipeline.
+**What people do:** Open and parse package.json files inside `createDependencies` for each project.
+**Why it's wrong:** `createDependencies` should be fast. Filesystem reads here bypass the cache layer and run on every uncached Nx command. The existing architecture puts all IO in `populateGraphReport`.
+**Do this instead:** Read package names and dependency lists during the extraction phase in `cache.ts`, store them in the `PolyrepoGraphReport`, and use them as pure data in `createDependencies`.
 
-### Anti-Pattern 2: Re-running Assembly During Every Graph Construction
+### Anti-Pattern 2: Using DependencyType.static for Cross-repo Edges
 
-**What:** Cloning or pulling repos every time `createNodes` is called.
-**Why bad:** Graph construction happens frequently (every `nx` command). Git operations add seconds to every invocation. The Nx daemon caches plugin results, but cold starts would be severely impacted.
-**Instead:** Assembly is an explicit step (generator, executor, or sync generator). Graph plugin reads from the synced directory assuming it exists. Staleness checks use filesystem timestamps, not git fetch.
+**What people do:** Use `DependencyType.static` with a `sourceFile` pointing to the package.json.
+**Why it's wrong:** Static dependencies are associated with a specific source file and are cached by Nx's file change tracking. Cross-repo package.json files are in `.repos/`, which is gitignored. Nx's file watcher will not track changes to these files. Using `static` would cause stale edges.
+**Do this instead:** Use `DependencyType.implicit`. Implicit dependencies have no source file association and are recomputed every time `createDependencies` runs (which is correct -- they should be re-evaluated when the graph report changes).
 
-### Anti-Pattern 3: Deep-Merging Target Configurations
+### Anti-Pattern 3: Overrides That Reference Non-namespaced Project Names
 
-**What:** Attempting to deeply merge target options when host and external repos define the same target name.
-**Why bad:** Nx's own merging is shallow. Deep merging creates unpredictable behavior and diverges from Nx conventions. Overwritten targets cause silent behavior changes.
-**Instead:** External repo targets are preserved as-is under namespaced project names. No target-level merging across repos.
+**What people do:** Allow overrides like `{ source: "my-app", target: "shared-lib" }` without repo prefix.
+**Why it's wrong:** Without namespacing, project name collisions across repos are ambiguous. "my-app" could exist in three repos.
+**Do this instead:** Require fully namespaced names: `{ source: "frontend/my-app", target: "shared/shared-lib" }`. Validate that both names follow the `repo/project` pattern in the Zod schema.
 
-### Anti-Pattern 4: Single Barrel File for All Plugin Features
+### Anti-Pattern 4: Separate Cache for Cross-repo Dependencies
 
-**What:** Exporting generators, executors, graph plugin, and sync generators from one `index.ts`.
-**Why bad:** Nx compiles the entire plugin at runtime. Importing git/child_process utilities when only generators are needed wastes startup time and may cause issues in constrained environments.
-**Instead:** Separate entry points per feature type. The `package.json` points to different files for generators, executors, and the plugin entry.
+**What people do:** Create a new cache file or module-level variable for cross-repo dependency data.
+**Why it's wrong:** The existing two-layer cache (`cache.ts`) already handles invalidation correctly. The hash includes plugin options (so adding `dependencyOverrides` changes the hash) and each repo's git state (so package.json changes trigger re-extraction).
+**Do this instead:** Extend the existing `PolyrepoGraphReport` to include package name/dependency data. The existing cache handles the rest.
 
-## Component Dependency Graph (Build Order)
+## Integration Points
 
-Build order reflects internal dependencies between components:
+### Internal Boundaries
 
-```
-Layer 0 (no deps):
-  - Config types/schemas (shared interfaces for repo definitions, plugin options)
+| Boundary | Communication | Change for v1.1 |
+|----------|---------------|-----------------|
+| `schema.ts` -> `validate.ts` | Zod parse at plugin load | `dependencyOverrides` flows through existing validation |
+| `cache.ts` -> `extract.ts` | `extractGraphFromRepo()` call | Add `readPackageNames()` + `readPackageDependencies()` calls |
+| `cache.ts` -> `transform.ts` | `transformGraphForRepo()` call | `packageName` attached to each `TransformedNode` |
+| `cache.ts` -> `types.ts` | `PolyrepoGraphReport` shape | Add `packageNames` + `packageDependencies` fields |
+| `index.ts` -> `detect-cross-deps.ts` | NEW: `detectCrossRepoDependencies()` call | New integration point in `createDependencies` |
+| `index.ts` -> `cache.ts` | `populateGraphReport()` | Unchanged -- report now contains richer data |
 
-Layer 1 (depends on Layer 0):
-  - Repo Assembler (uses config types, calls git CLI)
-  - Graph Extractor (uses config types, reads filesystem)
+### Nx Plugin API Surface
 
-Layer 2 (depends on Layers 0-1):
-  - Graph Merger (consumes Extractor output, applies namespacing)
+| API | Usage in v1.1 |
+|-----|---------------|
+| `CreateDependencies<PolyrepoConfig>` | Return type unchanged; more edges returned |
+| `RawProjectGraphDependency` | Used for both intra-repo and cross-repo edges |
+| `DependencyType.implicit` | All cross-repo edges use implicit type |
+| `CreateDependenciesContext.projects` | Existence check for both auto-detected and override edges |
 
-Layer 3 (depends on Layers 0-2):
-  - Project Graph Plugin (createNodes + createDependencies, orchestrates extraction + merging)
-  - Sync Generator (reads merged graph, updates host files)
+## Suggested Build Order
 
-Layer 4 (depends on Layers 0-1):
-  - Generators (init, add-repo -- configure nx.json, trigger assembly)
-  - Executors (assemble -- wraps Repo Assembler as Nx target)
-```
-
-**Suggested build order for phases:**
-1. Config types + Repo Assembler (foundation -- get repos cloned)
-2. Graph Extractor + Graph Merger (core logic -- produce merged graph)
-3. createNodes + createDependencies (integration -- surface to Nx)
-4. Generators (DX -- easy setup and repo management)
-5. Sync Generator (polish -- auto-sync tsconfig paths, gitignore)
-6. Executors (optional -- explicit assembly target)
-
-## Nx Plugin API Surface Area Needed
-
-| API | From | Purpose |
-|-----|------|---------|
-| `CreateNodes` (v2 shape) | `@nx/devkit` | Register external projects in host graph |
-| `CreateDependencies` | `@nx/devkit` | Register cross-repo dependency edges |
-| `CreateDependenciesContext` | `@nx/devkit` | Access existing graph nodes, workspace config |
-| `ProjectConfiguration` | `@nx/devkit` | Type for project definitions returned by createNodes |
-| `DependencyType` | `@nx/devkit` | Classify dependencies (implicit for cross-repo) |
-| `Tree` | `@nx/devkit` | Filesystem abstraction for generators |
-| `readJson` / `writeJson` | `@nx/devkit` | Read/write nx.json and tsconfig in generators |
-| `generateFiles` | `@nx/devkit` | Template file generation in generators |
-| `SyncGeneratorResult` | `@nx/devkit` | Return type for sync generators |
-| `formatFiles` | `@nx/devkit` | Format generated files with Prettier |
-| `readProjectsConfigurationFromProjectGraph` | `@nx/devkit` | Extract project configs from cached graph (if used) |
-
-## Scalability Considerations
-
-| Concern | 2-3 repos | 10-20 repos | 50+ repos |
-|---------|-----------|-------------|-----------|
-| Assembly time | Seconds (shallow clone) | 30-60s first run, fast after | Minutes first run; parallel clone needed |
-| Graph construction | Negligible overhead | Hundreds of projects; cached JSON essential | Thousands of projects; lazy loading by repo needed |
-| Namespace collisions | Unlikely | Possible with common names | Prefix strategy is critical |
-| Staleness detection | Manual is fine | Needs auto-check on `nx sync` | Needs background refresh or CI-triggered assembly |
-| Disk usage | < 100 MB | 1-5 GB | 10+ GB; sparse checkout / shallow clone mandatory |
-
-## Directory Layout (Recommended)
+The build order follows data flow dependencies. Each layer builds on the previous.
 
 ```
-packages/nx-openpolyrepo/
-  package.json              # Plugin package with generators/executors/nx-migrations
-  generators.json           # Generator registry
-  executors.json            # Executor registry
-  src/
-    index.ts                # Graph plugin entry: exports createNodes, createDependencies
-    graph/
-      plugin.ts             # createNodes + createDependencies implementation
-      extractor.ts          # Graph extraction from synced repos
-      merger.ts             # Graph merging + namespacing logic
-      types.ts              # RepoConfig, MergedProject, etc.
-    assembly/
-      assembler.ts          # Git clone/pull operations
-      staleness.ts          # Cache freshness detection
-    generators/
-      init/
-        generator.ts        # First-time setup: add plugin to nx.json
-        schema.json
-        schema.d.ts
-      add-repo/
-        generator.ts        # Add a new repo to plugin config
-        schema.json
-        schema.d.ts
-    executors/
-      assemble/
-        executor.ts         # Explicit assembly as Nx target
-        schema.json
-        schema.d.ts
-    sync/
-      sync-generator.ts     # Keep tsconfig paths, gitignore in sync
-    utils/
-      git.ts                # Git CLI wrapper (cross-platform)
-      config.ts             # Plugin options parsing + validation
+Phase 1: Schema extension
+  - Add dependencyOverrides to polyrepoConfigSchema
+  - Add Zod validation (source/target format, existence checks deferred to runtime)
+  - Unit tests for new schema fields
+  Depends on: nothing new
+
+Phase 2: Package name/dependency extraction
+  - Add packageName to TransformedNode
+  - Add readPackageNames() function
+  - Add readPackageDependencies() function
+  - Extend PolyrepoGraphReport type with packageNames + packageDependencies
+  - Wire into cache.ts extraction pipeline
+  - Unit tests for package reading + transform passthrough
+  Depends on: Phase 1 (for types), existing extract.ts + transform.ts
+
+Phase 3: Cross-repo dependency detection
+  - Create detect-cross-deps.ts (pure function)
+  - Build package-to-project lookup from report
+  - Match dependencies cross-repo
+  - Merge explicit overrides
+  - Unit tests for detection logic (SIFERS, no mocks needed)
+  Depends on: Phase 2 (for report shape with package data)
+
+Phase 4: Integration into createDependencies
+  - Wire detectCrossRepoDependencies into index.ts createDependencies
+  - Integration tests verifying end-to-end edge emission
+  - Update existing createDependencies tests
+  Depends on: Phase 3
+
+Phase 5: E2E validation
+  - Extend testcontainers e2e to verify cross-repo edges appear in nx graph
+  - Test override edges
+  - Test package.json auto-detection
+  Depends on: Phase 4
 ```
+
+**Phase ordering rationale:**
+- Schema first because it defines the config contract that all other components depend on.
+- Package extraction second because the detection function needs this data.
+- Detection logic third as a pure function -- easiest to test in isolation before wiring.
+- Integration fourth -- once the detection function works, wiring is mechanical.
+- E2E last as a full-stack validation of all prior phases.
 
 ## Sources
 
-- [Extending the Project Graph | Nx](https://nx.dev/docs/extending-nx/project-graph-plugins)
-- [CreateNodes Compatibility | Nx](https://nx.dev/docs/extending-nx/createnodes-compatibility)
-- [Sync Generators | Nx](https://nx.dev/docs/concepts/sync-generators)
-- [Create a Sync Generator | Nx](https://nx.dev/docs/extending-nx/create-sync-generator)
-- [createProjectGraphAsync | Nx](https://nx.dev/docs/reference/devkit/createProjectGraphAsync)
-- [Nx Enterprise - Polygraph | Nx](https://nx.dev/docs/enterprise/polygraph)
-- [10 Tips for Successful Nx Plugin Architecture](https://smartsdlc.dev/blog/10-tips-for-successful-nx-plugin-architecture/)
-- [meta - tool for turning many repos into a meta repo](https://github.com/mateodelnorte/meta)
-- [Integrate a New Tool with a Tooling Plugin | Nx](https://nx.dev/docs/extending-nx/tooling-plugin)
-- [ProjectGraph | Nx](https://nx.dev/docs/reference/devkit/ProjectGraph)
-- [@nx/gradle source](https://github.com/nrwl/nx/tree/master/packages/gradle) -- createNodesV2 + cached Gradle project graph report pattern
-- [@nx/maven source](https://github.com/nrwl/nx/tree/master/packages/maven) -- Kotlin analyzer subprocess + PluginCache pattern
-- [@nx/dotnet source](https://github.com/nrwl/nx/tree/master/packages/dotnet) -- C# MSBuild analyzer + cross-project dependency mapping
+- [Extending the Project Graph | Nx](https://nx.dev/docs/extending-nx/project-graph-plugins) -- createDependencies API, DependencyType, CreateDependenciesContext
+- [Dependency Management Strategies | Nx](https://nx.dev/docs/concepts/decisions/dependency-management) -- per-project package.json patterns
+- [@nx/dotnet source](https://github.com/nrwl/nx/tree/master/packages/dotnet) -- cross-project dependency mapping pattern via `referencesByRoot`
+- [@nx/gradle source](https://github.com/nrwl/nx/tree/master/packages/gradle) -- module-level cache + shared report pattern
+- Existing v1.0 source code in `packages/op-nx-polyrepo/src/` -- baseline architecture, patterns, conventions
+
+---
+*Architecture research for: v1.1 cross-repo dependency detection and manual overrides*
+*Researched: 2026-03-17*

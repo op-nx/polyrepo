@@ -8,12 +8,17 @@ import type * as ConfigSchema from '../../config/schema.js';
 import type * as GitCommands from '../../git/commands.js';
 import type * as GitDetect from '../../git/detect.js';
 import type * as FormatTable from '../../format/table.js';
+import type * as GraphCache from '../../graph/cache.js';
+import type * as GraphExtract from '../../graph/extract.js';
+import type * as GraphTransform from '../../graph/transform.js';
+import type * as NxDevkitInternals from 'nx/src/devkit-internals';
 import { assertDefined } from '../../testing/asserts';
 
 // Mock dependencies before importing executor
 vi.mock('node:fs', () => ({
   readFileSync: vi.fn<(path: string, options?: unknown) => string>(),
   existsSync: vi.fn<(path: string) => boolean>(),
+  rmSync: vi.fn(),
   writeFileSync: vi.fn<(path: string, data: string) => void>(),
 }));
 
@@ -62,7 +67,48 @@ vi.mock('../../format/table', () => ({
   ),
 }));
 
-import { readFileSync, existsSync, writeFileSync } from 'node:fs';
+vi.mock('nx/src/devkit-internals', () => ({
+  hashObject: vi.fn<typeof NxDevkitInternals.hashObject>(() => 'mock-repos-config-hash'),
+}));
+
+vi.mock('../../graph/cache', () => ({
+  computeRepoHash: vi.fn<typeof GraphCache.computeRepoHash>(() => Promise.resolve('mock-repo-hash')),
+  writePerRepoCache: vi.fn<typeof GraphCache.writePerRepoCache>(),
+}));
+
+vi.mock('../../graph/extract', () => ({
+  extractGraphFromRepo: vi.fn<typeof GraphExtract.extractGraphFromRepo>(() =>
+    Promise.resolve({
+      graph: {
+        nodes: {
+          'proj-a': {
+            name: 'proj-a',
+            type: 'library',
+            data: { root: 'packages/proj-a', targets: {}, tags: [], metadata: {} },
+          },
+        },
+        dependencies: {},
+      },
+    }),
+  ),
+}));
+
+vi.mock('../../graph/transform', () => ({
+  transformGraphForRepo: vi.fn<typeof GraphTransform.transformGraphForRepo>(() => ({
+    nodes: {
+      'repo-a/proj-a': {
+        name: 'repo-a/proj-a',
+        root: '.repos/repo-a/packages/proj-a',
+        projectType: 'library',
+        targets: {},
+        tags: ['polyrepo:external', 'polyrepo:repo-a'],
+      },
+    },
+    dependencies: [],
+  })),
+}));
+
+import { readFileSync, existsSync, rmSync, writeFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { logger } from '@nx/devkit';
 import { createMockChildProcess } from '../../testing/mock-child-process';
@@ -86,10 +132,15 @@ import {
   isGitTag,
 } from '../../git/detect';
 import { formatAlignedTable } from '../../format/table';
+import { hashObject } from 'nx/src/devkit-internals';
+import { computeRepoHash, writePerRepoCache } from '../../graph/cache';
+import { extractGraphFromRepo } from '../../graph/extract';
+import { transformGraphForRepo } from '../../graph/transform';
 import syncExecutor from './executor';
 
 const mockReadFileSync = vi.mocked(readFileSync);
 const mockExistsSync = vi.mocked(existsSync);
+const mockRmSync = vi.mocked(rmSync);
 const mockWriteFileSync = vi.mocked(writeFileSync);
 const mockSpawn = vi.mocked(spawn);
 const mockValidateConfig = vi.mocked(validateConfig);
@@ -109,6 +160,11 @@ const mockIsGitTag = vi.mocked(isGitTag);
 const mockFormatAlignedTable = vi.mocked(formatAlignedTable);
 const mockLoggerInfo = vi.mocked(logger.info);
 const mockLoggerWarn = vi.mocked(logger.warn);
+const mockHashObject = vi.mocked(hashObject);
+const mockComputeRepoHash = vi.mocked(computeRepoHash);
+const mockWritePerRepoCache = vi.mocked(writePerRepoCache);
+const mockExtractGraphFromRepo = vi.mocked(extractGraphFromRepo);
+const mockTransformGraphForRepo = vi.mocked(transformGraphForRepo);
 
 function createTestContext(
   overrides?: Partial<ExecutorContext>,
@@ -1638,6 +1694,329 @@ describe(syncExecutor, () => {
     });
   });
 
+  describe('pre-caching', () => {
+    it('calls extractGraphFromRepo after successful clone+install', async () => {
+      expect.hasAssertions();
+
+      setup();
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          depth: 1,
+          disableHooks: true,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('not-synced');
+
+      await syncExecutor({}, createTestContext());
+
+      expect(mockExtractGraphFromRepo).toHaveBeenCalledWith(
+        expect.stringMatching(/\.repos[\\/]repo-a/),
+      );
+    });
+
+    it('calls transformGraphForRepo with alias and raw graph after extraction', async () => {
+      expect.hasAssertions();
+
+      setup();
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          depth: 1,
+          disableHooks: true,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('not-synced');
+
+      await syncExecutor({}, createTestContext());
+
+      expect(mockTransformGraphForRepo).toHaveBeenCalledWith(
+        'repo-a',
+        expect.objectContaining({ graph: expect.any(Object) }),
+        '/workspace',
+      );
+    });
+
+    it('calls computeRepoHash with reposConfigHash, alias, and repoPath', async () => {
+      expect.hasAssertions();
+
+      setup();
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          depth: 1,
+          disableHooks: true,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('not-synced');
+
+      await syncExecutor({}, createTestContext());
+
+      expect(mockComputeRepoHash).toHaveBeenCalledWith(
+        'mock-repos-config-hash',
+        'repo-a',
+        expect.stringMatching(/\.repos[\\/]repo-a/),
+      );
+    });
+
+    it('calls writePerRepoCache with correct alias, hash, and transformed report', async () => {
+      expect.hasAssertions();
+
+      setup();
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          depth: 1,
+          disableHooks: true,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('not-synced');
+
+      await syncExecutor({}, createTestContext());
+
+      expect(mockWritePerRepoCache).toHaveBeenCalledWith(
+        '/workspace',
+        'repo-a',
+        'mock-repo-hash',
+        expect.objectContaining({
+          nodes: expect.any(Object),
+          dependencies: expect.any(Array),
+        }),
+      );
+    });
+
+    it('logs "Extracting graph for" before extraction', async () => {
+      expect.hasAssertions();
+
+      setup();
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          depth: 1,
+          disableHooks: true,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('not-synced');
+
+      await syncExecutor({}, createTestContext());
+
+      const infoCalls = mockLoggerInfo.mock.calls.map((c) => String(c[0]));
+      const hasExtracting = infoCalls.some((msg) =>
+        msg.includes('Extracting graph for repo-a'),
+      );
+
+      expect(hasExtracting).toBe(true);
+    });
+
+    it('logs "Cached graph for" with project count after caching', async () => {
+      expect.hasAssertions();
+
+      setup();
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          depth: 1,
+          disableHooks: true,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('not-synced');
+
+      await syncExecutor({}, createTestContext());
+
+      const infoCalls = mockLoggerInfo.mock.calls.map((c) => String(c[0]));
+      const hasCached = infoCalls.some(
+        (msg) =>
+          msg.includes('Cached graph for repo-a') && msg.includes('1 projects'),
+      );
+
+      expect(hasCached).toBe(true);
+    });
+
+    it('pre-cache failure logs warning and does not fail the sync', async () => {
+      expect.hasAssertions();
+
+      setup();
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          depth: 1,
+          disableHooks: true,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('not-synced');
+      mockExtractGraphFromRepo.mockRejectedValue(new Error('extraction boom'));
+
+      const result = await syncExecutor({}, createTestContext());
+
+      const warnCalls = mockLoggerWarn.mock.calls.map((c) => String(c[0]));
+      const hasFailWarning = warnCalls.some((msg) =>
+        msg.includes('Failed to pre-cache graph for repo-a'),
+      );
+
+      expect(hasFailWarning).toBe(true);
+      expect(result).toStrictEqual({ success: true });
+    });
+
+    it('does not pre-cache when install fails', async () => {
+      expect.hasAssertions();
+
+      setup();
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          depth: 1,
+          disableHooks: true,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('not-synced');
+      // Make spawn exit with code 1 (install failure)
+      mockSpawn.mockImplementation(() => createMockChildProcess(1));
+
+      await syncExecutor({}, createTestContext());
+
+      expect(mockExtractGraphFromRepo).not.toHaveBeenCalled();
+    });
+
+    it('does not pre-cache on dry run', async () => {
+      expect.hasAssertions();
+
+      setup();
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          depth: 1,
+          disableHooks: true,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('not-synced');
+
+      await syncExecutor({ dryRun: true }, createTestContext());
+
+      expect(mockExtractGraphFromRepo).not.toHaveBeenCalled();
+    });
+
+    it('pre-caches after pull when deps already installed (no install needed)', async () => {
+      expect.hasAssertions();
+
+      setup();
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          ref: 'main',
+          depth: 1,
+          disableHooks: true,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('cloned');
+
+      // Simulate deps already installed (needsInstall returns false)
+      const lockContent = Buffer.from('lockfile-content');
+      const hash = createHash('sha256').update(lockContent).digest('hex');
+
+      mockExistsSync.mockImplementation((p) => {
+        const path = String(p);
+
+        if (path.endsWith('node_modules')) {
+          return true;
+        }
+
+        if (path.endsWith('pnpm-lock.yaml')) {
+          return true;
+        }
+
+        if (path.endsWith('.lock-hash')) {
+          return true;
+        }
+
+        return false;
+      });
+      mockReadFileSync.mockImplementation((p) => {
+        const path = String(p);
+
+        if (path.endsWith('nx.json')) {
+          return JSON.stringify({
+            plugins: [{ plugin: '@op-nx/polyrepo', options: fakeConfig }],
+          });
+        }
+
+        if (path.endsWith('pnpm-lock.yaml')) {
+          return lockContent;
+        }
+
+        if (path.endsWith('.lock-hash')) {
+          return hash;
+        }
+
+        return '';
+      });
+
+      await syncExecutor({}, createTestContext());
+
+      expect(mockSpawn).not.toHaveBeenCalled();
+      expect(mockExtractGraphFromRepo).toHaveBeenCalledWith(
+        expect.stringMatching(/\.repos[\\/]repo-a/),
+      );
+    });
+
+    it('pre-caches for local repos after pull', async () => {
+      expect.hasAssertions();
+
+      setup();
+      setupPluginConfig([
+        { type: 'local', alias: 'repo-b', path: 'D:/projects/repo-b' },
+      ]);
+      mockDetectRepoState.mockReturnValue('referenced');
+
+      await syncExecutor({}, createTestContext());
+
+      expect(mockExtractGraphFromRepo).toHaveBeenCalledWith(
+        'D:/projects/repo-b',
+      );
+    });
+
+    it('uses hashObject to compute reposConfigHash', async () => {
+      expect.hasAssertions();
+
+      setup();
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          depth: 1,
+          disableHooks: true,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('not-synced');
+
+      await syncExecutor({}, createTestContext());
+
+      expect(mockHashObject).toHaveBeenCalledWith(
+        fakeConfig.repos,
+      );
+    });
+  });
+
   describe('conditional dependency installation', () => {
     function setupSpawnMockSuccess(): void {
       mockSpawn.mockImplementation(() => createMockChildProcess(0));
@@ -1655,6 +2034,10 @@ describe(syncExecutor, () => {
       const hash = createHash('sha256').update(lockContent).digest('hex');
       mockExistsSync.mockImplementation((p) => {
         const path = String(p);
+
+        if (path.endsWith('node_modules')) {
+          return true;
+        }
 
         if (path.endsWith('pnpm-lock.yaml')) {
           return true;
@@ -1956,6 +2339,64 @@ describe(syncExecutor, () => {
       await syncExecutor({}, createTestContext());
 
       expect(mockSpawn).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('stale cache clearing', () => {
+    it('clears stale .nx/cache and dist when node_modules is missing before install', async () => {
+      expect.hasAssertions();
+
+      setup();
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          depth: 1,
+          disableHooks: true,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('not-synced');
+
+      await syncExecutor({}, createTestContext());
+
+      expect(mockRmSync).toHaveBeenCalledWith(
+        expect.stringMatching(/\.nx[\\/]cache/),
+        { recursive: true, force: true },
+      );
+      expect(mockRmSync).toHaveBeenCalledWith(
+        expect.stringMatching(/[\\/]dist$/),
+        { recursive: true, force: true },
+      );
+    });
+
+    it('does not clear cache when node_modules already exists', async () => {
+      expect.hasAssertions();
+
+      setup();
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          depth: 1,
+          disableHooks: true,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('cloned');
+      mockExistsSync.mockImplementation((p: unknown) => {
+        const path = String(p);
+
+        if (path.endsWith('node_modules')) {
+          return true;
+        }
+
+        return false;
+      });
+
+      await syncExecutor({}, createTestContext());
+
+      expect(mockRmSync).not.toHaveBeenCalled();
     });
   });
 });

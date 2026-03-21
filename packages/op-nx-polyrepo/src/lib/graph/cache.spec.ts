@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, expectTypeOf, vi } from 'vitest';
 import type * as ExtractModule from './extract.js';
 import type * as TransformModule from './transform.js';
 import type * as GitDetect from '../git/detect.js';
@@ -10,6 +10,7 @@ vi.mock('node:fs', () => ({
   readFileSync: vi.fn<(path: string, options?: unknown) => string>(),
   writeFileSync: vi.fn<(path: string, data: string) => void>(),
   mkdirSync: vi.fn<(path: string, options?: unknown) => void>(),
+  unlinkSync: vi.fn<(path: string) => void>(),
 }));
 
 vi.mock('./extract', () => ({
@@ -33,6 +34,10 @@ vi.mock('@nx/devkit', () => ({
   hashArray: vi.fn<typeof NxDevkit.hashArray>(),
   readJsonFile: vi.fn<typeof NxDevkit.readJsonFile>(),
   writeJsonFile: vi.fn<typeof NxDevkit.writeJsonFile>(),
+  logger: {
+    warn: vi.fn<(message: string) => void>(),
+    info: vi.fn<(message: string) => void>(),
+  },
 }));
 
 import type { PolyrepoConfig, NormalizedRepoEntry } from '../config/schema';
@@ -80,13 +85,25 @@ const rawGraph: ExternalGraphJson = {
   },
 };
 
-const transformedResult = {
+const transformedResultA = {
   nodes: {
     'repo-a/my-lib': {
       name: 'repo-a/my-lib',
       root: '.repos/repo-a/libs/my-lib',
       targets: {},
       tags: ['scope:shared', 'polyrepo:external', 'polyrepo:repo-a'],
+    },
+  },
+  dependencies: [],
+};
+
+const transformedResultB = {
+  nodes: {
+    'repo-b/my-lib': {
+      name: 'repo-b/my-lib',
+      root: '.repos/repo-b/libs/my-lib',
+      targets: {},
+      tags: ['scope:shared', 'polyrepo:external', 'polyrepo:repo-b'],
     },
   },
   dependencies: [],
@@ -120,6 +137,7 @@ describe('cache', () => {
 
     return {
       existsSync: vi.mocked(fs.existsSync),
+      unlinkSync: vi.mocked(fs.unlinkSync),
       extractGraphFromRepo: vi.mocked(extract.extractGraphFromRepo),
       transformGraphForRepo: vi.mocked(transform.transformGraphForRepo),
       getHeadSha: vi.mocked(git.getHeadSha),
@@ -128,6 +146,7 @@ describe('cache', () => {
       hashArray: vi.mocked(devkit.hashArray),
       readJsonFile: vi.mocked(devkit.readJsonFile),
       writeJsonFile: vi.mocked(devkit.writeJsonFile),
+      loggerWarn: vi.mocked(devkit.logger.warn),
     };
   }
 
@@ -135,6 +154,7 @@ describe('cache', () => {
     mocks: Awaited<ReturnType<typeof loadMocks>>,
   ) {
     mocks.normalizeRepos.mockReturnValue(testEntries);
+
     // .repos/repo-a/.git exists, /local/repo-b/.git exists
     mocks.existsSync.mockImplementation((p: unknown) => {
       const ps = String(p);
@@ -143,22 +163,39 @@ describe('cache', () => {
         return true;
       }
 
-      // Cache file does not exist
+      // Old cache file and per-repo cache files do not exist by default
       return false;
     });
+
     mocks.getHeadSha.mockResolvedValue('abc123');
     mocks.getDirtyFiles.mockResolvedValue('');
-    mocks.hashArray.mockReturnValue('hash-1');
+
+    // Deterministic hash: same inputs produce same output across calls
+    mocks.hashArray.mockImplementation((parts: unknown) => {
+      return `hash-${JSON.stringify(parts)}`;
+    });
+
     mocks.extractGraphFromRepo.mockResolvedValue(rawGraph);
-    mocks.transformGraphForRepo.mockReturnValue(transformedResult);
+
+    mocks.transformGraphForRepo.mockImplementation(
+      (alias: string, _raw: unknown, _ws: string) => {
+        if (alias === 'repo-a') {
+          return transformedResultA;
+        }
+
+        return transformedResultB;
+      },
+    );
+
     mocks.readJsonFile.mockImplementation(() => {
       throw new Error('File not found');
     });
+
     mocks.writeJsonFile.mockImplementation(() => undefined);
   }
 
-  describe('populateGraphReport', () => {
-    it('returns cached report when outer hash matches (no extraction called)', async () => {
+  describe('global gate (DAEMON-01)', () => {
+    it('returns instantly without disk reads or extraction when global hash unchanged', async () => {
       expect.hasAssertions();
 
       const { mocks } = await setup();
@@ -166,9 +203,11 @@ describe('cache', () => {
 
       // First call: populates cache
       await populateGraphReport(testConfig, '/workspace', 'opts-hash');
-      mocks.extractGraphFromRepo.mockClear();
 
-      // Second call with same hash: should return cached
+      mocks.extractGraphFromRepo.mockClear();
+      mocks.readJsonFile.mockClear();
+
+      // Second call with same hash: should return cached (no disk or extraction)
       const result = await populateGraphReport(
         testConfig,
         '/workspace',
@@ -176,28 +215,444 @@ describe('cache', () => {
       );
 
       expect(mocks.extractGraphFromRepo).not.toHaveBeenCalled();
+      expect(mocks.readJsonFile).not.toHaveBeenCalled();
       expect(result).toBeDefined();
       expect(result.repos).toBeDefined();
     });
+  });
 
-    it('extracts fresh graph when hash changes (extraction called for each repo)', async () => {
+  describe('per-repo selective invalidation (DAEMON-03)', () => {
+    it('only re-extracts the changed repo while unchanged repo stays cached', async () => {
       expect.hasAssertions();
 
       const { mocks } = await setup();
       const { populateGraphReport } = await loadCacheModule();
 
-      // First call
+      // First call: extracts both repos
       await populateGraphReport(testConfig, '/workspace', 'opts-hash');
+
+      expect(mocks.extractGraphFromRepo).toHaveBeenCalledTimes(2);
+
       mocks.extractGraphFromRepo.mockClear();
-      mocks.hashArray.mockReturnValue('hash-2');
 
-      // Second call with different hash: should re-extract
-      await populateGraphReport(testConfig, '/workspace', 'opts-hash-2');
+      // Change only repo-a's SHA (simulate a commit in repo-a)
+      mocks.getHeadSha.mockImplementation((repoPath: string) => {
+        if (repoPath.includes('repo-a')) {
+          return Promise.resolve('new-sha-for-a');
+        }
 
-      expect(mocks.extractGraphFromRepo).toHaveBeenCalled();
+        return Promise.resolve('abc123');
+      });
+
+      // Second call: only repo-a should re-extract
+      const result = await populateGraphReport(
+        testConfig,
+        '/workspace',
+        'opts-hash',
+      );
+
+      expect(mocks.extractGraphFromRepo).toHaveBeenCalledTimes(1);
+      expect(mocks.extractGraphFromRepo).toHaveBeenCalledWith(
+        expect.stringContaining('repo-a'),
+      );
+
+      // Both repos should be in the result
+      expect(result.repos['repo-a']).toBeDefined();
+      expect(result.repos['repo-b']).toBeDefined();
+    });
+  });
+
+  describe('per-repo disk cache (DAEMON-02)', () => {
+    it('restores per-repo data from disk on cold start without extraction', async () => {
+      expect.hasAssertions();
+
+      const { mocks } = await setup();
+
+      // Use a stable hash so we can match it
+      mocks.hashArray.mockReturnValue('stable-hash');
+
+      // Mock per-repo disk cache for repo-a only
+      mocks.readJsonFile.mockImplementation((path: unknown) => {
+        const ps = String(path);
+
+        if (
+          ps.includes('repo-a') &&
+          ps.includes('.polyrepo-graph-cache.json')
+        ) {
+          return { hash: 'stable-hash', report: transformedResultA };
+        }
+
+        throw new Error('File not found');
+      });
+
+      const { populateGraphReport } = await loadCacheModule();
+
+      const result = await populateGraphReport(
+        testConfig,
+        '/workspace',
+        'opts-hash',
+      );
+
+      // repo-a should NOT be extracted (disk hit)
+      // repo-b should be extracted (no disk cache)
+      expect(mocks.extractGraphFromRepo).toHaveBeenCalledTimes(1);
+      expect(mocks.extractGraphFromRepo).toHaveBeenCalledWith(
+        expect.stringContaining('repo-b'),
+      );
+      expect(result.repos['repo-a']).toBeDefined();
+      expect(result.repos['repo-b']).toBeDefined();
     });
 
-    it('skips repos without .git directory (unsynced repos)', async () => {
+    it('falls through to extraction on disk cache miss', async () => {
+      expect.hasAssertions();
+
+      const { mocks } = await setup();
+
+      // All readJsonFile calls throw (no disk cache)
+      mocks.readJsonFile.mockImplementation(() => {
+        throw new Error('File not found');
+      });
+
+      const { populateGraphReport } = await loadCacheModule();
+
+      await populateGraphReport(testConfig, '/workspace', 'opts-hash');
+
+      // Both repos should be extracted
+      expect(mocks.extractGraphFromRepo).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('disk write', () => {
+    it('writes per-repo cache file to .repos/ALIAS/.polyrepo-graph-cache.json after extraction', async () => {
+      expect.hasAssertions();
+
+      const { mocks } = await setup();
+      const { populateGraphReport } = await loadCacheModule();
+
+      await populateGraphReport(testConfig, '/workspace', 'opts-hash');
+
+      // Should write per-repo cache for each repo
+      expect(mocks.writeJsonFile).toHaveBeenCalledWith(
+        expect.stringContaining('repo-a'),
+        expect.objectContaining({ hash: expect.any(String) }),
+      );
+      expect(mocks.writeJsonFile).toHaveBeenCalledWith(
+        expect.stringContaining('repo-b'),
+        expect.objectContaining({ hash: expect.any(String) }),
+      );
+    });
+  });
+
+  describe('extraction failure isolation', () => {
+    it('continues serving other repos when one repo extraction fails', async () => {
+      expect.hasAssertions();
+
+      const { mocks } = await setup();
+
+      // repo-a extraction fails
+      mocks.extractGraphFromRepo.mockImplementation(
+        (repoPath: string) => {
+          if (repoPath.includes('repo-a')) {
+            return Promise.reject(new Error('extraction failed'));
+          }
+
+          return Promise.resolve(rawGraph);
+        },
+      );
+
+      const { populateGraphReport } = await loadCacheModule();
+
+      const result = await populateGraphReport(
+        testConfig,
+        '/workspace',
+        'opts-hash',
+      );
+
+      // repo-b should still be in the report
+      expect(result.repos['repo-b']).toBeDefined();
+
+      // repo-a should not be in the report (extraction failed)
+      expect(result.repos['repo-a']).toBeUndefined();
+    });
+  });
+
+  describe('backoff (DAEMON-06)', () => {
+    it('skips extraction during backoff cooldown after failure', async () => {
+      expect.hasAssertions();
+
+      const { mocks } = await setup();
+
+      // repo-a extraction always fails
+      mocks.extractGraphFromRepo.mockImplementation(
+        (repoPath: string) => {
+          if (repoPath.includes('repo-a')) {
+            return Promise.reject(new Error('extraction failed'));
+          }
+
+          return Promise.resolve(rawGraph);
+        },
+      );
+
+      const { populateGraphReport } = await loadCacheModule();
+
+      // First call: both repos attempted, repo-a fails
+      await populateGraphReport(testConfig, '/workspace', 'opts-hash');
+
+      expect(mocks.extractGraphFromRepo).toHaveBeenCalledTimes(2);
+
+      mocks.extractGraphFromRepo.mockClear();
+
+      // Second call (within 2s cooldown): repo-a extraction should be skipped
+      await populateGraphReport(testConfig, '/workspace', 'opts-hash');
+
+      // Only repo-b should be re-extracted (or served from cache)
+      // repo-a should NOT be extracted due to backoff
+      const calls = mocks.extractGraphFromRepo.mock.calls;
+
+      for (const call of calls) {
+        expect(call[0]).not.toContain('repo-a');
+      }
+    });
+
+    it('allows extraction after cooldown expires', async () => {
+      expect.hasAssertions();
+
+      const { mocks } = await setup();
+      const originalDateNow = Date.now;
+
+      // repo-a extraction fails
+      mocks.extractGraphFromRepo.mockImplementation(
+        (repoPath: string) => {
+          if (repoPath.includes('repo-a')) {
+            return Promise.reject(new Error('extraction failed'));
+          }
+
+          return Promise.resolve(rawGraph);
+        },
+      );
+
+      const { populateGraphReport } = await loadCacheModule();
+
+      // First call: records failure
+      await populateGraphReport(testConfig, '/workspace', 'opts-hash');
+
+      mocks.extractGraphFromRepo.mockClear();
+
+      // Simulate time passing beyond 2s cooldown
+      Date.now = () => originalDateNow() + 3000;
+
+      try {
+        await populateGraphReport(testConfig, '/workspace', 'opts-hash');
+
+        // repo-a extraction should be attempted again
+        const repoACalls = mocks.extractGraphFromRepo.mock.calls.filter(
+          (call) => call[0].includes('repo-a'),
+        );
+
+        expect(repoACalls.length).toBeGreaterThanOrEqual(1);
+      } finally {
+        Date.now = originalDateNow;
+      }
+    });
+  });
+
+  describe('hash-change resets backoff (DAEMON-07)', () => {
+    it('resets backoff when repo hash changes after failure', async () => {
+      expect.hasAssertions();
+
+      const { mocks } = await setup();
+
+      // repo-a extraction fails initially
+      mocks.extractGraphFromRepo.mockImplementation(
+        (repoPath: string) => {
+          if (repoPath.includes('repo-a')) {
+            return Promise.reject(new Error('extraction failed'));
+          }
+
+          return Promise.resolve(rawGraph);
+        },
+      );
+
+      const { populateGraphReport } = await loadCacheModule();
+
+      // First call: records failure for repo-a
+      await populateGraphReport(testConfig, '/workspace', 'opts-hash');
+
+      mocks.extractGraphFromRepo.mockClear();
+
+      // Change repo-a's hash (simulate a file edit)
+      mocks.getHeadSha.mockImplementation((repoPath: string) => {
+        if (repoPath.includes('repo-a')) {
+          return Promise.resolve('fixed-sha');
+        }
+
+        return Promise.resolve('abc123');
+      });
+
+      // Make extraction succeed now
+      mocks.extractGraphFromRepo.mockResolvedValue(rawGraph);
+
+      // Second call (still within cooldown but hash changed): should attempt extraction
+      await populateGraphReport(testConfig, '/workspace', 'opts-hash');
+
+      const repoACalls = mocks.extractGraphFromRepo.mock.calls.filter(
+        (call) => call[0].includes('repo-a'),
+      );
+
+      expect(repoACalls.length).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  describe('backoff cap', () => {
+    it('caps backoff at 30 seconds', async () => {
+      expect.hasAssertions();
+
+      const { mocks } = await setup();
+      const originalDateNow = Date.now;
+      let fakeTime = originalDateNow();
+
+      Date.now = () => fakeTime;
+
+      // repo-a extraction always fails
+      mocks.extractGraphFromRepo.mockImplementation(
+        (repoPath: string) => {
+          if (repoPath.includes('repo-a')) {
+            return Promise.reject(new Error('extraction failed'));
+          }
+
+          return Promise.resolve(rawGraph);
+        },
+      );
+
+      const { populateGraphReport } = await loadCacheModule();
+
+      try {
+        // Fail 6 times with increasing cooldowns
+        // Attempt 1: fail, backoff = 2s
+        await populateGraphReport(testConfig, '/workspace', 'opts-hash');
+        fakeTime += 2001;
+
+        // Attempt 2: fail, backoff = 4s
+        await populateGraphReport(testConfig, '/workspace', 'opts-hash');
+        fakeTime += 4001;
+
+        // Attempt 3: fail, backoff = 8s
+        await populateGraphReport(testConfig, '/workspace', 'opts-hash');
+        fakeTime += 8001;
+
+        // Attempt 4: fail, backoff = 16s
+        await populateGraphReport(testConfig, '/workspace', 'opts-hash');
+        fakeTime += 16001;
+
+        // Attempt 5: fail, backoff = 30s (capped)
+        await populateGraphReport(testConfig, '/workspace', 'opts-hash');
+        fakeTime += 30001;
+
+        // Attempt 6: fail, backoff should still be 30s (capped)
+        await populateGraphReport(testConfig, '/workspace', 'opts-hash');
+
+        mocks.extractGraphFromRepo.mockClear();
+
+        // After 29s: should still be in cooldown
+        fakeTime += 29000;
+        await populateGraphReport(testConfig, '/workspace', 'opts-hash');
+
+        const callsDuringCooldown =
+          mocks.extractGraphFromRepo.mock.calls.filter((call) =>
+            call[0].includes('repo-a'),
+          );
+
+        expect(callsDuringCooldown).toHaveLength(0);
+
+        // After 31s total from last attempt: should allow extraction
+        fakeTime += 2000;
+
+        mocks.extractGraphFromRepo.mockClear();
+
+        await populateGraphReport(testConfig, '/workspace', 'opts-hash');
+
+        const callsAfterCooldown =
+          mocks.extractGraphFromRepo.mock.calls.filter((call) =>
+            call[0].includes('repo-a'),
+          );
+
+        expect(callsAfterCooldown.length).toBeGreaterThanOrEqual(1);
+      } finally {
+        Date.now = originalDateNow;
+      }
+    });
+  });
+
+  describe('actionable warning (DAEMON-08)', () => {
+    it('logs actionable troubleshooting steps on extraction failure', async () => {
+      expect.hasAssertions();
+
+      const { mocks } = await setup();
+
+      mocks.extractGraphFromRepo.mockImplementation(
+        (repoPath: string) => {
+          if (repoPath.includes('repo-a')) {
+            return Promise.reject(new Error('extraction failed'));
+          }
+
+          return Promise.resolve(rawGraph);
+        },
+      );
+
+      const { populateGraphReport } = await loadCacheModule();
+
+      await populateGraphReport(testConfig, '/workspace', 'opts-hash');
+
+      const warnCalls: string[] = mocks.loggerWarn.mock.calls.map(
+        (call: [string]) => call[0],
+      );
+      const allWarnings = warnCalls.join('\n');
+
+      expect(allWarnings).toContain('polyrepo-sync');
+      expect(allWarnings).toContain('NX_DAEMON=false');
+      expect(allWarnings).toContain('NX_PLUGIN_NO_TIMEOUTS');
+    });
+  });
+
+  describe('old cache cleanup', () => {
+    it('attempts to delete old monolithic cache file on first invocation', async () => {
+      expect.hasAssertions();
+
+      const { mocks } = await setup();
+
+      // Old cache file exists
+      mocks.existsSync.mockImplementation((p: unknown) => {
+        const ps = String(p);
+
+        if (ps.includes('.git')) {
+          return true;
+        }
+
+        // The old monolithic cache path: .repos/.polyrepo-graph-cache.json
+        // Must NOT match per-repo paths like .repos/repo-a/.polyrepo-graph-cache.json
+        if (
+          ps.includes('.polyrepo-graph-cache.json') &&
+          !ps.includes('repo-a') &&
+          !ps.includes('repo-b')
+        ) {
+          return true;
+        }
+
+        return false;
+      });
+
+      const { populateGraphReport } = await loadCacheModule();
+
+      await populateGraphReport(testConfig, '/workspace', 'opts-hash');
+
+      expect(mocks.unlinkSync).toHaveBeenCalledWith(
+        expect.stringContaining('.polyrepo-graph-cache.json'),
+      );
+    });
+  });
+
+  describe('unsynced repos', () => {
+    it('skips repos without .git directory in both hash computation and extraction', async () => {
       expect.hasAssertions();
 
       const { mocks } = await setup();
@@ -219,177 +674,48 @@ describe('cache', () => {
 
       // Only repo-a should be extracted
       expect(mocks.extractGraphFromRepo).toHaveBeenCalledTimes(1);
-    });
-
-    it('calls extractGraphFromRepo in parallel (Promise.all) for multiple repos', async () => {
-      expect.hasAssertions();
-
-      const { mocks } = await setup();
-
-      const callOrder: string[] = [];
-
-      mocks.extractGraphFromRepo.mockImplementation(
-        async (repoPath: string) => {
-          callOrder.push(`start:${repoPath}`);
-          // Simulate async work
-          await new Promise((r) => setTimeout(r, 10));
-          callOrder.push(`end:${repoPath}`);
-
-          return rawGraph;
-        },
+      expect(mocks.extractGraphFromRepo).toHaveBeenCalledWith(
+        expect.stringContaining('repo-a'),
       );
-
-      const { populateGraphReport } = await loadCacheModule();
-
-      await populateGraphReport(testConfig, '/workspace', 'opts-hash');
-
-      // Both starts should come before both ends (parallel execution)
-      expect(mocks.extractGraphFromRepo).toHaveBeenCalledTimes(2);
-    });
-
-    it('calls transformGraphForRepo on each extracted JSON', async () => {
-      expect.hasAssertions();
-
-      const { mocks } = await setup();
-      const { populateGraphReport } = await loadCacheModule();
-
-      await populateGraphReport(testConfig, '/workspace', 'opts-hash');
-
-      expect(mocks.transformGraphForRepo).toHaveBeenCalledTimes(2);
-      expect(mocks.transformGraphForRepo).toHaveBeenCalledWith(
-        'repo-a',
-        rawGraph,
-        '/workspace',
-      );
-      expect(mocks.transformGraphForRepo).toHaveBeenCalledWith(
-        'repo-b',
-        rawGraph,
-        '/workspace',
-      );
-    });
-
-    it('persists cache to disk via writeJsonFile', async () => {
-      expect.hasAssertions();
-
-      const { mocks } = await setup();
-      const { populateGraphReport } = await loadCacheModule();
-
-      await populateGraphReport(testConfig, '/workspace', 'opts-hash');
-
-      expect(mocks.writeJsonFile).toHaveBeenCalledWith(
-        expect.stringContaining('.repos'),
-        expect.objectContaining({ hash: expect.any(String) }),
-      );
-    });
-  });
-
-  describe('outer hash computation', () => {
-    it('hash includes pluginOptionsHash', async () => {
-      expect.hasAssertions();
-
-      const { mocks } = await setup();
-      const { populateGraphReport } = await loadCacheModule();
-
-      await populateGraphReport(testConfig, '/workspace', 'my-plugin-opts');
-
-      expect(mocks.hashArray).toHaveBeenCalledWith(
-        expect.arrayContaining(['my-plugin-opts']),
-      );
-    });
-
-    it('hash includes each repo alias, HEAD SHA, and dirty files', async () => {
-      expect.hasAssertions();
-
-      const { mocks } = await setup();
-      mocks.getHeadSha.mockResolvedValue('sha123');
-      mocks.getDirtyFiles.mockResolvedValue('file.ts');
-      const { populateGraphReport } = await loadCacheModule();
-
-      await populateGraphReport(testConfig, '/workspace', 'opts-hash');
-
-      expect(mocks.hashArray).toHaveBeenCalledWith(
-        expect.arrayContaining(['repo-a', 'sha123', 'file.ts']),
-      );
-    });
-
-    it('skips repos without .git dir (does not include them in hash)', async () => {
-      expect.hasAssertions();
-
-      const { mocks } = await setup();
-
-      // Only repo-a has .git
-      mocks.existsSync.mockImplementation((p: unknown) => {
-        const ps = String(p);
-
-        if (ps.includes('repo-a') && ps.includes('.git')) {
-          return true;
-        }
-
-        return false;
-      });
-
-      const { populateGraphReport } = await loadCacheModule();
-
-      await populateGraphReport(testConfig, '/workspace', 'opts-hash');
 
       // getHeadSha should only be called for repo-a
       expect(mocks.getHeadSha).toHaveBeenCalledTimes(1);
     });
+  });
 
-    it('different HEAD SHA produces different hash', async () => {
+  describe('exports', () => {
+    it('exports computeRepoHash', async () => {
       expect.hasAssertions();
 
-      const { mocks } = await setup();
+      await setup();
 
-      let callCount = 0;
+      const mod = await loadCacheModule();
 
-      mocks.hashArray.mockImplementation((_parts: unknown) => {
-        callCount++;
+      expectTypeOf(mod.computeRepoHash).toBeFunction();
 
-        return `hash-${callCount}`;
-      });
-
-      const { populateGraphReport } = await loadCacheModule();
-
-      // First call
-      await populateGraphReport(testConfig, '/workspace', 'opts-hash');
-      mocks.extractGraphFromRepo.mockClear();
-
-      // Change SHA
-      mocks.getHeadSha.mockResolvedValue('different-sha');
-
-      // Second call should extract again (hash changed)
-      await populateGraphReport(testConfig, '/workspace', 'opts-hash');
-
-      expect(mocks.extractGraphFromRepo).toHaveBeenCalled();
+      expect(mod.computeRepoHash).toBeDefined();
     });
 
-    it('different dirty files produce different hash', async () => {
+    it('exports writePerRepoCache', async () => {
       expect.hasAssertions();
 
-      const { mocks } = await setup();
+      await setup();
 
-      let callCount = 0;
+      const mod = await loadCacheModule();
 
-      mocks.hashArray.mockImplementation((_parts: unknown) => {
-        callCount++;
+      expectTypeOf(mod.writePerRepoCache).toBeFunction();
 
-        return `hash-${callCount}`;
-      });
+      expect(mod.writePerRepoCache).toBeDefined();
+    });
 
-      const { populateGraphReport } = await loadCacheModule();
+    it('exports CACHE_FILENAME', async () => {
+      expect.hasAssertions();
 
-      // First call
-      await populateGraphReport(testConfig, '/workspace', 'opts-hash');
-      mocks.extractGraphFromRepo.mockClear();
+      await setup();
 
-      // Change dirty files
-      mocks.getDirtyFiles.mockResolvedValue('new-file.ts');
+      const mod = await loadCacheModule();
 
-      // Second call should extract again
-      await populateGraphReport(testConfig, '/workspace', 'opts-hash');
-
-      expect(mocks.extractGraphFromRepo).toHaveBeenCalled();
+      expect(mod.CACHE_FILENAME).toBe('.polyrepo-graph-cache.json');
     });
   });
 });

@@ -82,6 +82,9 @@ export const polyrepoConfigSchema = z.object({
         });
       }
     }),
+  implicitDependencies: z
+    .record(z.string().min(1), z.array(z.string().min(1)))
+    .optional(),
 });
 
 export type PolyrepoConfig = z.infer<typeof polyrepoConfigSchema>;
