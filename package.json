@@ -19,7 +19,8 @@
     "e2e": "nx e2e op-nx-polyrepo-e2e",
     "graph": "nx graph",
     "format": "nx format",
-    "format:check": "nx format:check"
+    "format:check": "nx format:check",
+    "ci": "nx format:check && nx run-many -t build,test,lint,typecheck,e2e --exclude tag:polyrepo:external --skip-sync"
   },
   "dependencies": {
     "zod": "^4.3.6"
