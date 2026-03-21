@@ -98,7 +98,10 @@ Plans:
   3. REQUIREMENTS.md traceability table shows Phase 12 requirements as "Complete" (not "Planned")
   4. detect.ts:416 uses `String()` instead of `as string` cast
   5. sync executor spec asserts rmSync calls for stale cache clearing
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 13-01-PLAN.md -- Generate missing VERIFICATION.md for Phases 10 and 11
+- [ ] 13-02-PLAN.md -- Fix detect.ts `as string` cast and add rmSync test assertions
 
 ## Progress
 
@@ -119,7 +122,7 @@ Phases execute in numeric order: 8 -> 9 -> 10 -> 11 -> 12 -> 13
 | 10. Integration and End-to-End Validation | v1.1 | 3/3 | Complete | 2026-03-18 |
 | 11. Full Nx Daemon Support | v1.1 | 3/3 | Complete | 2026-03-21 |
 | 12. Resolve cross-repo build cascade | v1.1 | 2/2 | Complete | 2026-03-21 |
-| 13. Verification and Tech Debt Cleanup | v1.1 | 0/0 | Planned | - |
+| 13. Verification and Tech Debt Cleanup | v1.1 | 0/2 | Planned | - |
 
 ### Phase 12: Resolve the cross-repo build cascade issue when syncing external nrwl/nx repo on Windows
 **Goal:** Host targetDefaults no longer leak into external project proxy targets, and nx/devkit:build succeeds via proxy executor on Windows, so nx test @op-nx/polyrepo works without --exclude-task-dependencies
