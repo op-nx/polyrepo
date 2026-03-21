@@ -41,33 +41,59 @@ function isRecordOfRecords(
 function rewriteDependsOn(
   rawDependsOn: unknown,
   repoAlias: string,
-): TargetConfiguration['dependsOn'] {
+): NonNullable<TargetConfiguration['dependsOn']> {
   if (!Array.isArray(rawDependsOn)) {
     return [];
   }
 
-  return rawDependsOn.map((entry: unknown) => {
+  const result: NonNullable<TargetConfiguration['dependsOn']> = [];
+  const entries: unknown[] = rawDependsOn;
+
+  for (const entry of entries) {
     if (typeof entry === 'string') {
-      return entry;
+      result.push(entry);
+      continue;
     }
 
     if (isRecord(entry) && typeof entry['target'] === 'string') {
-      const result: Record<string, unknown> = { ...entry };
+      const dep: {
+        target: string;
+        projects?: string | string[];
+        params?: 'ignore' | 'forward';
+        dependencies?: boolean;
+      } = {
+        target: entry['target'],
+      };
 
       if (Array.isArray(entry['projects'])) {
-        result['projects'] = (entry['projects'] as unknown[]).map(
-          (p: unknown) =>
-            typeof p === 'string' && !p.startsWith('tag:')
-              ? `${repoAlias}/${p}`
-              : p,
-        );
+        const projects: unknown[] = entry['projects'];
+        dep.projects = projects
+          .filter((p): p is string => typeof p === 'string')
+          .map((p) =>
+            p.startsWith('tag:') ? p : `${repoAlias}/${p}`,
+          );
+      } else if (typeof entry['projects'] === 'string') {
+        dep.projects = entry['projects'];
       }
 
-      return result;
-    }
+      if (
+        entry['params'] === 'ignore' ||
+        entry['params'] === 'forward'
+      ) {
+        dep.params = entry['params'];
+      }
 
-    return entry;
-  });
+      if (typeof entry['dependencies'] === 'boolean') {
+        dep.dependencies = entry['dependencies'];
+      }
+
+      result.push(dep);
+      continue;
+    }
+    // Unknown shapes silently dropped
+  }
+
+  return result;
 }
 
 /**
