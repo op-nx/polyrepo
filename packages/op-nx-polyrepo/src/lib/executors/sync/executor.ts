@@ -221,6 +221,12 @@ function writeInstalledHash(workspaceRoot: string, alias: string, hash: string):
 }
 
 function needsInstall(repoPath: string, workspaceRoot: string, alias: string): boolean {
+  // If node_modules is missing (e.g., after git clean -fdx), always install
+  // regardless of lockfile hash match.
+  if (!existsSync(join(repoPath, 'node_modules'))) {
+    return true;
+  }
+
   const currentHash = hashLockfile(repoPath);
   const installedHash = readInstalledHash(workspaceRoot, alias);
 

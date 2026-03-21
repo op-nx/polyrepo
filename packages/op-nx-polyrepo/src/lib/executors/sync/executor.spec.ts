@@ -1934,6 +1934,10 @@ describe(syncExecutor, () => {
       mockExistsSync.mockImplementation((p) => {
         const path = String(p);
 
+        if (path.endsWith('node_modules')) {
+          return true;
+        }
+
         if (path.endsWith('pnpm-lock.yaml')) {
           return true;
         }
@@ -2028,6 +2032,10 @@ describe(syncExecutor, () => {
       const hash = createHash('sha256').update(lockContent).digest('hex');
       mockExistsSync.mockImplementation((p) => {
         const path = String(p);
+
+        if (path.endsWith('node_modules')) {
+          return true;
+        }
 
         if (path.endsWith('pnpm-lock.yaml')) {
           return true;

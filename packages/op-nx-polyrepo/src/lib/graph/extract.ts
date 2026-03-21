@@ -1,8 +1,15 @@
 import { exec } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { externalGraphJsonSchema } from './types';
 import type { ExternalGraphJson } from './types';
+
+/**
+ * Normalize all path separators to forward slashes.
+ */
+function normalizePath(p: string): string {
+  return p.replace(/\\/g, '/');
+}
 
 /**
  * 1 GB maxBuffer -- matches Nx's own LARGE_BUFFER constant.
@@ -78,6 +85,12 @@ export function extractGraphFromRepo(
   const nxBin = join(repoPath, 'node_modules', '.bin', 'nx');
   const command = `"${nxBin}" graph --print`;
 
+  // Ensure the temp directory exists before spawning the child process.
+  // Same isolation as the proxy executor: prevents lock contention and
+  // "path not found" errors when .nx/ was deleted.
+  const repoTmpDir = normalizePath(join(repoPath, '.tmp'));
+  mkdirSync(join(repoPath, '.tmp'), { recursive: true });
+
   return new Promise((resolve, reject) => {
     exec(
       command,
@@ -86,6 +99,9 @@ export function extractGraphFromRepo(
         maxBuffer: LARGE_BUFFER,
         env: {
           ...process.env,
+          TEMP: repoTmpDir,
+          TMP: repoTmpDir,
+          TMPDIR: repoTmpDir,
           NX_DAEMON: 'false',
           NX_VERBOSE_LOGGING: 'false',
           NX_PERF_LOGGING: 'false',
