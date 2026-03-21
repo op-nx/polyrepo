@@ -28,6 +28,7 @@ metrics:
   completed_date: "2026-03-17"
   tasks_completed: 2
   files_modified: 5
+requirements_completed: [DETECT-05]
 ---
 
 # Phase 8 Plan 01: Config Schema Extension and Graph Type Enrichment Summary

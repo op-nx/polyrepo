@@ -83,7 +83,7 @@ _No REFACTOR commit needed — implementation was clean on first pass._
 ## Decisions Made
 
 - External nodes' packageName takes precedence over host project packageName on map key collision. This ensures external cross-repo edges resolve to the correct external project when there is a naming conflict.
-- `DependencyType.static` used for all dep list edges regardless of field (dependencies vs devDependencies vs peerDependencies). The distinction between static/implicit is about declaration mechanism (package.json vs config file), not dev/prod classification.
+- `DependencyType.static` used for all dep list edges regardless of field (dependencies vs devDependencies vs peerDependencies). The distinction between static/implicit is about declaration mechanism (package.json vs config file), not dev/prod classification. **Note:** Phase 10 Plan 03 later changed auto-detected edges to `DependencyType.implicit` because `static` edges require a `sourceFile` in the fileMap, which `.repos/` gitignoring prevents.
 - `__host__` sentinel used instead of `undefined` as repo alias for host projects. This makes cross-repo guard logic uniform: any two projects with the same alias (including `__host__`) are intra-repo and suppressed.
 
 ## Deviations from Plan

@@ -6,20 +6,20 @@ score: 4/4 must-haves verified
 human_verification:
   - test: "Run nx test @op-nx/polyrepo without --exclude-task-dependencies"
     expected: "359 tests pass, 8 proxy tasks execute without a cascaded build of all ~150 external nx/* targets"
-    why_human: "Requires the synced nrwl/nx repo to be present in .repos/nx/; automated checks verify the code is correct but cannot run a live Nx invocation"
+    result: "PASSED — 361 tests pass, 8 proxy tasks succeed (2026-03-21)"
   - test: "Run nx build @op-nx/polyrepo and confirm nx/devkit:build succeeds via proxy executor"
     expected: "Build completes without SQLite locking errors or timeout; child Nx process uses isolated TEMP and NX_WORKSPACE_DATA_DIRECTORY"
-    why_human: "Windows-specific runtime behavior (SQLite WAL locks, TEMP isolation) cannot be verified by static file inspection"
+    result: "PASSED — build completes, devkit:build succeeds via proxy, no lock errors (2026-03-21)"
   - test: "Scorched-earth recovery: delete .repos/nx/node_modules (simulating git clean -fdx), run polyrepo-sync, then run nx test @op-nx/polyrepo"
     expected: "Sync detects missing node_modules, installs deps, clears .nx/cache/ and dist/, then test passes on first run"
-    why_human: "Requires live execution of the sync executor against a real child repo to verify the needsInstall node_modules check and stale cache clearing"
+    result: "PASSED — sync detected missing node_modules, installed deps, pre-cached 149 projects, 361 tests pass (2026-03-21)"
 ---
 
 # Phase 12: Resolve the Cross-Repo Build Cascade Issue Verification Report
 
 **Phase Goal:** Host targetDefaults no longer leak into external project proxy targets, and nx/devkit:build succeeds via proxy executor on Windows, so nx test @op-nx/polyrepo works without --exclude-task-dependencies
 **Verified:** 2026-03-21T12:00:00Z
-**Status:** human_needed — all automated checks pass; three behavioral items require live execution
+**Status:** passed — all automated checks pass; three human verification items confirmed 2026-03-21
 **Re-verification:** No — initial verification
 
 ## Goal Achievement
