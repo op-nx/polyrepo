@@ -415,7 +415,7 @@ export function detectCrossRepoDependencies(
     let pkgJson: Record<string, unknown>;
 
     try {
-      const raw = JSON.parse(readFileSync(pkgJsonPath, 'utf-8') as string);
+      const raw = JSON.parse(String(readFileSync(pkgJsonPath, 'utf-8')));
 
       if (!isRecord(raw)) {
         continue;

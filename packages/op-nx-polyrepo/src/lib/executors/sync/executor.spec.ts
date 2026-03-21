@@ -108,7 +108,7 @@ vi.mock('../../graph/transform', () => ({
   })),
 }));
 
-import { readFileSync, existsSync, writeFileSync } from 'node:fs';
+import { readFileSync, existsSync, rmSync, writeFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { logger } from '@nx/devkit';
 import { createMockChildProcess } from '../../testing/mock-child-process';
@@ -140,6 +140,7 @@ import syncExecutor from './executor';
 
 const mockReadFileSync = vi.mocked(readFileSync);
 const mockExistsSync = vi.mocked(existsSync);
+const mockRmSync = vi.mocked(rmSync);
 const mockWriteFileSync = vi.mocked(writeFileSync);
 const mockSpawn = vi.mocked(spawn);
 const mockValidateConfig = vi.mocked(validateConfig);
@@ -2338,6 +2339,64 @@ describe(syncExecutor, () => {
       await syncExecutor({}, createTestContext());
 
       expect(mockSpawn).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('stale cache clearing', () => {
+    it('clears stale .nx/cache and dist when node_modules is missing before install', async () => {
+      expect.hasAssertions();
+
+      setup();
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          depth: 1,
+          disableHooks: true,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('not-synced');
+
+      await syncExecutor({}, createTestContext());
+
+      expect(mockRmSync).toHaveBeenCalledWith(
+        expect.stringMatching(/\.nx[\\/]cache/),
+        { recursive: true, force: true },
+      );
+      expect(mockRmSync).toHaveBeenCalledWith(
+        expect.stringMatching(/[\\/]dist$/),
+        { recursive: true, force: true },
+      );
+    });
+
+    it('does not clear cache when node_modules already exists', async () => {
+      expect.hasAssertions();
+
+      setup();
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          depth: 1,
+          disableHooks: true,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('cloned');
+      mockExistsSync.mockImplementation((p: unknown) => {
+        const path = String(p);
+
+        if (path.endsWith('node_modules')) {
+          return true;
+        }
+
+        return false;
+      });
+
+      await syncExecutor({}, createTestContext());
+
+      expect(mockRmSync).not.toHaveBeenCalled();
     });
   });
 });
