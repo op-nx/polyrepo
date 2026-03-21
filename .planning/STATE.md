@@ -96,10 +96,11 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-3 pending:
+4 pending:
 - [sync] Parse pnpm ndjson reporter for concise install progress
 - [detection] Migrate auto-detected edges from implicit to static
 - [proxy] Enable host-level caching for proxy targets using runtime inputs tied to child repo git HEAD — eliminates child Nx bootstrap cost on cache hit
+- [executor] Rename .tmp to tmp in child repo temp directories — tmp/ already gitignored by Nx
 
 ### Roadmap Evolution
 
