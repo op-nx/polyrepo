@@ -3,7 +3,7 @@
 ## Milestones
 
 - [x] **v1.0 MVP** -- Phases 1-7 (shipped 2026-03-16)
-- [ ] **v1.1 Cross-repo Dependencies** -- Phases 8-10 (in progress)
+- [x] **v1.1 Cross-repo Dependencies** -- Phases 8-11 (completed 2026-03-21)
 
 ## Phases
 
@@ -83,9 +83,9 @@ Plans:
   6. E2e tests pass under both NX_DAEMON=true and NX_DAEMON=false
 **Plans**: 3 plans
 Plans:
-- [ ] 11-01-PLAN.md -- Per-repo cache refactor with three-layer invalidation, exponential backoff, and actionable warnings
-- [ ] 11-02-PLAN.md -- Pre-caching graph data during polyrepo-sync after install
-- [ ] 11-03-PLAN.md -- E2e daemon mode verification (Dockerfile, container env forwarding, --skip-nx-cache test)
+- [x] 11-01-PLAN.md -- Per-repo cache refactor with three-layer invalidation, exponential backoff, and actionable warnings
+- [x] 11-02-PLAN.md -- Pre-caching graph data during polyrepo-sync after install
+- [x] 11-03-PLAN.md -- E2e daemon mode verification (Dockerfile, container env forwarding, --skip-nx-cache test)
 
 ## Progress
 
@@ -104,7 +104,7 @@ Phases execute in numeric order: 8 -> 9 -> 10 -> 11
 | 8. Schema Extension and Data Extraction | v1.1 | 1/1 | Complete | 2026-03-17 |
 | 9. Cross-repo Dependency Detection | v1.1 | 2/2 | Complete | 2026-03-17 |
 | 10. Integration and End-to-End Validation | v1.1 | 3/3 | Complete | 2026-03-18 |
-| 11. Full Nx Daemon Support | 2/3 | In Progress|  | - |
+| 11. Full Nx Daemon Support | v1.1 | 3/3 | Complete | 2026-03-21 |
 
 ---
 *Full v1.0 details: [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)*

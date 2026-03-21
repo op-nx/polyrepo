@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Cross-repo Dependencies
-status: in-progress
-stopped_at: Completed Phase 11 Plan 2 (sync pre-caching)
-last_updated: "2026-03-20T13:05:26Z"
-last_activity: 2026-03-20 --- Completed Phase 11 Plan 2 (sync pre-caching for warm daemon startup)
+status: completed
+stopped_at: Completed 11-03-PLAN.md (Phase 11 complete, v1.1 milestone feature-complete)
+last_updated: "2026-03-21T00:01:35.151Z"
+last_activity: 2026-03-21 --- Completed Phase 11 Plan 3 (e2e daemon verification)
 progress:
   total_phases: 4
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 9
-  completed_plans: 8
-  percent: 89
+  completed_plans: 9
+  percent: 100
 ---
 
 # Project State
@@ -21,28 +21,29 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-17)
 
 **Core value:** `nx graph` displays projects from all synced repos with cross-repo dependency edges, and all relevant Nx CLI commands output projects from multiple repos
-**Current focus:** Phase 11 -- Full Nx Daemon Support (per-repo cache, sync pre-caching, e2e daemon verification)
+**Current focus:** v1.1 milestone complete -- all phases delivered
 
 ## Current Position
 
-Phase: 11 of 11 (Full Nx Daemon Support)
-Plan: 2 of 3 in Phase 11 (complete)
-Status: Plan 2 complete -- sync pre-caching for warm daemon startup
-Last activity: 2026-03-20 --- Completed Phase 11 Plan 2 (sync pre-caching)
+Phase: 11 of 11 (Full Nx Daemon Support) -- COMPLETE
+Plan: 3 of 3 in Phase 11 (complete)
+Status: Phase 11 complete -- e2e daemon verification under all modes
+Last activity: 2026-03-21 --- Completed Phase 11 Plan 3 (e2e daemon verification)
 
-Progress: [█████████░] 89%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 8 (v1.1)
-- Average duration: ~6.3 minutes
-- Total execution time: ~50 minutes
+- Total plans completed: 9 (v1.1)
+- Average duration: ~7 minutes
+- Total execution time: ~62 minutes
 
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
 | 11 | 01 | 4min | 2 | 3 |
 | 11 | 02 | 6min | 1 | 2 |
+| 11 | 03 | 12min | 3 | 6 |
 
 ## Accumulated Context
 
@@ -79,6 +80,10 @@ Recent decisions affecting current work:
 - [Phase 11-sync-precache]: hashObject(config.repos) computes reposConfigHash identically to index.ts for hash consistency
 - [Phase 11-sync-precache]: Pre-cache failure is non-blocking -- warns and continues, plugin extracts on next Nx command
 
+- [Phase 11-e2e-daemon]: NX_DAEMON removed from Dockerfile workspace ENV -- controlled by test environment via container.ts withEnvironment
+- [Phase 11-e2e-daemon]: Daemon stopped after every writeNxJson to prevent stale graph cache when daemon is running
+- [Phase 11-e2e-daemon]: E2e tests require --exclude-task-dependencies due to ^build cascade into synced repos (future phase)
+
 ### Pending Todos
 
 2 pending:
@@ -98,6 +103,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-03-20T13:05:00Z
-Stopped at: Completed 11-02-PLAN.md
-Resume: Continue with Phase 11 Plan 03 (e2e daemon verification)
+Last session: 2026-03-21T00:01:00Z
+Stopped at: Completed 11-03-PLAN.md (Phase 11 complete, v1.1 milestone feature-complete)
+Resume: v1.1 milestone audit -- all 9 plans complete, 21 requirements covered

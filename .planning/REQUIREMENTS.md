@@ -33,9 +33,9 @@ Requirements for cross-repo dependency detection. Each maps to roadmap phases.
 - [x] **DAEMON-06**: Exponential backoff skips re-extraction during cooldown period after failure
 - [x] **DAEMON-07**: Hash change in a failing repo resets backoff immediately
 - [x] **DAEMON-08**: Actionable troubleshooting warning logged on extraction failure
-- [ ] **DAEMON-09**: Old monolithic cache file deleted on first invocation
-- [ ] **DAEMON-10**: E2e tests pass under NX_DAEMON=true
-- [ ] **DAEMON-11**: E2e tests pass under NX_DAEMON=false
+- [x] **DAEMON-09**: Old monolithic cache file deleted on first invocation
+- [x] **DAEMON-10**: E2e tests pass under NX_DAEMON=true
+- [x] **DAEMON-11**: E2e tests pass under NX_DAEMON=false
 
 ## Future Requirements
 
@@ -83,20 +83,21 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DAEMON-01 | Phase 11 | Complete |
 | DAEMON-02 | Phase 11 | Complete |
 | DAEMON-03 | Phase 11 | Complete |
-| DAEMON-04 | Phase 11 | Planned |
-| DAEMON-05 | Phase 11 | Planned |
+| DAEMON-04 | Phase 11 | Complete |
+| DAEMON-05 | Phase 11 | Complete |
 | DAEMON-06 | Phase 11 | Complete |
 | DAEMON-07 | Phase 11 | Complete |
 | DAEMON-08 | Phase 11 | Complete |
-| DAEMON-09 | Phase 11 | Planned |
-| DAEMON-10 | Phase 11 | Planned |
-| DAEMON-11 | Phase 11 | Planned |
+| DAEMON-09 | Phase 11 | Complete |
+| DAEMON-10 | Phase 11 | Complete |
+| DAEMON-11 | Phase 11 | Complete |
 
 **Coverage:**
 - v1.1 requirements: 21 total
 - Mapped to phases: 21
 - Unmapped: 0
+- Complete: 21/21
 
 ---
 *Requirements defined: 2026-03-17*
-*Last updated: 2026-03-20 after Phase 11 Plan 1 completion*
+*Last updated: 2026-03-21 after Phase 11 Plan 3 completion (v1.1 milestone complete)*
