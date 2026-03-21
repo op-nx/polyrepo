@@ -103,6 +103,7 @@ export function extractGraphFromRepo(
           TMP: repoTmpDir,
           TMPDIR: repoTmpDir,
           NX_DAEMON: 'false',
+          NX_NO_CLOUD: 'true',
           NX_VERBOSE_LOGGING: 'false',
           NX_PERF_LOGGING: 'false',
         },
