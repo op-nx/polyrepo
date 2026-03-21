@@ -106,5 +106,15 @@ Phases execute in numeric order: 8 -> 9 -> 10 -> 11
 | 10. Integration and End-to-End Validation | v1.1 | 3/3 | Complete | 2026-03-18 |
 | 11. Full Nx Daemon Support | v1.1 | 3/3 | Complete | 2026-03-21 |
 
+### Phase 12: Resolve the cross-repo build cascade issue when syncing external nrwl/nx repo on Windows
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 11
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 12 to break down)
+
 ---
 *Full v1.0 details: [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)*

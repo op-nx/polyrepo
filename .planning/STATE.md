@@ -93,6 +93,7 @@ Recent decisions affecting current work:
 ### Roadmap Evolution
 
 - Phase 11 added: Full Nx Daemon Support — make the plugin work with NX_DAEMON=true (default), NX_DAEMON=false, and unset
+- Phase 12 added: Resolve the cross-repo build cascade issue when syncing external nrwl/nx repo on Windows
 
 ### Blockers/Concerns
 
