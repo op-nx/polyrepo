@@ -34,7 +34,14 @@ An open-source Nx plugin for synthetic monorepos. Merges project graphs from mul
 
 ### Active
 
-(None -- planning next milestone)
+#### Current Milestone: v1.2 Static edges and proxy caching
+
+**Goal:** Harden existing features — fix temp directory naming, upgrade dependency edges to static type, and enable host-level caching for proxy targets.
+
+**Target features:**
+- Rename .tmp to tmp in child repo temp directories
+- Migrate auto-detected cross-repo edges from implicit to static
+- Enable host-level caching for proxy targets using runtime inputs tied to child repo git HEAD
 
 ### Future
 
@@ -103,4 +110,4 @@ Known issues:
 | Proxy executor env isolation (TEMP, NX_DAEMON, NX_WORKSPACE_DATA_DIRECTORY) | Prevents SQLite WAL lock contention between host and child Nx | [x] Good -- v1.1 |
 
 ---
-*Last updated: 2026-03-21 after v1.1 milestone*
+*Last updated: 2026-03-22 after v1.2 milestone start*

@@ -1,32 +1,34 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1
-milestone_name: Cross-repo Dependencies
-status: complete
-stopped_at: Milestone v1.1 shipped
-last_updated: "2026-03-21"
-last_activity: 2026-03-21 --- Milestone v1.1 shipped
+milestone: v1.2
+milestone_name: Static edges and proxy caching
+status: active
+stopped_at: null
+last_updated: "2026-03-22"
+last_activity: 2026-03-22 --- Milestone v1.2 started
 progress:
-  total_phases: 6
-  completed_phases: 6
-  total_plans: 13
-  completed_plans: 13
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-21)
+See: .planning/PROJECT.md (updated 2026-03-22)
 
 **Core value:** `nx graph` displays projects from all synced repos with cross-repo dependency edges, and all relevant Nx CLI commands output projects from multiple repos
-**Current focus:** Planning next milestone
+**Current focus:** v1.2 Static edges and proxy caching
 
 ## Current Position
 
-Milestone v1.1 complete. All 6 phases (13 plans) shipped.
-Next: `/gsd:new-milestone` to start next milestone cycle.
+Phase: Not started (defining requirements)
+Plan: ---
+Status: Defining requirements
+Last activity: 2026-03-22 --- Milestone v1.2 started
 
 ## Pending Todos
 
@@ -39,6 +41,6 @@ Next: `/gsd:new-milestone` to start next milestone cycle.
 
 ## Session Continuity
 
-Last session: 2026-03-21
-Stopped at: Milestone v1.1 shipped
-Resume: `/gsd:new-milestone` to start next milestone
+Last session: 2026-03-22
+Stopped at: Defining requirements for v1.2
+Resume: Continue milestone setup
