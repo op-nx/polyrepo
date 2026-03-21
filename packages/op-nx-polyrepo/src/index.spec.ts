@@ -172,10 +172,12 @@ describe('createNodesV2 plugin', () => {
     expect(targets).toBeDefined();
     expect(targets?.['polyrepo-sync']).toStrictEqual({
       executor: '@op-nx/polyrepo:sync',
+      cache: false,
       options: {},
     });
     expect(targets?.['polyrepo-status']).toStrictEqual({
       executor: '@op-nx/polyrepo:status',
+      cache: false,
       options: {},
     });
   });

@@ -142,10 +142,12 @@ export const createNodesV2: CreateNodesV2<PolyrepoConfig> = [
           targets: {
             'polyrepo-sync': {
               executor: '@op-nx/polyrepo:sync',
+              cache: false,
               options: {},
             },
             'polyrepo-status': {
               executor: '@op-nx/polyrepo:status',
+              cache: false,
               options: {},
             },
           },
