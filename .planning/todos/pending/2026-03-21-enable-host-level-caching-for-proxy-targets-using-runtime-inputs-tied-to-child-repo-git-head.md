@@ -26,14 +26,20 @@ Nx executes the command, hashes stdout, and uses it as part of the cache key. Wh
 
 ## Design decisions
 
-### Input granularity: HEAD vs write-tree
+### Input granularity: HEAD vs write-tree vs diff hash
+
+Synced repos are full git working copies with their own `.git/` folder. Users can and do edit files directly — this is a synthetic monorepo over a polyrepo, not a vendor cache. The input must capture uncommitted changes.
 
 | Approach | What it tracks | When it invalidates | Cost |
 |----------|---------------|--------------------|----- |
-| `git rev-parse HEAD` | Commit SHA | On sync (new tag/commit) | Negligible (~2ms) |
-| `git write-tree` | Working tree state | On ANY file change including untracked | ~50ms for 150-project repo |
+| `git rev-parse HEAD` | Commit SHA only | On sync (new tag/commit) | ~2ms |
+| `git write-tree` | Full working tree state | On ANY tracked file change | ~50ms for 150-project repo |
+| `git diff HEAD --stat` | Uncommitted changes | On edits, staged or unstaged | ~10ms |
+| Compound: `HEAD` + `diff` hash | Commit + working tree delta | Both sync and local edits | ~12ms |
 
-**Recommendation: HEAD.** Synced repos are read-only (checked out at a specific tag). Uncommitted changes shouldn't exist. HEAD is simpler, faster, and correct for the sync-based workflow.
+**Recommendation: Compound.** Use `git -C .repos/${repoAlias} rev-parse HEAD && git -C .repos/${repoAlias} diff HEAD` piped through a hash. HEAD catches sync changes, diff catches user edits. `write-tree` is more expensive and captures untracked files which may not affect builds.
+
+Note: `git write-tree` requires all files to be staged, so it fails on repos with unstaged changes unless preceded by `git add -A`. The compound approach avoids this.
 
 ### Outputs
 
@@ -50,7 +56,7 @@ After `rm -rf .repos/nx/dist .repos/nx/.nx`, git HEAD is unchanged but the child
 2. **Compound input** -- add a second runtime input checking output existence: `git -C .repos/nx rev-parse HEAD && test -d .repos/nx/dist/packages/devkit`. If dist/ is missing, the command fails or produces different output, invalidating the cache. More defensive but more complex.
 3. **Sync clears host cache** -- the sync executor could clear host `.nx/cache/` entries for the affected repo when it reinstalls. This ensures the first post-sync run always rebuilds.
 
-**Recommendation: Option 1** (accept sync as prerequisite). It's already the recovery path, and the `needsInstall` + stale cache clearing from Phase 12 ensures sync restores a working state.
+**Recommendation: Option 1** (accept sync as prerequisite for full-reset recovery). The `needsInstall` + stale cache clearing from Phase 12 ensures sync restores a working state. For the normal editing workflow, the compound `HEAD + diff` input already captures file changes.
 
 ### Alternative: graph cache hash as input
 
@@ -60,9 +66,9 @@ Instead of git HEAD, use the `.polyrepo-graph-cache.json` file's hash or modific
 inputs: [{ runtime: `git hash-object .repos/${repoAlias}/.polyrepo-graph-cache.json` }]
 ```
 
-This changes whenever the graph extraction runs (after sync). It's slightly more conservative than HEAD (re-extractions without HEAD change would invalidate). But it couples the proxy cache to the graph extraction cache, which is a different concern.
+This changes whenever the graph extraction runs (after sync). It's slightly more conservative than HEAD (re-extractions without HEAD change would invalidate). But it couples the proxy cache to the graph extraction cache, which is a different concern. It also wouldn't catch user edits to source files that don't trigger re-extraction.
 
-**Not recommended as primary approach**, but could supplement HEAD as a compound input.
+**Not recommended as primary approach**, but could supplement the compound input for structural graph changes.
 
 ### Cross-platform
 
@@ -74,4 +80,4 @@ This changes whenever the graph extraction runs (after sync). It's slightly more
 
 ## Impact
 
-Eliminates child Nx bootstrap overhead on warm runs. First run after sync still pays full cost (HEAD changed -> cache miss -> child builds). Subsequent runs skip all proxy invocations entirely.
+Eliminates child Nx bootstrap overhead on warm runs. First run after sync or user edit pays full cost (cache miss -> child builds). Subsequent runs with no changes skip all proxy invocations entirely. Users editing files in `.repos/<alias>/` get correct cache invalidation via the diff component of the compound input.
