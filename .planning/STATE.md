@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Cross-repo Dependencies
-status: completed
-stopped_at: Completed 12-01-PLAN.md
-last_updated: "2026-03-21T11:03:32.560Z"
-last_activity: 2026-03-21 --- Completed Phase 12 Plan 1 (targetDefaults isolation + env isolation)
+status: in-progress
+stopped_at: "12-02-PLAN.md Task 2 checkpoint (human-verify)"
+last_updated: "2026-03-21T11:39:01Z"
+last_activity: 2026-03-21 --- Completed Phase 12 Plan 2 Task 1 (verification + preVersionCommand cleanup)
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 11
   completed_plans: 10
-  percent: 91
+  percent: 95
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-03-17)
 ## Current Position
 
 Phase: 12 of 12 (Resolve cross-repo build cascade) -- IN PROGRESS
-Plan: 1 of 2 in Phase 12 (complete)
-Status: Plan 12-01 complete -- dependsOn preservation and env isolation implemented
-Last activity: 2026-03-21 --- Completed Phase 12 Plan 1 (targetDefaults isolation + env isolation)
+Plan: 2 of 2 in Phase 12 (checkpoint: human-verify)
+Status: Plan 12-02 Task 1 complete -- preVersionCommand cleaned up, awaiting user verification
+Last activity: 2026-03-21 --- Completed Phase 12 Plan 2 Task 1 (verification + preVersionCommand cleanup)
 
-Progress: [█████████░] 91%
+Progress: [█████████░] 95%
 
 ## Performance Metrics
 
@@ -45,6 +45,7 @@ Progress: [█████████░] 91%
 | 11 | 02 | 6min | 1 | 2 |
 | 11 | 03 | 12min | 3 | 6 |
 | 12 | 01 | 6min | 2 | 4 |
+| 12 | 02 | 18min | 1 | 1 |
 
 ## Accumulated Context
 
@@ -89,6 +90,10 @@ Recent decisions affecting current work:
 - [Phase 12-01]: Tag selectors (tag:*) in projects arrays pass through unchanged since tags preserved on namespaced projects
 - [Phase 12-01]: Non-array dependsOn values treated as absent, return [] for targetDefaults blocking
 
+- [Phase 12-02]: --exclude-task-dependencies removed from preVersionCommand: proxy executor with env isolation handles cross-repo cascade correctly
+- [Phase 12-02]: Stale disk cache cleared after plugin transform logic changes: cache hash based on repo state, not plugin code version
+- [Phase 12-02]: Host targetDefaults.test.dependsOn override on external targets accepted: cosmetically incorrect but functionally harmless
+
 ### Pending Todos
 
 2 pending:
@@ -105,10 +110,10 @@ Recent decisions affecting current work:
 - **Cold start with daemon**: First extraction after sync needs `NX_DAEMON=false`
 - **Pop-over cmd windows on Windows**: Nx `runCommandsImpl` spawns without `windowsHide`
 - **Scaling**: ~4s for 150 projects from cached graph; may need optimization for 500+ project workspaces
-- **Task cascading via ^build**: Cross-repo edges cause ^build to cascade into external repo builds. Workaround: run vitest/eslint directly, or use --exclude-task-dependencies. Pre-version command already uses this flag.
+- **Task cascading via ^build**: RESOLVED in Phase 12 -- proxy executor with dependsOn preservation and env isolation handles cascade correctly. --exclude-task-dependencies workaround removed.
 
 ## Session Continuity
 
-Last session: 2026-03-21T11:03:32.558Z
-Stopped at: Completed 12-01-PLAN.md
-Resume: Execute 12-02-PLAN.md -- e2e verification and --exclude-task-dependencies cleanup
+Last session: 2026-03-21T11:39:01Z
+Stopped at: 12-02-PLAN.md Task 2 checkpoint (human-verify)
+Resume: User verifies end-to-end fix, then continuation agent completes Task 2 and finalizes

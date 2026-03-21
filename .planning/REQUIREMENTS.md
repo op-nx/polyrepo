@@ -46,7 +46,7 @@ Requirements for cross-repo dependency detection. Each maps to roadmap phases.
 ### Cross-repo Build Support
 
 - [x] **BUILD-01**: Proxy executor passes NX_DAEMON=false and NX_WORKSPACE_DATA_DIRECTORY to child Nx processes for SQLite isolation
-- [ ] **BUILD-02**: `nx test @op-nx/polyrepo` succeeds without `--exclude-task-dependencies` workaround
+- [x] **BUILD-02**: `nx test @op-nx/polyrepo` succeeds without `--exclude-task-dependencies` workaround
 
 ## Future Requirements
 

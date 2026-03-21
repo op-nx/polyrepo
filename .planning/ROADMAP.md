@@ -105,7 +105,7 @@ Phases execute in numeric order: 8 -> 9 -> 10 -> 11 -> 12
 | 9. Cross-repo Dependency Detection | v1.1 | 2/2 | Complete | 2026-03-17 |
 | 10. Integration and End-to-End Validation | v1.1 | 3/3 | Complete | 2026-03-18 |
 | 11. Full Nx Daemon Support | v1.1 | 3/3 | Complete | 2026-03-21 |
-| 12. Resolve cross-repo build cascade | v1.1 | 1/2 | In Progress | - |
+| 12. Resolve cross-repo build cascade | 2/2 | Complete   | 2026-03-21 | - |
 
 ### Phase 12: Resolve the cross-repo build cascade issue when syncing external nrwl/nx repo on Windows
 **Goal:** Host targetDefaults no longer leak into external project proxy targets, and nx/devkit:build succeeds via proxy executor on Windows, so nx test @op-nx/polyrepo works without --exclude-task-dependencies
