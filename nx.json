@@ -75,6 +75,7 @@
     }
   },
   "targetDefaults": {
+    "@op-nx/polyrepo:run": {},
     "@nx/vitest:test": {
       "cache": true,
       "inputs": ["default", "^production"]

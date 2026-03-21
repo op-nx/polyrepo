@@ -1,3 +1,5 @@
+import { readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type {
   CreateNodesV2,
   CreateNodesResult,
@@ -18,6 +20,61 @@ import {
   warnUnsyncedRepos,
 } from './lib/config/validate';
 
+const PROXY_EXECUTOR = '@op-nx/polyrepo:run';
+
+/**
+ * Ensure nx.json has an empty targetDefaults entry keyed by our proxy
+ * executor. Nx resolves targetDefaults by executor first, then by target
+ * name. Without this entry, name-based defaults (e.g. `test.dependsOn`)
+ * leak into every proxy target because Nx allows host targetDefaults to
+ * override third-party plugin values. An empty executor-scoped entry
+ * intercepts the lookup and returns nothing to merge, preserving the
+ * dependsOn values our plugin sets on proxy targets.
+ *
+ * This writes to nx.json on disk as a one-time side effect. The daemon
+ * detects the change and restarts, so the fix takes effect on the next
+ * graph computation cycle.
+ */
+function ensureTargetDefaultsShield(
+  workspaceRoot: string,
+  targetDefaults: Record<string, unknown> | undefined,
+): void {
+  if (targetDefaults?.[PROXY_EXECUTOR] !== undefined) {
+    return;
+  }
+
+  const nxJsonPath = join(workspaceRoot, 'nx.json');
+
+  try {
+    const raw = readFileSync(nxJsonPath, 'utf-8');
+    const nxJson: Record<string, unknown> = JSON.parse(raw);
+
+    const existingDefaults = nxJson['targetDefaults'];
+
+    if (
+      !existingDefaults ||
+      typeof existingDefaults !== 'object' ||
+      Array.isArray(existingDefaults)
+    ) {
+      nxJson['targetDefaults'] = { [PROXY_EXECUTOR]: {} };
+    } else {
+      const defaults: Record<string, unknown> = { ...existingDefaults };
+      defaults[PROXY_EXECUTOR] = {};
+      nxJson['targetDefaults'] = defaults;
+    }
+
+    writeFileSync(nxJsonPath, JSON.stringify(nxJson, null, 2) + '\n', 'utf-8');
+    logger.info(
+      `Added '${PROXY_EXECUTOR}' to targetDefaults in nx.json (shields proxy targets from host overrides)`,
+    );
+  } catch {
+    logger.warn(
+      `Could not add '${PROXY_EXECUTOR}' to targetDefaults in nx.json. ` +
+      `Add it manually to prevent host targetDefaults from overriding external project targets.`,
+    );
+  }
+}
+
 function toProjectType(value: string | undefined): ProjectType | undefined {
   if (value === 'application' || value === 'library') {
     return value;
@@ -30,6 +87,11 @@ export const createNodesV2: CreateNodesV2<PolyrepoConfig> = [
   'nx.json',
   async (configFiles, options, context) => {
     const config = validateConfig(options);
+
+    ensureTargetDefaultsShield(
+      context.workspaceRoot,
+      context.nxJsonConfiguration.targetDefaults,
+    );
 
     await warnIfReposNotGitignored(context.workspaceRoot);
     warnUnsyncedRepos(config, context.workspaceRoot);
