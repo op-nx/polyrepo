@@ -1,12 +1,10 @@
-# Architecture Research: Cross-repo Dependency Detection and Manual Overrides
+# Architecture Research: v1.2 Static Edges, Proxy Caching, and Temp Directory Rename
 
-**Domain:** Nx plugin for synthetic monorepos -- extending v1.0 graph pipeline with cross-repo dependency edges
-**Researched:** 2026-03-17
+**Domain:** Nx plugin for synthetic monorepos -- hardening existing features in `@op-nx/polyrepo`
+**Researched:** 2026-03-22
 **Confidence:** HIGH
 
-## Existing Architecture (v1.0 baseline)
-
-Understanding the current system is essential before describing where new components integrate.
+## Existing Architecture (v1.1 baseline)
 
 ```
 nx.json plugin options (PolyrepoConfig)
@@ -16,14 +14,17 @@ nx.json plugin options (PolyrepoConfig)
 | Config + Validate|----->| Graph Extract        |
 | (schema.ts,      |      | (extract.ts)         |
 |  validate.ts)    |      | nx graph --print     |
-+------------------+      +---------------------+
++------------------+      | + TEMP=.repos/X/.tmp |
+                           +---------------------+
                                     |
                                     v
                           +---------------------+
                           | Graph Transform      |
                           | (transform.ts)       |
                           | namespace, tags,     |
-                          | proxy targets        |
+                          | proxy targets:       |
+                          |   cache: false       |
+                          |   inputs: []         |
                           +---------------------+
                                     |
                                     v
@@ -31,530 +32,531 @@ nx.json plugin options (PolyrepoConfig)
                           | Graph Cache          |
                           | (cache.ts)           |
                           | memory + disk,       |
-                          | hash invalidation    |
+                          | hash: HEAD+dirty     |
+                          +---------------------+
+                                    |
+                                    v
+                          +---------------------+
+                          | detect.ts            |
+                          | Cross-repo deps      |
+                          | DependencyType.      |
+                          |   implicit (all)     |
                           +---------------------+
                                     |
                                     v
                           +---------------------+
                           | index.ts             |
                           | createNodesV2:       |
-                          |   registers projects |
+                          |   register projects  |
+                          |   namedInputs: {}    |
                           | createDependencies:  |
-                          |   intra-repo edges   |
+                          |   intra + cross-repo |
                           +---------------------+
                                     |
                                     v
-                          Host workspace project graph
+                          +---------------------+
+                          | run/executor.ts      |
+                          | Proxy executor       |
+                          | TEMP=.repos/X/.tmp   |
+                          | runCommandsImpl()    |
+                          +---------------------+
 ```
 
-### Key Existing Data Structures
+### Key Existing Behaviors Targeted by v1.2
 
-**PolyrepoConfig** (Zod schema in `schema.ts`):
-```typescript
-{ repos: Record<string, string | RemoteRepoObject | LocalRepoObject> }
+1. **Cross-repo edges use `DependencyType.implicit`** -- All auto-detected and override edges (detect.ts line 388, 508) use implicit type with no `sourceFile`. The v1.1 decision was deliberate: static edges require `sourceFile` and Nx validates that file exists in the fileMap, but `.repos/` is gitignored so files there are absent from the fileMap.
+
+2. **Proxy targets have `cache: false` + `inputs: []`** -- In `createProxyTarget` (transform.ts line 122-123). Every `nx run` invocation spawns a child Node.js process, loads plugins, reads graph, checks child cache, runs target. Even warm-cache runs take several seconds per target due to bootstrap overhead.
+
+3. **Temp directories use `.tmp`** -- Both `extract.ts` (line 91-92) and `run/executor.ts` (line 41-42) create `.repos/<alias>/.tmp/` for TEMP/TMP/TMPDIR isolation. This dotfile path requires explicit `.gitignore` entries in each synced repo. Nx workspaces already gitignore `tmp/` by default.
+
+## v1.2 Changes: System Overview
+
+```
+                         FEATURE 3: TEMP RENAME
+                          .tmp -> tmp
+                                    |
+                          +---------------------+
+                          | Graph Extract        |
+                          | extract.ts           |
+                          | TEMP=.repos/X/tmp    |  <-- MODIFY (2 lines)
+                          +---------------------+
+                                    |
+                                    v
+                          +---------------------+
+                          | Graph Transform      |
+                          | transform.ts         |
+                          | proxy targets:       |
+                          |   cache: true        |  <-- MODIFY (Feature 2)
+                          |   inputs: [runtime]  |  <-- MODIFY (Feature 2)
+                          +---------------------+
+                                    |
+                                    v
+                          +---------------------+
+                          | detect.ts            |
+                          | Cross-repo deps      |
+                          | Auto-detected:       |
+                          |   static + sourceFile|  <-- MODIFY (Feature 1)
+                          | Host-sourced:        |
+                          |   static + sourceFile|  <-- MODIFY (Feature 1)
+                          | Overrides:           |
+                          |   implicit (no file) |  <-- UNCHANGED
+                          +---------------------+
+                                    |
+                                    v
+                          +---------------------+
+                          | run/executor.ts      |
+                          | TEMP=.repos/X/tmp    |  <-- MODIFY (2 lines)
+                          +---------------------+
 ```
 
-**PolyrepoGraphReport** (in `types.ts`):
+## Feature 1: Static Dependency Edges
+
+### Problem Analysis
+
+Auto-detected cross-repo edges from package.json and tsconfig path analysis are semantically static -- they derive from analyzing specific source files. Using `DependencyType.implicit` loses provenance: `nx affected` cannot trace which file created the edge. Static edges carry a `sourceFile` pointing to the declaring file.
+
+### Nx Validation of Static Edges (verified from source)
+
+The `validateDependency` function in `nx/src/project-graph/project-graph-builder.js` enforces:
+
+1. **`validateStaticDependency` (line 351-357):** If `projects[source]` exists (source is an internal project, not an external npm node), then `sourceFile` MUST be provided. Error: "Source project file is required".
+
+2. **`validateCommonDependencyRules` (line 328-335):** If `sourceFile` is provided AND `projects[source]` exists, Nx calls `getFileData()` which looks up the file in `fileMap.projectFileMap[source]` and falls back to `fileMap.nonProjectFiles`. If NOT found in either, it throws "Source file does not exist in the workspace".
+
+### Critical Constraint: .repos/ Files Not in FileMap
+
+The `.repos/` directory is gitignored. Nx builds its fileMap from git-tracked files. Therefore:
+- Files under `.repos/<alias>/...` are NOT in `fileMap.projectFileMap` or `fileMap.nonProjectFiles`
+- A `sourceFile` pointing to `.repos/repo-a/packages/app/package.json` will FAIL validation
+
+### Solution: Bifurcated Edge Types by Source Location
+
+**External-sourced edges (source project in `.repos/`):**
+- The source project is registered as a `projects` entry (via `createNodesV2`), NOT as an `externalNode`
+- `sourceFile` pointing into `.repos/` would fail `getFileData()` validation
+- MUST remain `DependencyType.implicit` -- no `sourceFile` required or validated
+
+**Host-sourced edges (source project in host workspace):**
+- The source project IS a standard host project
+- `sourceFile` pointing to the host's `package.json` (e.g., `packages/my-app/package.json`) IS in the fileMap
+- CAN use `DependencyType.static` with `sourceFile`
+
+**Override edges (from `implicitDependencies` config):**
+- No natural source file -- these are user-configured manual wiring
+- MUST remain `DependencyType.implicit`
+
+### Component Changes for Feature 1
+
+| Component | File | Change |
+|-----------|------|--------|
+| `detect.ts` | `lib/graph/detect.ts` | Bifurcate `maybeEmitEdge` into two code paths based on source location |
+| `detect.ts` | `lib/graph/detect.ts` | Host-sourced: emit `DependencyType.static` + `sourceFile` pointing to host package.json |
+| `detect.ts` | `lib/graph/detect.ts` | External-sourced: keep `DependencyType.implicit` (no sourceFile) |
+| `detect.spec.ts` | `lib/graph/detect.spec.ts` | Update ~30 test assertions for edge types |
+| `index.spec.ts` | `src/index.spec.ts` | Update integration assertions |
+| `cross-repo-deps.spec.ts` | `e2e/src/cross-repo-deps.spec.ts` | Update 3 e2e assertions |
+
+### Detailed detect.ts Changes
+
+The current `maybeEmitEdge` function (lines 351-389) emits all edges as implicit. The change needs to:
+
+1. Determine whether the source project is a host project or an external project
+2. For host-sourced edges: compute the `sourceFile` relative path to the package.json
+3. Emit the appropriate edge type
+
 ```typescript
-{
-  repos: Record<string, {
-    nodes: Record<string, TransformedNode>;
-    dependencies: Array<{ source: string; target: string; type: string }>;
-  }>;
+// Current (v1.1)
+function maybeEmitEdge(sourceName: string, depName: string): void {
+  // ... lookup, cross-repo guard ...
+  edges.push({
+    source: sourceName,
+    target: targetName,
+    type: DependencyType.implicit,
+  });
+}
+
+// Proposed (v1.2) -- bifurcated by source location
+function maybeEmitEdge(
+  sourceName: string,
+  depName: string,
+  sourceFile: string | undefined,
+): void {
+  // ... lookup, cross-repo guard ...
+  const sourceRepo = projectToRepo.get(sourceName);
+
+  if (sourceRepo === HOST_REPO_SENTINEL && sourceFile !== undefined) {
+    // Host-sourced: static edge with sourceFile
+    edges.push({
+      source: sourceName,
+      target: targetName,
+      type: DependencyType.static,
+      sourceFile,
+    });
+  } else {
+    // External-sourced: implicit edge (no sourceFile)
+    edges.push({
+      source: sourceName,
+      target: targetName,
+      type: DependencyType.implicit,
+    });
+  }
 }
 ```
 
-**createDependencies** (in `index.ts`): Iterates `report.repos[*].dependencies` and emits `DependencyType.implicit` edges, filtering to only edges where both source and target exist in `context.projects`.
+The caller in section 3b (host project scanning, lines 409-438) already knows the package.json path. It constructs `pkgJsonPath = join(workspaceRoot, projectConfig.root, 'package.json')`. The relative sourceFile is `join(projectConfig.root, 'package.json')` with forward-slash normalization.
 
-### Current Limitation
+The caller in section 3a (external node scanning, lines 394-406) passes `undefined` for sourceFile since `.repos/` paths are not in the fileMap.
 
-Today, `createDependencies` only emits **intra-repo** edges (dependencies extracted from each child repo's own graph). If repo-a's project depends on a package published by repo-b, that cross-repo edge does not exist because each repo's `nx graph --print` only knows about its own projects.
+### Risk Assessment
 
-## New Components for v1.1
+**LOW risk.** The change is a data value change (DependencyType constant + optional field), not a control flow change. The v1.1 architecture already has separate code paths for external-sourced (section 3a) and host-sourced (section 3b) scanning. The bifurcation aligns naturally with the existing code structure.
 
-### System Overview with New Components
+**Caveat: tsconfig-alias-sourced edges.** The current detect.ts does not emit edges from tsconfig path alias detection with a specific sourceFile. Tsconfig aliases are expanded into the lookup map (step 1c/1d) and resolved during the same maybeEmitEdge calls. For host-sourced edges triggered via tsconfig alias (not package.json dep), the sourceFile should point to `tsconfig.base.json` or `tsconfig.json` in the project root. However, the current code does not track which lookup mechanism triggered the edge. Simplest approach: host-sourced edges from the package.json scanning path (section 3b) get the package.json as sourceFile. The tsconfig path aliases feed the lookup map but do not generate edges directly -- they make the maybeEmitEdge lookup succeed. So the sourceFile is always the package.json of the source project (where the dependency is declared).
 
+## Feature 2: Host-Level Proxy Caching via Runtime Inputs
+
+### Problem Analysis
+
+Proxy targets set `cache: false` and `inputs: []`. Every invocation spawns a child Nx process (~2-5s overhead even on warm cache). With 8 proxy tasks in a dependency chain, the overhead compounds significantly.
+
+### Solution: Runtime Input Tied to Git State
+
+Change `createProxyTarget` (transform.ts) to set:
+- `cache: true`
+- `inputs: [{ runtime: "<command that outputs repo git state>" }]`
+
+Nx executes the runtime command, hashes its stdout, and uses it as the cache key. When the child repo's git state is unchanged, the host cache hits and skips the proxy invocation entirely.
+
+### Runtime Input Command Design
+
+**Recommended: Compound HEAD + diff hash**
+
+The runtime input needs to capture two things:
+1. The commit SHA (changes after `polyrepo-sync`)
+2. Uncommitted changes (users editing files in `.repos/<alias>/`)
+
+Single-command approach using shell compound:
 ```
-nx.json plugin options (PolyrepoConfig v1.1)
-        |                          |
-        v                          v
-+------------------+      +-----------------------+
-| Config + Validate|      | NEW: dependencyOverrides
-| (schema.ts v1.1) |      |   from config schema  |
-+--------+---------+      +-----------+-----------+
-         |                            |
-         v                            |
-+---------------------+               |
-| Graph Extract       |               |
-| (extract.ts)        |               |
-| + NEW: package.json |               |
-|   name extraction   |               |
-+---------------------+               |
-         |                            |
-         v                            |
-+---------------------+               |
-| Graph Transform     |               |
-| (transform.ts)      |               |
-| + NEW: packageName  |               |
-|   on TransformedNode|               |
-+---------------------+               |
-         |                            |
-         v                            |
-+---------------------+               |
-| Graph Cache         |               |
-| (cache.ts)          |               |
-| unchanged           |               |
-+---------------------+               |
-         |                            |
-         v                            v
-+-----------------------------------------------+
-| NEW: detect.ts (cross-repo dep detection)     |
-| - Build package-name-to-project lookup        |
-| - Read each project's package.json deps       |
-| - Match against lookup for auto-detection     |
-| - Merge with explicit overrides from config   |
-| - Emit RawProjectGraphDependency[] edges      |
-+-----------------------------------------------+
-         |
-         v
-+---------------------+
-| index.ts            |
-| createNodesV2:      |
-|   unchanged         |
-| createDependencies: |
-|   intra-repo edges  |
-|   + cross-repo edges|  <-- NEW
-|   + override edges  |  <-- NEW
-+---------------------+
-         |
-         v
-Host workspace project graph
+git -C .repos/<alias> rev-parse HEAD && git -C .repos/<alias> diff HEAD
 ```
 
-### New vs Modified Components
+Nx hashes the full stdout. When HEAD is the same and no uncommitted changes exist, the output is identical and the cache hits.
 
-| Component | Status | File | Change Description |
-|-----------|--------|------|--------------------|
-| `schema.ts` | **MODIFY** | `lib/config/schema.ts` | Add `dependencyOverrides` field to `polyrepoConfigSchema` |
-| `types.ts` | **MODIFY** | `lib/graph/types.ts` | Add `packageName` to `TransformedNode`, add `packageNames` to repo report |
-| `extract.ts` | **MODIFY** | `lib/graph/extract.ts` | Extract `package.json` `name` field per project during graph extraction |
-| `transform.ts` | **MODIFY** | `lib/graph/transform.ts` | Pass through `packageName` on `TransformedNode` |
-| `detect.ts` | **NEW** | `lib/graph/detect-cross-deps.ts` | Cross-repo dependency detection logic (auto + overrides) |
-| `index.ts` | **MODIFY** | `src/index.ts` | Wire `detect-cross-deps` into `createDependencies` |
-| `cache.ts` | **NO CHANGE** | `lib/graph/cache.ts` | Hash invalidation already covers config changes |
+**Cross-platform verification:**
+- `git -C <path>` works on Windows (Git for Windows), Linux, macOS
+- Nx executes runtime inputs via the shell, so no `.cmd` shim issues
+- Forward slashes in `.repos/<alias>` work on all platforms in git commands
 
-## Detailed Component Design
+### Component Changes for Feature 2
 
-### 1. Config Schema Extension (`schema.ts`)
+| Component | File | Change |
+|-----------|------|--------|
+| `transform.ts` | `lib/graph/transform.ts` | Change `createProxyTarget`: `cache: true`, add runtime input |
+| `transform.spec.ts` | `lib/graph/transform.spec.ts` | Update test: cache false -> true, verify inputs contain runtime |
 
-Add an optional `dependencyOverrides` field for explicit manual wiring:
+### Detailed transform.ts Changes
 
 ```typescript
-const dependencyOverride = z.object({
-  source: z.string().min(1),  // namespaced project: "repo-a/my-app"
-  target: z.string().min(1),  // namespaced project: "repo-b/shared-lib"
-});
+// Current (v1.1)
+function createProxyTarget(
+  repoAlias: string,
+  originalProject: string,
+  targetName: string,
+  rawTargetConfig: unknown,
+): TargetConfiguration {
+  const config = isRecord(rawTargetConfig) ? rawTargetConfig : {};
 
-export const polyrepoConfigSchema = z.object({
-  repos: z.record(/* ... existing ... */),
-  dependencyOverrides: z.array(dependencyOverride).optional(),
-});
-```
+  return {
+    executor: '@op-nx/polyrepo:run',
+    options: { repoAlias, originalProject, targetName },
+    inputs: [],
+    cache: false,
+    // ...
+  };
+}
 
-**Config in nx.json would look like:**
-```json
-{
-  "plugins": [{
-    "plugin": "@op-nx/polyrepo",
-    "options": {
-      "repos": {
-        "frontend": "git@github.com:org/frontend.git",
-        "backend": "git@github.com:org/backend.git",
-        "shared": "git@github.com:org/shared.git"
+// Proposed (v1.2)
+function createProxyTarget(
+  repoAlias: string,
+  originalProject: string,
+  targetName: string,
+  rawTargetConfig: unknown,
+): TargetConfiguration {
+  const config = isRecord(rawTargetConfig) ? rawTargetConfig : {};
+
+  return {
+    executor: '@op-nx/polyrepo:run',
+    options: { repoAlias, originalProject, targetName },
+    inputs: [
+      {
+        runtime: `git -C .repos/${repoAlias} rev-parse HEAD && git -C .repos/${repoAlias} diff HEAD`,
       },
-      "dependencyOverrides": [
-        { "source": "frontend/web-app", "target": "shared/api-types" },
-        { "source": "backend/api", "target": "shared/api-types" }
-      ]
-    }
-  }]
+    ],
+    cache: true,
+    // ...
+  };
 }
 ```
 
-**Why this shape:**
-- Uses namespaced project names (`repo/project`) consistent with how projects appear in the host graph.
-- Array of explicit edges, not a map, because a single source can have multiple override targets.
-- No `type` field -- overrides are always `DependencyType.implicit` (same as existing intra-repo edges, consistent with cross-repo semantics where no source file exists in the host workspace).
+### Interaction with namedInputs Override
 
-### 2. Package Name Extraction (`extract.ts` + `types.ts`)
+In `createNodesV2` (index.ts lines 129-135), all workspace-level named inputs are overridden to `[]` on external projects. This prevents the native task hasher from generating `ProjectFileSet` hash instructions for external projects whose files are absent from the fileMap.
 
-**Problem:** The current `ExternalGraphJson` schema captures nodes from `nx graph --print`, but Nx's graph output does not include `package.json` `name` fields. We need package names to match against other repos' dependency lists.
+With `cache: true` and explicit `inputs: [{ runtime: ... }]`, the task hasher uses ONLY the declared inputs -- it does not expand named inputs for the task itself. The `namedInputs` override on external projects is for dependency traversal (`^production` etc.), not for the project's own task inputs. These two mechanisms are orthogonal and do not conflict.
 
-**Solution:** Extend the extraction to also read each project's `package.json` and capture the `name` field.
+### Risk Assessment
 
-Two approaches, recommend approach A:
+**LOW risk** for the transform.ts change itself (3 lines). **MEDIUM risk** for behavioral correctness: the compound runtime input must reliably capture all state changes. Edge cases:
 
-**Approach A -- Post-extraction filesystem read (recommended):**
-After `extractGraphFromRepo` returns the graph JSON, read `package.json` for each project node using the project's `root` path. This keeps `extract.ts` focused on graph extraction and adds a thin layer for package name lookup.
+1. **Scorched earth (`rm -rf .repos/X/dist`):** Git HEAD unchanged, cache hits, but child outputs are gone. Mitigation: `polyrepo-sync` is already the recovery path (clears stale child cache via `rmSync` in `tryInstallDeps`). Documented as expected behavior.
+
+2. **Untracked files:** `git diff HEAD` only captures tracked file changes. New untracked files (not `git add`ed) are invisible. This is acceptable because untracked files in `.repos/` are typically build artifacts, not source changes.
+
+3. **Runtime input failure:** If git is not installed or `.repos/<alias>` does not exist, the runtime command fails. Nx treats failed runtime inputs as cache misses (re-runs the task). This is correct behavior -- the proxy executor will also handle the missing repo gracefully.
+
+## Feature 3: Temp Directory Rename (.tmp -> tmp)
+
+### Problem Analysis
+
+The proxy executor and graph extraction create per-repo temp directories at `.repos/<alias>/.tmp/`. This dotfile path is not covered by the standard Nx `.gitignore` template, which includes `tmp/` but not `.tmp/`. Users must manually add `.tmp` to each synced repo's `.gitignore` to avoid noise.
+
+### Solution: Rename to `tmp`
+
+Change the path from `.tmp` to `tmp` in two locations:
+1. `run/executor.ts` lines 41-42
+2. `extract.ts` lines 91-92
+
+### Component Changes for Feature 3
+
+| Component | File | Change |
+|-----------|------|--------|
+| `extract.ts` | `lib/graph/extract.ts` | Lines 91-92: `.tmp` -> `tmp` |
+| `run/executor.ts` | `lib/executors/run/executor.ts` | Lines 41-42: `.tmp` -> `tmp` |
+| `extract.spec.ts` | `lib/graph/extract.spec.ts` | Update path assertions if any |
+| `executor.spec.ts` | `lib/executors/run/executor.spec.ts` | Update path assertions if any |
+
+### Detailed Changes
 
 ```typescript
-// New function in extract.ts or a new file
-async function readPackageNames(
-  repoPath: string,
-  nodes: Record<string, ExternalProjectNode>,
-): Promise<Record<string, string>> {
-  // Returns: { originalProjectName: packageJsonName }
-  const result: Record<string, string> = {};
+// extract.ts -- Current
+const repoTmpDir = normalizePath(join(repoPath, '.tmp'));
+mkdirSync(join(repoPath, '.tmp'), { recursive: true });
 
-  for (const [name, node] of Object.entries(nodes)) {
-    const pkgPath = join(repoPath, node.data.root, 'package.json');
-
-    try {
-      const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
-
-      if (typeof pkg.name === 'string') {
-        result[name] = pkg.name;
-      }
-    } catch {
-      // No package.json or invalid -- skip (not all projects are npm packages)
-    }
-  }
-
-  return result;
-}
+// extract.ts -- Proposed
+const repoTmpDir = normalizePath(join(repoPath, 'tmp'));
+mkdirSync(join(repoPath, 'tmp'), { recursive: true });
 ```
-
-**Why not Approach B (modify the nx graph --print subprocess):** The `nx graph --print` output format is controlled by Nx, not by us. We cannot add fields to it. Shelling out a second command just for package names is wasteful when the files are on disk.
-
-### 3. TransformedNode Extension (`types.ts`)
 
 ```typescript
-export interface TransformedNode {
-  name: string;
-  root: string;
-  projectType?: string;
-  sourceRoot?: string;
-  targets: Record<string, TargetConfiguration>;
-  tags: string[];
-  metadata?: Record<string, unknown>;
-  packageName?: string;  // NEW: npm package name from package.json
-}
+// run/executor.ts -- Current
+const repoTmpDir = normalizePath(join(repoPath, '.tmp'));
+mkdirSync(join(repoPath, '.tmp'), { recursive: true });
+
+// run/executor.ts -- Proposed
+const repoTmpDir = normalizePath(join(repoPath, 'tmp'));
+mkdirSync(join(repoPath, 'tmp'), { recursive: true });
 ```
 
-The `PolyrepoGraphReport` type gains a package name map per repo:
+### Risk Assessment
 
-```typescript
-export interface PolyrepoGraphReport {
-  repos: Record<string, {
-    nodes: Record<string, TransformedNode>;
-    dependencies: Array<{ source: string; target: string; type: string }>;
-    packageNames: Record<string, string>;  // NEW: namespacedProject -> npmPackageName
-  }>;
-}
-```
+**NEGLIGIBLE risk.** Two-line path rename per file. No behavioral change. The directory is created fresh with `mkdirSync({ recursive: true })` on each invocation. Old `.tmp` directories in already-synced repos become orphaned but harmless.
 
-### 4. Cross-repo Dependency Detection (`detect-cross-deps.ts`) -- NEW FILE
+## New vs Modified Components Summary
 
-This is the core new logic. It is a pure function with no side effects, making it easily testable with SIFERS.
+| Component | Status | File | Feature | Lines Changed |
+|-----------|--------|------|---------|---------------|
+| `detect.ts` | MODIFY | `lib/graph/detect.ts` | Static edges | ~20 lines (bifurcate maybeEmitEdge) |
+| `detect.spec.ts` | MODIFY | `lib/graph/detect.spec.ts` | Static edges | ~30 assertions |
+| `transform.ts` | MODIFY | `lib/graph/transform.ts` | Proxy caching | ~5 lines (cache + inputs) |
+| `transform.spec.ts` | MODIFY | `lib/graph/transform.spec.ts` | Proxy caching | ~5 assertions |
+| `extract.ts` | MODIFY | `lib/graph/extract.ts` | Temp rename | 2 lines |
+| `extract.spec.ts` | MODIFY | `lib/graph/extract.spec.ts` | Temp rename | Path assertions |
+| `run/executor.ts` | MODIFY | `lib/executors/run/executor.ts` | Temp rename | 2 lines |
+| `run/executor.spec.ts` | MODIFY | `lib/executors/run/executor.spec.ts` | Temp rename | Path assertions |
+| `index.spec.ts` | MODIFY | `src/index.spec.ts` | Static edges | Edge type assertions |
+| `cross-repo-deps.spec.ts` | MODIFY | `e2e/src/cross-repo-deps.spec.ts` | Static edges | Edge type assertions |
 
-```typescript
-import type { RawProjectGraphDependency } from '@nx/devkit';
-import { DependencyType } from '@nx/devkit';
-import type { PolyrepoGraphReport } from './types';
-import type { PolyrepoConfig } from '../config/schema';
+**No new files created.** All three features modify existing components only.
 
-interface CrossDepDetectionContext {
-  /** All projects currently in the host graph (for existence checks) */
-  projectNames: Set<string>;
-}
+## Data Flow Changes
 
-/**
- * Detect cross-repo dependencies by matching npm package names
- * against dependency declarations in each project's package.json.
- *
- * Also merges explicit dependency overrides from config.
- */
-export function detectCrossRepoDependencies(
-  report: PolyrepoGraphReport,
-  config: PolyrepoConfig,
-  context: CrossDepDetectionContext,
-): RawProjectGraphDependency[] {
-  const dependencies: RawProjectGraphDependency[] = [];
-
-  // Step 1: Build reverse lookup: npmPackageName -> namespacedProjectName
-  const packageToProject = new Map<string, string>();
-
-  for (const [, repoData] of Object.entries(report.repos)) {
-    for (const [namespacedName, npmName] of Object.entries(repoData.packageNames)) {
-      packageToProject.set(npmName, namespacedName);
-    }
-  }
-
-  // Step 2: For each project, check if its package.json deps reference
-  // a package name that maps to a project in another repo
-  for (const [, repoData] of Object.entries(report.repos)) {
-    for (const [namespacedName, node] of Object.entries(repoData.nodes)) {
-      // node.packageDependencies would be read during extraction
-      // Match against packageToProject lookup
-      // Only emit if source and target are in DIFFERENT repos
-      // Only emit if both exist in context.projectNames
-    }
-  }
-
-  // Step 3: Merge explicit overrides
-  for (const override of config.dependencyOverrides ?? []) {
-    if (context.projectNames.has(override.source) && context.projectNames.has(override.target)) {
-      dependencies.push({
-        source: override.source,
-        target: override.target,
-        type: DependencyType.implicit,
-      });
-    }
-  }
-
-  return dependencies;
-}
-```
-
-**Key design decisions:**
-- **Pure function:** Takes report + config + context, returns edges. No module-level state. No filesystem access.
-- **Same-repo edges excluded:** Cross-repo detection only matches dependencies where source and target are in different repos. Intra-repo edges are already handled by the existing `createDependencies` loop.
-- **Overrides are additive:** They do not replace auto-detected edges. They add edges that auto-detection cannot find (e.g., non-npm dependencies like shared proto files, API contracts).
-- **Existence guard:** Same pattern as existing code -- only emit edges where both projects exist in the host graph.
-
-### 5. Integration into `createDependencies` (`index.ts`)
-
-The existing `createDependencies` function gains one additional call:
-
-```typescript
-export const createDependencies: CreateDependencies<PolyrepoConfig> = async (
-  options, context,
-) => {
-  const dependencies: RawProjectGraphDependency[] = [];
-
-  let report: PolyrepoGraphReport | undefined;
-
-  try {
-    const config = validateConfig(options);
-    const optionsHash = hashObject(options ?? {});
-    report = await populateGraphReport(config, context.workspaceRoot, optionsHash);
-  } catch {
-    return dependencies;
-  }
-
-  // EXISTING: intra-repo edges
-  for (const [, repoReport] of Object.entries(report.repos)) {
-    for (const dep of repoReport.dependencies) {
-      if (context.projects[dep.source] && context.projects[dep.target]) {
-        dependencies.push({
-          source: dep.source,
-          target: dep.target,
-          type: DependencyType.implicit,
-        });
-      }
-    }
-  }
-
-  // NEW: cross-repo edges (auto-detected + overrides)
-  const config = validateConfig(options);
-  const crossRepoDeps = detectCrossRepoDependencies(
-    report,
-    config,
-    { projectNames: new Set(Object.keys(context.projects)) },
-  );
-  dependencies.push(...crossRepoDeps);
-
-  return dependencies;
-};
-```
-
-### 6. Package.json Dependency Reading
-
-To auto-detect cross-repo deps, we need each project's npm dependency list. Two options:
-
-**Option A -- Read during extraction (in cache pipeline, recommended):**
-Add package.json dependency reading alongside package name reading in the cache pipeline. This means the data is cached and does not require filesystem reads during `createDependencies`.
-
-The `PolyrepoGraphReport` per-repo object would store:
-```typescript
-{
-  nodes: Record<string, TransformedNode>;
-  dependencies: Array<{ source: string; target: string; type: string }>;
-  packageNames: Record<string, string>;           // NEW
-  packageDependencies: Record<string, string[]>;   // NEW: namespacedProject -> [npmPackageName, ...]
-}
-```
-
-**Option B -- Read during createDependencies (lazy):**
-Read package.json files on-the-fly during `createDependencies`. Simpler but slower (filesystem reads on every uncached invocation) and breaks the pattern of keeping all IO in the cache pipeline.
-
-**Recommendation:** Option A. It follows the existing pattern where all IO happens during `populateGraphReport` and the rest is pure transformation.
-
-## Data Flow Summary
+### Before (v1.1)
 
 ```
-[Extraction Phase - in populateGraphReport]
-  For each synced repo:
-    1. extractGraphFromRepo(repoPath) -> ExternalGraphJson
-    2. readPackageNames(repoPath, graph.nodes) -> Record<string, string>
-    3. readPackageDependencies(repoPath, graph.nodes) -> Record<string, string[]>
-    4. transformGraphForRepo(alias, graph, workspaceRoot) -> { nodes, dependencies }
-    5. Attach packageNames + packageDependencies to report
+detect.ts:
+  External-sourced edges -> DependencyType.implicit (no sourceFile)
+  Host-sourced edges     -> DependencyType.implicit (no sourceFile)
+  Override edges         -> DependencyType.implicit (no sourceFile)
 
-[Dependency Phase - in createDependencies]
-  1. populateGraphReport() -> PolyrepoGraphReport (from cache, fast)
-  2. Emit intra-repo edges (existing loop)
-  3. detectCrossRepoDependencies(report, config, context) -> cross-repo edges
-     a. Build packageName -> namespacedProject lookup (all repos)
-     b. For each project, match its packageDependencies against lookup
-     c. Filter: different repos only, both exist in host graph
-     d. Merge explicit overrides from config
-  4. Return all edges
+transform.ts:
+  Proxy targets -> cache: false, inputs: []
+
+extract.ts + run/executor.ts:
+  Temp dir -> .repos/<alias>/.tmp/
+```
+
+### After (v1.2)
+
+```
+detect.ts:
+  External-sourced edges -> DependencyType.implicit (no sourceFile)  [UNCHANGED]
+  Host-sourced edges     -> DependencyType.static + sourceFile       [CHANGED]
+  Override edges         -> DependencyType.implicit (no sourceFile)  [UNCHANGED]
+
+transform.ts:
+  Proxy targets -> cache: true, inputs: [{ runtime: "git -C ..." }] [CHANGED]
+
+extract.ts + run/executor.ts:
+  Temp dir -> .repos/<alias>/tmp/                                    [CHANGED]
 ```
 
 ## Architectural Patterns
 
-### Pattern 1: Package Name as Cross-repo Join Key
+### Pattern 1: Bifurcated Edge Types by Source Location
 
-**What:** Use npm package names (from `package.json` `name` field) as the key to join dependencies across repos. If repo-a's project declares `"@org/shared-utils": "^1.0"` in its `package.json` and repo-b has a project whose `package.json` `name` is `"@org/shared-utils"`, emit an implicit dependency edge.
+**What:** Emit different `DependencyType` values depending on whether the source project is a host workspace project (fileMap-tracked) or an external project (.repos/, not in fileMap).
 
-**When to use:** Always for auto-detection. This is the natural join key because npm packages are how JavaScript projects declare dependencies.
-
-**Trade-offs:**
-- PRO: Works without any user configuration
-- PRO: Mirrors how Nx itself detects dependencies within a monorepo
-- CON: Only works for projects that publish npm packages (not all projects have package.json)
-- CON: Does not detect non-npm relationships (gRPC proto imports, shared API types via codegen)
-- Mitigation: The `dependencyOverrides` feature covers the CON cases
-
-### Pattern 2: Additive Override Merging
-
-**What:** Explicit `dependencyOverrides` are additive -- they add edges that auto-detection does not find. They never remove auto-detected edges.
-
-**When to use:** Always. If users need to suppress an auto-detected edge, they should fix the underlying package.json rather than adding a negation mechanism.
+**When to use:** Any time Nx validation constraints differ based on project location. The Nx `validateStaticDependency` function requires `sourceFile` for internal projects and validates it against the fileMap. External projects under `.repos/` cannot satisfy this constraint.
 
 **Trade-offs:**
-- PRO: Simple mental model -- overrides only add
-- PRO: Auto-detected edges are always truthful (package.json is source of truth)
-- CON: No way to suppress false positives from auto-detection
-- Mitigation: False positives should be rare (requires exact package name match). If needed, a future `ignoreDependencies` field could be added.
+- PRO: Host-sourced edges gain provenance (sourceFile) for `nx affected` tracing
+- PRO: External-sourced edges avoid validation errors
+- CON: Two edge types in the same detection function -- slightly more complex
+- Mitigation: The existing code already has separate scanning loops (3a for external, 3b for host), so the bifurcation aligns naturally
 
-### Pattern 3: Pure Detection Function
+### Pattern 2: Runtime Inputs for External State Tracking
 
-**What:** `detectCrossRepoDependencies` is a pure function: input data in, edges out. No filesystem reads, no module state, no side effects.
+**What:** Use Nx runtime inputs (`{ runtime: "command" }`) to capture external state (git HEAD + working tree diff) that the native file-based hasher cannot see.
 
-**When to use:** For all new dependency logic. Follows the existing SIFERS test pattern where test setup is explicit.
+**When to use:** When the task's correctness depends on state outside the host workspace's git-tracked files. The `.repos/` directory is gitignored, so Nx's file-based hashing sees nothing there. Runtime inputs bridge this gap.
 
 **Trade-offs:**
-- PRO: Trivially testable with SIFERS
-- PRO: No mocking filesystem or module state
-- CON: Requires all data to be pre-loaded (package names, package deps)
-- Mitigation: Data loading happens in the cache pipeline, which already handles IO
+- PRO: Eliminates child Nx bootstrap overhead on warm runs (~2-5s per target)
+- PRO: Correct invalidation on sync (new HEAD) and local edits (diff changes)
+- CON: Runtime command adds ~12ms per target to hash computation
+- CON: Untracked files invisible to `git diff HEAD`
+- Acceptable: 12ms is negligible vs 2-5s bootstrap. Untracked files are typically build artifacts.
+
+### Pattern 3: Convention-Based Gitignore Coverage
+
+**What:** Use directory names that match existing `.gitignore` conventions rather than inventing new dotfile names.
+
+**When to use:** When creating auxiliary directories in external repositories that you do not control. Nx's `create-nx-workspace` scaffold includes `tmp/` in `.gitignore`. Using `tmp/` instead of `.tmp/` gets free coverage.
+
+**Trade-offs:**
+- PRO: Zero configuration needed in synced repos
+- PRO: Follows Nx conventions
+- CON: `tmp/` is less visually distinctive than `.tmp/`
+- Negligible: The directory is an implementation detail, not user-facing
 
 ## Anti-Patterns to Avoid
 
-### Anti-Pattern 1: Reading package.json in createDependencies
+### Anti-Pattern 1: Static Edges for External-Sourced Dependencies
 
-**What people do:** Open and parse package.json files inside `createDependencies` for each project.
-**Why it's wrong:** `createDependencies` should be fast. Filesystem reads here bypass the cache layer and run on every uncached Nx command. The existing architecture puts all IO in `populateGraphReport`.
-**Do this instead:** Read package names and dependency lists during the extraction phase in `cache.ts`, store them in the `PolyrepoGraphReport`, and use them as pure data in `createDependencies`.
+**What people do:** Use `DependencyType.static` with `sourceFile` pointing to `.repos/<alias>/packages/app/package.json` for all cross-repo edges.
+**Why it's wrong:** Nx validates that `sourceFile` exists in `fileMap.projectFileMap` or `fileMap.nonProjectFiles`. Files under `.repos/` are gitignored and not in either map. The `validateCommonDependencyRules` function (line 329-334) will throw "Source file does not exist in the workspace".
+**Do this instead:** Use `DependencyType.implicit` for external-sourced edges (source in `.repos/`). Only use `DependencyType.static` for host-sourced edges where the `sourceFile` (e.g., `packages/my-app/package.json`) is git-tracked.
 
-### Anti-Pattern 2: Using DependencyType.static for Cross-repo Edges
+### Anti-Pattern 2: File-Based Inputs for Proxy Targets
 
-**What people do:** Use `DependencyType.static` with a `sourceFile` pointing to the package.json.
-**Why it's wrong:** Static dependencies are associated with a specific source file and are cached by Nx's file change tracking. Cross-repo package.json files are in `.repos/`, which is gitignored. Nx's file watcher will not track changes to these files. Using `static` would cause stale edges.
-**Do this instead:** Use `DependencyType.implicit`. Implicit dependencies have no source file association and are recomputed every time `createDependencies` runs (which is correct -- they should be re-evaluated when the graph report changes).
+**What people do:** Set `inputs: ["{projectRoot}/**/*"]` or similar file-based patterns on proxy targets.
+**Why it's wrong:** External project roots are under `.repos/`, which is gitignored. Nx's file-based input expansion uses the fileMap, which does not include gitignored files. File-based inputs would resolve to nothing, producing a constant hash that never invalidates.
+**Do this instead:** Use `{ runtime: "git -C .repos/<alias> ..." }` to capture external state via git commands that operate independently of the host workspace's fileMap.
 
-### Anti-Pattern 3: Overrides That Reference Non-namespaced Project Names
+### Anti-Pattern 3: Single Runtime Input with Only HEAD SHA
 
-**What people do:** Allow overrides like `{ source: "my-app", target: "shared-lib" }` without repo prefix.
-**Why it's wrong:** Without namespacing, project name collisions across repos are ambiguous. "my-app" could exist in three repos.
-**Do this instead:** Require fully namespaced names: `{ source: "frontend/my-app", target: "shared/shared-lib" }`. Validate that both names follow the `repo/project` pattern in the Zod schema.
+**What people do:** Use `{ runtime: "git -C .repos/<alias> rev-parse HEAD" }` as the sole input.
+**Why it's wrong:** This only tracks committed state. Users editing files in `.repos/<alias>/` (a common workflow in synthetic monorepos) would see stale cache hits because HEAD did not change.
+**Do this instead:** Compound input: `git -C .repos/<alias> rev-parse HEAD && git -C .repos/<alias> diff HEAD`. The diff component captures uncommitted tracked-file changes.
 
-### Anti-Pattern 4: Separate Cache for Cross-repo Dependencies
+## Dependency Graph Between Features
 
-**What people do:** Create a new cache file or module-level variable for cross-repo dependency data.
-**Why it's wrong:** The existing two-layer cache (`cache.ts`) already handles invalidation correctly. The hash includes plugin options (so adding `dependencyOverrides` changes the hash) and each repo's git state (so package.json changes trigger re-extraction).
-**Do this instead:** Extend the existing `PolyrepoGraphReport` to include package name/dependency data. The existing cache handles the rest.
+```
+Feature 3: Temp Rename        Feature 2: Proxy Caching
+(.tmp -> tmp)                  (cache: true + runtime)
+  |                              |
+  | independent                  | independent
+  v                              v
+  extract.ts                     transform.ts
+  run/executor.ts                transform.spec.ts
+                                   |
+                                   | Feature 2 changes the inputs[]
+                                   | array that Feature 1's sourceFile
+                                   | does NOT interact with (inputs
+                                   | are per-target, sourceFile is
+                                   | per-dependency-edge)
+                                   |
+                              Feature 1: Static Edges
+                              (implicit -> static for host-sourced)
+                                   |
+                                   v
+                                 detect.ts
+                                 detect.spec.ts
+                                 index.spec.ts
+                                 cross-repo-deps.spec.ts (e2e)
+```
 
-## Integration Points
-
-### Internal Boundaries
-
-| Boundary | Communication | Change for v1.1 |
-|----------|---------------|-----------------|
-| `schema.ts` -> `validate.ts` | Zod parse at plugin load | `dependencyOverrides` flows through existing validation |
-| `cache.ts` -> `extract.ts` | `extractGraphFromRepo()` call | Add `readPackageNames()` + `readPackageDependencies()` calls |
-| `cache.ts` -> `transform.ts` | `transformGraphForRepo()` call | `packageName` attached to each `TransformedNode` |
-| `cache.ts` -> `types.ts` | `PolyrepoGraphReport` shape | Add `packageNames` + `packageDependencies` fields |
-| `index.ts` -> `detect-cross-deps.ts` | NEW: `detectCrossRepoDependencies()` call | New integration point in `createDependencies` |
-| `index.ts` -> `cache.ts` | `populateGraphReport()` | Unchanged -- report now contains richer data |
-
-### Nx Plugin API Surface
-
-| API | Usage in v1.1 |
-|-----|---------------|
-| `CreateDependencies<PolyrepoConfig>` | Return type unchanged; more edges returned |
-| `RawProjectGraphDependency` | Used for both intra-repo and cross-repo edges |
-| `DependencyType.implicit` | All cross-repo edges use implicit type |
-| `CreateDependenciesContext.projects` | Existence check for both auto-detected and override edges |
+**All three features are independent.** No code-level dependency between them. They can be built in any order or in parallel. The suggested build order below is based on risk and test surface area.
 
 ## Suggested Build Order
 
-The build order follows data flow dependencies. Each layer builds on the previous.
-
 ```
-Phase 1: Schema extension
-  - Add dependencyOverrides to polyrepoConfigSchema
-  - Add Zod validation (source/target format, existence checks deferred to runtime)
-  - Unit tests for new schema fields
-  Depends on: nothing new
+Phase 1: Temp directory rename (.tmp -> tmp)
+  - 2-line change in extract.ts
+  - 2-line change in run/executor.ts
+  - Update test assertions
+  - RISK: negligible
+  - SIZE: ~30 minutes
+  Rationale: Smallest, safest, clears the deck
 
-Phase 2: Package name/dependency extraction
-  - Add packageName to TransformedNode
-  - Add readPackageNames() function
-  - Add readPackageDependencies() function
-  - Extend PolyrepoGraphReport type with packageNames + packageDependencies
-  - Wire into cache.ts extraction pipeline
-  - Unit tests for package reading + transform passthrough
-  Depends on: Phase 1 (for types), existing extract.ts + transform.ts
+Phase 2: Proxy caching (cache: true + runtime inputs)
+  - ~5-line change in createProxyTarget (transform.ts)
+  - Update transform.spec.ts assertions
+  - Manual validation: run nx with warm cache, verify skip
+  - RISK: low (behavioral change -- verify cache invalidation)
+  - SIZE: ~1-2 hours
+  Rationale: Medium risk, but self-contained in one function
 
-Phase 3: Cross-repo dependency detection
-  - Create detect-cross-deps.ts (pure function)
-  - Build package-to-project lookup from report
-  - Match dependencies cross-repo
-  - Merge explicit overrides
-  - Unit tests for detection logic (SIFERS, no mocks needed)
-  Depends on: Phase 2 (for report shape with package data)
-
-Phase 4: Integration into createDependencies
-  - Wire detectCrossRepoDependencies into index.ts createDependencies
-  - Integration tests verifying end-to-end edge emission
-  - Update existing createDependencies tests
-  Depends on: Phase 3
-
-Phase 5: E2E validation
-  - Extend testcontainers e2e to verify cross-repo edges appear in nx graph
-  - Test override edges
-  - Test package.json auto-detection
-  Depends on: Phase 4
+Phase 3: Static dependency edges
+  - ~20-line change in detect.ts (bifurcate maybeEmitEdge)
+  - ~30 assertion updates in detect.spec.ts
+  - Update index.spec.ts assertions
+  - Update cross-repo-deps.spec.ts (e2e)
+  - RISK: low (data value change, but large test surface)
+  - SIZE: ~2-3 hours
+  Rationale: Largest test surface, benefits from phases 1-2 being committed
 ```
 
 **Phase ordering rationale:**
-- Schema first because it defines the config contract that all other components depend on.
-- Package extraction second because the detection function needs this data.
-- Detection logic third as a pure function -- easiest to test in isolation before wiring.
-- Integration fourth -- once the detection function works, wiring is mechanical.
-- E2E last as a full-stack validation of all prior phases.
+- Phase 1 first because it is trivial and unblocks a consistent naming convention before phases 2-3 touch the same files
+- Phase 2 before phase 3 because proxy caching is isolated to `transform.ts` with no downstream test coupling, while static edges touch detect.ts + index.ts + e2e
+- Phase 3 last because it has the widest blast radius (~30+ test assertions) and benefits from the other changes being stable
+
+## Scaling Considerations
+
+| Scale | Architecture Impact |
+|-------|---------------------|
+| 1-3 synced repos | All features work as designed. Runtime input overhead is ~12ms * number of targets |
+| 5-10 synced repos | Runtime inputs scale linearly. ~50-100ms total for hash computation. Still negligible vs build time |
+| 20+ synced repos | Each repo's runtime input is independent. No cross-repo hash computation. Linear scaling holds |
+
+### First Bottleneck: Runtime Input Execution
+
+At large scale, the compound `git rev-parse HEAD && git diff HEAD` command runs per-target (not per-repo). With 20 repos averaging 7.5 targets each = 150 runtime commands during hash computation. At ~12ms each, that is ~1.8s total. This is still much faster than the ~5s * 150 = 750s of child Nx bootstraps without caching.
+
+**Future optimization (not needed for v1.2):** Deduplicate runtime commands per-repo. All targets in the same repo share the same git state. Nx does not natively deduplicate runtime inputs, but the runtime command output is identical for all targets in the same repo, so Nx's internal runtime cache (keyed by command string) handles this automatically.
 
 ## Sources
 
-- [Extending the Project Graph | Nx](https://nx.dev/docs/extending-nx/project-graph-plugins) -- createDependencies API, DependencyType, CreateDependenciesContext
-- [Dependency Management Strategies | Nx](https://nx.dev/docs/concepts/decisions/dependency-management) -- per-project package.json patterns
-- [@nx/dotnet source](https://github.com/nrwl/nx/tree/master/packages/dotnet) -- cross-project dependency mapping pattern via `referencesByRoot`
-- [@nx/gradle source](https://github.com/nrwl/nx/tree/master/packages/gradle) -- module-level cache + shared report pattern
-- Existing v1.0 source code in `packages/op-nx-polyrepo/src/` -- baseline architecture, patterns, conventions
+- Nx project-graph-builder.js source (node_modules/nx/src/project-graph/project-graph-builder.js) -- `validateStaticDependency`, `validateCommonDependencyRules`, `getFileData` implementation verified at lines 304-379
+- Nx project-graph-builder.d.ts (node_modules/nx/src/project-graph/project-graph-builder.d.ts) -- `StaticDependency` type: "sourceFile MUST be present unless the source is the name of a ProjectGraphExternalNode"
+- Nx build-project-graph.js (node_modules/nx/src/project-graph/build-project-graph.js) -- line 225 confirms `addDependency` is called with sourceFile from createDependencies return
+- [Inputs and Named Inputs | Nx](https://nx.dev/docs/reference/inputs) -- runtime input format and execution semantics
+- [Configure Inputs for Task Caching | Nx](https://nx.dev/docs/guides/tasks--caching/configure-inputs) -- runtime input documentation
+- Existing v1.1 source code in `packages/op-nx-polyrepo/src/` -- baseline architecture, current implementations
+- Todo files in `.planning/todos/pending/` -- feature specifications and design decisions
 
 ---
-*Architecture research for: v1.1 cross-repo dependency detection and manual overrides*
-*Researched: 2026-03-17*
+*Architecture research for: v1.2 static edges, proxy caching, and temp directory rename*
+*Researched: 2026-03-22*
