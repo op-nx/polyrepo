@@ -39,13 +39,13 @@ Requirements for cross-repo dependency detection. Each maps to roadmap phases.
 
 ### targetDefaults Isolation
 
-- [ ] **TDEF-01**: Proxy targets preserve dependsOn from external repo's resolved graph output (with project name namespacing)
-- [ ] **TDEF-02**: Proxy targets without dependsOn in raw config get explicit empty array (blocks host targetDefaults merge)
-- [ ] **TDEF-03**: Object-style dependsOn entries with projects arrays have project names namespaced to repo alias
+- [x] **TDEF-01**: Proxy targets preserve dependsOn from external repo's resolved graph output (with project name namespacing)
+- [x] **TDEF-02**: Proxy targets without dependsOn in raw config get explicit empty array (blocks host targetDefaults merge)
+- [x] **TDEF-03**: Object-style dependsOn entries with projects arrays have project names namespaced to repo alias
 
 ### Cross-repo Build Support
 
-- [ ] **BUILD-01**: Proxy executor passes NX_DAEMON=false and NX_WORKSPACE_DATA_DIRECTORY to child Nx processes for SQLite isolation
+- [x] **BUILD-01**: Proxy executor passes NX_DAEMON=false and NX_WORKSPACE_DATA_DIRECTORY to child Nx processes for SQLite isolation
 - [ ] **BUILD-02**: `nx test @op-nx/polyrepo` succeeds without `--exclude-task-dependencies` workaround
 
 ## Future Requirements

@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Cross-repo Dependencies
 status: completed
-stopped_at: Completed 11-03-PLAN.md (Phase 11 complete, v1.1 milestone feature-complete)
-last_updated: "2026-03-21T00:01:35.151Z"
-last_activity: 2026-03-21 --- Completed Phase 11 Plan 3 (e2e daemon verification)
+stopped_at: Completed 12-01-PLAN.md
+last_updated: "2026-03-21T11:03:32.560Z"
+last_activity: 2026-03-21 --- Completed Phase 12 Plan 1 (targetDefaults isolation + env isolation)
 progress:
-  total_phases: 4
+  total_phases: 5
   completed_phases: 4
-  total_plans: 9
-  completed_plans: 9
-  percent: 100
+  total_plans: 11
+  completed_plans: 10
+  percent: 91
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-17)
 
 **Core value:** `nx graph` displays projects from all synced repos with cross-repo dependency edges, and all relevant Nx CLI commands output projects from multiple repos
-**Current focus:** v1.1 milestone complete -- all phases delivered
+**Current focus:** Phase 12 -- targetDefaults isolation and cross-repo build cascade fix
 
 ## Current Position
 
-Phase: 11 of 11 (Full Nx Daemon Support) -- COMPLETE
-Plan: 3 of 3 in Phase 11 (complete)
-Status: Phase 11 complete -- e2e daemon verification under all modes
-Last activity: 2026-03-21 --- Completed Phase 11 Plan 3 (e2e daemon verification)
+Phase: 12 of 12 (Resolve cross-repo build cascade) -- IN PROGRESS
+Plan: 1 of 2 in Phase 12 (complete)
+Status: Plan 12-01 complete -- dependsOn preservation and env isolation implemented
+Last activity: 2026-03-21 --- Completed Phase 12 Plan 1 (targetDefaults isolation + env isolation)
 
-Progress: [██████████] 100%
+Progress: [█████████░] 91%
 
 ## Performance Metrics
 
@@ -44,6 +44,7 @@ Progress: [██████████] 100%
 | 11 | 01 | 4min | 2 | 3 |
 | 11 | 02 | 6min | 1 | 2 |
 | 11 | 03 | 12min | 3 | 6 |
+| 12 | 01 | 6min | 2 | 4 |
 
 ## Accumulated Context
 
@@ -84,6 +85,10 @@ Recent decisions affecting current work:
 - [Phase 11-e2e-daemon]: Daemon stopped after every writeNxJson to prevent stale graph cache when daemon is running
 - [Phase 11-e2e-daemon]: E2e tests require --exclude-task-dependencies due to ^build cascade into synced repos (future phase)
 
+- [Phase 12-01]: rewriteDependsOn namespaces only project names in object entries with projects arrays; string entries and keywords pass through
+- [Phase 12-01]: Tag selectors (tag:*) in projects arrays pass through unchanged since tags preserved on namespaced projects
+- [Phase 12-01]: Non-array dependsOn values treated as absent, return [] for targetDefaults blocking
+
 ### Pending Todos
 
 2 pending:
@@ -104,6 +109,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-03-21T00:01:00Z
-Stopped at: Completed 11-03-PLAN.md (Phase 11 complete, v1.1 milestone feature-complete)
-Resume: v1.1 milestone audit -- all 9 plans complete, 21 requirements covered
+Last session: 2026-03-21T11:03:32.558Z
+Stopped at: Completed 12-01-PLAN.md
+Resume: Execute 12-02-PLAN.md -- e2e verification and --exclude-task-dependencies cleanup
