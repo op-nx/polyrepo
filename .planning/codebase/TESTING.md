@@ -1,266 +1,320 @@
 # Testing Patterns
 
-**Analysis Date:** 2026-03-10
+**Analysis Date:** 2026-03-22
 
 ## Test Framework
 
 **Runner:**
-- Vitest 4.0.0 (`^4.0.0` in `package.json`)
-- Config: No custom `vitest.config.ts` at root (uses Nx plugin defaults)
-- Test integration: `@nx/vitest` plugin (^22.5.4) configured in `nx.json`
-- Vite 7.0.0 used as underlying build tool
+- Vitest `^4.0.0`
+- Unit config: `packages/op-nx-polyrepo/vitest.config.mts`
+- E2E config: `packages/op-nx-polyrepo-e2e/vitest.config.mts`
+- Workspace config: `vitest.workspace.ts` (lists config files to discover)
 
 **Assertion Library:**
-- Vitest provides built-in assertion methods (compatible with Jest API)
-- No additional assertion library (chai, etc.) configured
+- Vitest built-ins: `expect`, `expectTypeOf`
+- Coverage provider: `@vitest/coverage-v8`
 
 **Run Commands:**
 ```bash
-npm exec nx run <project>:test              # Run tests for a specific project
-npm exec nx run-many --targets=test         # Run tests across all projects
-npm exec nx affected --targets=test         # Run tests for affected projects only
-npm exec nx test <project> -- --watch       # Watch mode for a specific project
-npm exec nx test <project> -- --coverage    # Generate coverage reports
+npm exec nx -- test @op-nx/polyrepo          # Run unit tests
+npm exec nx -- e2e op-nx-polyrepo-e2e        # Run e2e tests
+npm exec nx -- run-many -t test              # Run all tests
+npm run test                                  # Run all non-external tests via Nx
 ```
 
 ## Test File Organization
 
 **Location:**
-- Co-located with source files in the same directory
-- Test files live next to their implementation files
+- Unit tests: co-located alongside source files in `packages/op-nx-polyrepo/src/`
+- E2E tests: separate package at `packages/op-nx-polyrepo-e2e/src/`
+- Test helpers: `packages/op-nx-polyrepo/src/lib/testing/` — shared utilities for tests
 
 **Naming:**
-- `.test.ts` suffix for test files (e.g., `user-service.test.ts`)
-- `.spec.ts` suffix is also acceptable (e.g., `user-service.spec.ts`)
-- Follow the implementation file name exactly
+- Pattern: `<module-name>.spec.ts`
+- ESLint enforces `consistent-test-filename: ['error', { pattern: '.*\\.spec\\.[tj]sx?$' }]`
 
 **Structure:**
 ```
-src/
-  services/
-    user-service.ts           # Implementation
-    user-service.test.ts      # Tests for the service
-  components/
-    button.tsx                # Implementation
-    button.test.tsx           # Tests for the component
+packages/op-nx-polyrepo/src/
+├── index.spec.ts                        # Plugin entry point tests
+├── lib/
+│   ├── config/
+│   │   ├── resolve.spec.ts
+│   │   ├── schema.spec.ts
+│   │   └── validate.spec.ts
+│   ├── executors/
+│   │   ├── run/executor.spec.ts
+│   │   ├── status/executor.spec.ts
+│   │   └── sync/executor.spec.ts
+│   ├── format/table.spec.ts
+│   ├── git/
+│   │   ├── commands.spec.ts
+│   │   ├── detect.spec.ts
+│   │   └── normalize-url.spec.ts
+│   ├── graph/
+│   │   ├── cache.spec.ts
+│   │   ├── extract.spec.ts
+│   │   └── transform.spec.ts
+│   └── testing/
+│       ├── asserts.ts                   # assertDefined() helper
+│       └── mock-child-process.ts        # createMockChildProcess() factory
+
+packages/op-nx-polyrepo-e2e/src/
+├── cross-repo-deps.spec.ts
+├── installed.spec.ts
+├── polyrepo-status.spec.ts
+└── setup/
+    ├── container.ts
+    ├── global-setup.ts
+    └── provided-context.ts
 ```
 
 ## Test Structure
 
 **Suite Organization:**
 ```typescript
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+// Preferred: use function reference as describe title (enforced by vitest/prefer-describe-function-title)
+describe(extractGraphFromRepo, () => {
+  it('calls exec with command containing node_modules/.bin/nx and graph --print', async () => {
+    expect.hasAssertions();
 
-describe('UserService', () => {
-  let service: UserService;
+    const { mockExec } = setupExecSuccess(
+      JSON.stringify({ graph: { nodes: {}, dependencies: {} } }),
+    );
 
-  beforeEach(() => {
-    service = new UserService();
+    await extractGraphFromRepo('/workspace/.repos/repo-a');
+
+    expect(mockExec).toHaveBeenCalledWith(/* ... */);
+  });
+});
+
+// Nested describes for grouping related scenarios
+describe(transformGraphForRepo, () => {
+  describe('project name namespacing', () => {
+    it('prefixes project names with repoAlias/ separator', () => { /* ... */ });
   });
 
-  afterEach(() => {
-    // Cleanup
-  });
-
-  describe('getUserById', () => {
-    it('should return user when found', () => {
-      const result = service.getUserById('123');
-      expect(result).toBeDefined();
-    });
-
-    it('should throw error when user not found', () => {
-      expect(() => service.getUserById('invalid')).toThrow();
-    });
+  describe('path rewriting', () => {
+    it('rewrites project root to .repos/<alias>/<original-root>', () => { /* ... */ });
   });
 });
 ```
 
 **Patterns:**
-- `describe()` blocks organize tests by functionality or method
-- `it()` blocks test single behaviors (one assertion focus per test)
-- `beforeEach()` runs setup code before each test
-- `afterEach()` runs cleanup code after each test
-- `beforeAll()` and `afterAll()` for expensive operations that run once per suite
+- `expect.hasAssertions()` / `expect.assertions(N)` required on all async tests (enforced by `vitest/prefer-expect-assertions: ['error', { onlyFunctionsWithAsyncKeyword: true }]`)
+- No lifecycle hooks (`beforeEach`, `afterEach`, etc.) in unit tests — enforced by `vitest/no-hooks: error`. The `opNxE2e` ESLint override re-enables hooks for e2e only
+- `vi.clearAllMocks()` called at the start of each `setup()` helper function instead of hooks
+- Max 10 `expect` calls per test (`vitest/max-expects: ['error', { max: 10 }]`)
+- Lowercase test titles (`vitest/prefer-lowercase-title: error`)
+- Use `it` not `test` (`vitest/consistent-test-it: error`)
 
 ## Mocking
 
-**Framework:** Vitest's built-in `vi` module (compatible with Jest)
+**Framework:** Vitest `vi.mock`, `vi.fn`, `vi.mocked`
 
-**Patterns:**
+**Hoisted module mock pattern (standard):**
 ```typescript
-import { vi, describe, it, expect } from 'vitest';
+// 1. Type-only import of mocked module (before vi.mock)
+import type * as ExtractModule from './extract.js';
 
-describe('ApiClient', () => {
-  it('should call fetch with correct URL', () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
-    global.fetch = fetchMock;
+// 2. vi.mock with factory — MUST be before any runtime imports of the module
+vi.mock('./extract', () => ({
+  extractGraphFromRepo: vi.fn<typeof ExtractModule.extractGraphFromRepo>(),
+}));
 
-    // Call function being tested
-    await client.getUser('123');
+// 3. Runtime import after mocking
+import { extractGraphFromRepo } from './extract.js';
 
-    // Assert mock was called correctly
-    expect(fetchMock).toHaveBeenCalledWith(
-      'https://api.example.com/users/123'
-    );
-  });
+// 4. Get typed mock reference in test
+const mock = vi.mocked(extractGraphFromRepo);
+```
 
-  it('should retry on failure', () => {
-    const fetchMock = vi
-      .fn()
-      .mockRejectedValueOnce(new Error('Network error'))
-      .mockResolvedValueOnce({ ok: true });
+**Selective mock pattern (spread original):**
+```typescript
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
 
-    // Test retry logic
-  });
+  return {
+    ...actual,
+    existsSync: vi.fn<(path: string) => boolean>(),
+  };
+});
+```
+
+**Module state reset pattern (for modules with module-level state):**
+```typescript
+// cache.spec.ts — cache.ts has module-level Map state that must be reset
+describe('cache', () => {
+  async function setup() {
+    vi.clearAllMocks();
+    vi.resetModules();                    // Clears module registry → fresh module state
+
+    const mocks = await loadMocks();     // Re-import mocked modules after reset
+    setupMocksForExtraction(mocks);
+
+    return { mocks };
+  }
+
+  async function loadCacheModule() {
+    return import('./cache.js');         // Dynamic import gets fresh module instance
+  }
 });
 ```
 
 **What to Mock:**
-- External API calls (HTTP requests via fetch or axios)
-- Database connections
-- File system operations
-- Third-party services
-- System time (using `vi.useFakeTimers()`)
-- Environment variables (via vi.stubEnv())
+- All Node.js built-ins that perform I/O: `node:fs`, `node:child_process`
+- All `@nx/devkit` functions when testing plugin internals
+- All sibling modules at the boundary of the unit under test
 
 **What NOT to Mock:**
-- Pure utility functions (math, string formatting, etc.)
-- Business logic that you're testing
-- Internal methods of the class under test (unless specifically testing interaction)
-- The code being tested — always test real implementations
+- Zod schemas and validation logic — test them directly with `.safeParse()`
+- Pure transformation functions — test them directly with real input/output
+- Type utilities
 
 ## Fixtures and Factories
 
 **Test Data:**
 ```typescript
-// user-service.test.ts
-const mockUser = {
-  id: '123',
-  name: 'John Doe',
-  email: 'john@example.com',
-  role: 'admin'
-};
-
-const mockUsers = [mockUser, { ...mockUser, id: '456', name: 'Jane' }];
-
-describe('UserService', () => {
-  it('should return all users', () => {
-    const users = service.getAllUsers();
-    expect(users).toEqual(mockUsers);
-  });
-});
-```
-
-**Factory Pattern (optional, for complex data):**
-```typescript
-// Create factory functions for test data
-function createMockUser(overrides = {}) {
+// Factory function pattern — returns fresh object each call to prevent mutation bleed
+function makeFixtureGraph(): ExternalGraphJson {
   return {
-    id: '123',
-    name: 'John Doe',
-    email: 'john@example.com',
-    ...overrides
+    graph: {
+      nodes: {
+        'my-lib': {
+          name: 'my-lib',
+          type: 'lib',
+          data: { root: 'libs/my-lib', targets: { build: { executor: '@nx/js:tsc' } } },
+        },
+      },
+      dependencies: { 'my-lib': [] },
+    },
   };
 }
 
-// Usage in tests
-const adminUser = createMockUser({ role: 'admin' });
-const guestUser = createMockUser({ role: 'guest' });
+// Module-level const fixtures for simple, immutable test data
+const testConfig: PolyrepoConfig = {
+  repos: {
+    'repo-a': 'https://github.com/org/repo-a.git',
+  },
+};
 ```
 
+**Typed guard helpers (for noUncheckedIndexedAccess compatibility):**
+```typescript
+// In test files — avoids "possibly undefined" on index access
+function getNode(nodes: Record<string, TransformedNode>, key: string): TransformedNode {
+  const node = nodes[key];
+
+  if (!node) {
+    throw new Error(`Expected node "${key}" not found in result`);
+  }
+
+  return node;
+}
+```
+
+**Shared test utilities** (`src/lib/testing/`):
+- `assertDefined<T>(value, message?)` — narrows `T | undefined | null` to `T` with a helpful throw; used instead of repeated `if (!x) throw` guards
+- `createMockChildProcess(exitCode?)` — returns a typed `ChildProcess` stub built from `EventEmitter + Object.defineProperties`; encapsulates the single `as unknown as ChildProcess` cast so test files stay assertion-free
+
 **Location:**
-- Simple fixtures: inline in the test file above the test suite
-- Shared fixtures: in a `test-utils.ts` or `fixtures.ts` file in the same directory
-- Complex factories: may be extracted to a `__tests__` folder or dedicated utils module
+- Module-level constants for static fixtures at the top of test file
+- Factory functions for mutable fixtures as named functions within the describe block or at module scope
+- Shared cross-test utilities in `packages/op-nx-polyrepo/src/lib/testing/`
 
 ## Coverage
 
-**Requirements:** Not enforced (no coverage threshold configured)
+**Requirements:** Not enforced (no threshold configured in `vitest.config.mts`)
 
 **View Coverage:**
 ```bash
-npm exec nx test <project> -- --coverage
-# Output: coverage/ directory with HTML report
-open coverage/index.html
+npm exec nx -- test @op-nx/polyrepo --coverage
+# Report written to packages/op-nx-polyrepo/test-output/vitest/coverage/
 ```
-
-**Coverage Tool:** Vitest's built-in coverage (uses `c8` or `v8` by default)
-
-**Best Practice:**
-- Aim for 70-80% coverage on critical paths
-- Don't chase 100% — untestable code (getters/setters) can be ignored
-- Focus on testing edge cases and error paths, not line coverage percentages
 
 ## Test Types
 
 **Unit Tests:**
-- Scope: Single function, method, or small module
-- Approach: Test one behavior at a time, use mocks for dependencies
-- Execution: Fast (milliseconds), run frequently
-- Location: co-located `.test.ts` files
+- Scope: individual functions/modules with all I/O mocked
+- Globals enabled: `vi`, `describe`, `it`, `expect`, `expectTypeOf` available without imports (but the codebase imports them explicitly per ESLint rules)
+- Location: co-located at `packages/op-nx-polyrepo/src/**/*.spec.ts`
 
 **Integration Tests:**
-- Scope: Multiple modules working together
-- Approach: Use real implementations where possible, mock external services only
-- Execution: Slower (seconds), run before deployment
-- Location: Same `.test.ts` files with integration-specific `describe()` blocks
-- Example: Testing a service that uses a data mapper and repository together
+- None distinct from unit tests — the unit tests cover integration between internal modules via mocked I/O boundaries
 
 **E2E Tests:**
-- Framework: Not currently configured
-- Can be added via `@nx/cypress` or `@nx/playwright` if needed
-- Scope: Full user workflows from UI to database
-- Approach: Full system testing in a controlled environment
+- Framework: Vitest with `testcontainers` (`^11.12.0`)
+- Location: `packages/op-nx-polyrepo-e2e/src/`
+- Strategy: Docker-based — builds a workspace snapshot image, starts containers per test file, runs real `nx` commands inside the container
+- Global setup: `packages/op-nx-polyrepo-e2e/src/setup/global-setup.ts` orchestrates: Verdaccio start → plugin publish → snapshot image build → `project.provide('snapshotImage', name)`
+- Test timeout: `60_000ms`, hook timeout: `120_000ms`
+- Pool: `forks` (required by testcontainers)
+- Hooks (`beforeAll`/`afterAll`) are allowed in e2e tests only (via `opNxE2e` ESLint override in `packages/op-nx-polyrepo-e2e/eslint.config.mjs`)
 
 ## Common Patterns
 
 **Async Testing:**
 ```typescript
-it('should fetch user data', async () => {
-  const result = await service.getUser('123');
-  expect(result).toBeDefined();
-});
+it('rejects when stdout contains no valid JSON', async () => {
+  expect.hasAssertions();                  // REQUIRED for all async tests
 
-it('should handle fetch error', async () => {
-  await expect(service.getUser('invalid')).rejects.toThrow();
+  setupExecSuccess('[isolated-plugin] log only\nno json here');
+
+  await expect(
+    extractGraphFromRepo('/workspace/.repos/repo-a'),
+  ).rejects.toThrowError('/workspace/.repos/repo-a');
 });
 ```
 
 **Error Testing:**
 ```typescript
-it('should throw ValidationError for invalid input', () => {
-  expect(() => service.validate('')).toThrow(ValidationError);
-});
+it('throws with zod error details for invalid input', () => {
+  setup();
 
-it('should throw with specific message', () => {
-  expect(() => service.validate(''))
-    .toThrow('Email is required');
+  expect(() => validateConfig({})).toThrowError('Invalid @op-nx/polyrepo config');
 });
 ```
 
-**Snapshot Testing:**
+**Type-checking in tests:**
 ```typescript
-it('should render button correctly', () => {
-  const button = render(<Button label="Click me" />);
-  expect(button).toMatchSnapshot();
-});
+// expectTypeOf for structural type assertions
+it('dependencies use string type value (passed through)', () => {
+  const dep = result.dependencies.find((d) => d.source === 'repo-b/my-app');
 
-// Update snapshots with: npm exec nx test -- -u
+  expectTypeOf(dep?.type).toEqualTypeOf<string | undefined>();
+  expect(dep?.type).toBe('static');
+});
 ```
 
-## Nx Integration
+**Nth-call verification:**
+```typescript
+expect(mockExecFile).toHaveBeenNthCalledWith(
+  1,
+  'git',
+  ['fetch', '--depth', '1', 'origin', 'tag', 'v1.0.0'],
+  expect.objectContaining({ cwd: 'D:/workspace/.repos/repo' }),
+  expect.any(Function),
+);
+```
 
-**Test Cache:**
-- Enabled in `nx.json` under `targetDefaults["@nx/vitest:test"]`
-- Cache invalidation: inputs defined as `["default", "^production"]`
-- Inputs include all project files except test files (see `namedInputs` in `nx.json`)
+**Zod failure assertion helper pattern:**
+```typescript
+interface ZodFailureResult {
+  success: false;
+  error: ZodError;
+}
 
-**Run Tests via Nx:**
-- Nx automatically detects `.test.ts` and `.spec.ts` files
-- Each project gets a `test` target that runs Vitest
-- Supports parallel execution across projects with `nx run-many`
-- Supports watch mode: `npm exec nx test -- --watch`
+function expectZodFailure(result: { success: boolean }): asserts result is ZodFailureResult {
+  expect(result.success).toBe(false);
+}
+
+// Usage
+const result = polyrepoConfigSchema.safeParse({ ... });
+expectZodFailure(result);
+const message = result.error.issues[0]?.message ?? '';
+expect(message).toContain('repo-a');
+```
 
 ---
 
-*Testing analysis: 2026-03-10*
+*Testing analysis: 2026-03-22*

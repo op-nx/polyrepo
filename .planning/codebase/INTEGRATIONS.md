@@ -1,93 +1,106 @@
 # External Integrations
 
-**Analysis Date:** 2026-03-10
+**Analysis Date:** 2026-03-22
 
 ## APIs & External Services
 
-**None detected** - This is an Nx plugin/monorepo management tool with no external API integrations.
+**Git Hosting:**
+- GitHub (and any valid git remote) — the plugin clones and syncs external repositories
+  - SDK/Client: Node.js built-in `child_process.execFile('git', ...)` — no HTTP SDK; all git operations go through the `git` CLI binary
+  - Auth: ambient git credential helpers (SSH keys, HTTPS credential store) on the host machine; no env var injection by the plugin
+  - Implementation: `packages/op-nx-polyrepo/src/lib/git/commands.ts`
+
+**Nx Graph API:**
+- Child Nx workspace CLI — `nx graph --print` spawned as a subprocess in each synced repo
+  - Client: `child_process.exec(nxBin + " graph --print", ...)` — see `packages/op-nx-polyrepo/src/lib/graph/extract.ts`
+  - Auth: None (local process)
+  - Note: `NX_NO_CLOUD=true` and `NX_DAEMON=false` are injected into the subprocess environment to prevent cloud telemetry and daemon startup
+
+**npm Registry (e2e only):**
+- Verdaccio local registry — used during e2e test setup to publish the plugin tarball
+  - Client: npm CLI + `nx/release` programmatic API (`releaseVersion`, `releasePublish`)
+  - Auth: hardcoded e2e token `secretVerdaccioToken` written to a temporary `.npmrc.e2e` file
+  - Implementation: `packages/op-nx-polyrepo-e2e/src/setup/global-setup.ts`
+  - Registry URL: `http://localhost:4873` (host) / `http://host.docker.internal:4873` (container)
 
 ## Data Storage
 
 **Databases:**
-- Not applicable - This is a development/build tool, not a runtime application
+- None
 
 **File Storage:**
-- Local filesystem only - Uses local caching via `.nx/cache` and workspace-data directories
+- Local filesystem only
+  - Synced repos stored in `.repos/<alias>/` relative to workspace root
+  - Per-repo graph cache at `.repos/<alias>/.polyrepo-graph-cache.json`
+  - Per-repo lockfile hash at `.repos/.<alias>.lock-hash`
+  - Pre-computed graph JSON at `.repos/<alias>/.nx-graph-output.json` (populated by e2e Dockerfile; read as fast path by `packages/op-nx-polyrepo/src/lib/graph/extract.ts`)
+  - Old monolithic cache (migration artifact) at `.repos/.polyrepo-graph-cache.json` — cleaned up on first run
 
 **Caching:**
-- Nx local cache - Configured in `nx.json`
-- Support for self-hosted Nx cache (mentioned in README.md)
-- Default cache location: `.nx/cache`
+- Two-layer in-process + disk cache; no external cache service
+  - Layer 0: Module-level in-memory `Map` in `packages/op-nx-polyrepo/src/lib/graph/cache.ts` (persists for lifetime of Nx daemon worker process)
+  - Layer 1: Per-repo JSON files at `.repos/<alias>/.polyrepo-graph-cache.json`
+  - Cache key: `hashArray([reposConfigHash, alias, headSha, dirtyFiles])` — see `computeRepoHash` in `packages/op-nx-polyrepo/src/lib/graph/cache.ts`
 
 ## Authentication & Identity
 
 **Auth Provider:**
-- Not applicable - No runtime authentication required
-- Nx Cloud/Enterprise optional (not required)
+- None — no user authentication system
+- Git credentials: delegated entirely to the host OS git credential store / SSH agent; the plugin passes no credentials
+- Nx Cloud: explicitly disabled in subprocess invocations via `NX_NO_CLOUD=true`
 
 ## Monitoring & Observability
 
 **Error Tracking:**
-- None - Development-time tool only
+- None — no external error tracking service
 
 **Logs:**
-- Console output from build and test tasks
+- `logger` from `@nx/devkit` — all user-facing messages use `logger.info`, `logger.warn`, `logger.error`
+- No structured logging or log shipping
 
 ## CI/CD & Deployment
 
 **Hosting:**
-- Self-hosted (for cache) - Nx supports self-hosted caching without Nx Cloud/Enterprise
-- No pre-built CI/CD workflows detected
+- npm registry — published as `@op-nx/polyrepo` via `nx-release-publish` executor (`@nx/js:release-publish`)
+- Output directory: `dist/packages/op-nx-polyrepo/`
+- Release config in `packages/op-nx-polyrepo/package.json` (`nx.release`): `currentVersionResolver: "git-tag"`, `fallbackCurrentVersionResolver: "disk"`
 
 **CI Pipeline:**
-- Not detected - No `.github/workflows/`, GitLab CI, or other CI configurations present
-- Projects created from this plugin would define their own CI/CD
+- No `.github/` directory — no GitHub Actions workflows detected
+- Local CI command: `npm run ci` (runs `nx format:check && nx run-many -t build,test,lint,typecheck,e2e --exclude tag:polyrepo:external`)
 
 ## Environment Configuration
 
 **Required env vars:**
-- None - The workspace is self-contained with no external dependencies
+- None required for normal plugin operation
+- Optional Nx behavior vars:
+  - `NX_DAEMON` — set `false` to disable daemon (useful for debugging graph extraction)
+  - `NX_PLUGIN_NO_TIMEOUTS` — set `true` to disable plugin execution timeouts during slow graph extraction
 
 **Secrets location:**
-- Not applicable
+- No secrets managed by this codebase
+- Git credentials: host OS credential store
+- e2e registry token: ephemeral, hardcoded test value written to `.npmrc.e2e` and deleted after use
 
 ## Webhooks & Callbacks
 
 **Incoming:**
-- None - Not a runtime service
+- None
 
 **Outgoing:**
-- None - Not a runtime service
+- None — the plugin is purely local; it spawns child processes but makes no HTTP calls at runtime
 
-## Nx Workspace Integration
+## Docker (e2e only)
 
-**Core Integrations:**
-- npm workspaces - Primary integration point for package management
-- Nx plugins architecture - Extensible plugin system for adding custom targets/executors
-- TypeScript - Deep integration for type-safe builds and generators
-- Prettier - Code formatting in generated code
-- ESLint plugin - Linting configuration via Nx
+**Images used:**
+- `node:22-slim` — base image for both `nx-prep` and `workspace` build stages (`packages/op-nx-polyrepo-e2e/docker/Dockerfile`)
+- `hertzg/verdaccio` — Verdaccio container started by testcontainers in `packages/op-nx-polyrepo-e2e/src/setup/global-setup.ts`
 
-## Development-Time Tools Integration
-
-**Package Management:**
-- npm - Primary package manager
-- Workspace: `packages/*` pattern in `package.json`
-
-**Build System:**
-- Nx executor system - Provides targets: build, test, typecheck, serve, etc.
-- Vite - For web application projects
-- ESBuild - For general bundling
-- SWC - For fast transpilation
-
-**Testing Framework:**
-- Vitest - Test runner with UI dashboard support
-
-**Code Quality:**
-- TypeScript strict mode - Enforced in `tsconfig.base.json`
-- Prettier - Code formatting
-- ESLint - Via Nx plugin
+**Container orchestration:**
+- `testcontainers` library (`GenericContainer`, `GenericContainer.fromDockerfile`) manages Docker lifecycle
+- BuildKit is enabled (`withBuildkit()`) for layer caching
+- The snapshot image (`op-nx-e2e-snapshot`) is content-addressed via `PLUGIN_HASH` build arg (sha256 of published tarball) to achieve cache hits when plugin source is unchanged
 
 ---
 
-*Integration audit: 2026-03-10*
+*Integration audit: 2026-03-22*
