@@ -40,6 +40,7 @@ export default async function runExecutor(
         cwd: repoPath,
         env: {
           NX_DAEMON: 'false',
+          NX_NO_CLOUD: 'true',
           NX_WORKSPACE_DATA_DIRECTORY: normalizePath(
             join(repoPath, '.nx', 'workspace-data'),
           ),

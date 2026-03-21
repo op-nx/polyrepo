@@ -291,6 +291,7 @@ describe(runExecutor, () => {
     assertDefined(env, 'env should be defined');
 
     expect(env['NX_DAEMON']).toBe('false');
+    expect(env['NX_NO_CLOUD']).toBe('true');
     expect(env['NX_WORKSPACE_DATA_DIRECTORY']).toBe(
       '/workspace/.repos/repo-a/.nx/workspace-data',
     );
