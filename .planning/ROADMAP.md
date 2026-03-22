@@ -36,7 +36,7 @@
 ### v1.2 Static Edges and Proxy Caching
 
 - [x] **Phase 14: Temp Directory Rename** - Replace `.tmp` with `tmp` in child repo temp directories to align with Nx default `.gitignore` convention (completed 2026-03-22)
-- [ ] **Phase 15: Proxy Target Caching** - Enable host-level Nx caching for proxy targets using git-based runtime inputs, with daemon workaround and fallback guards (gap closure in progress)
+- [x] **Phase 15: Proxy Target Caching** - Enable host-level Nx caching for proxy targets using git-based runtime inputs, with daemon workaround and fallback guards (gap closure in progress) (completed 2026-03-22)
 - [ ] **Phase 16: Static Dependency Edges** - Upgrade host-sourced auto-detected edges from implicit to static with sourceFile provenance; external-sourced and override edges stay implicit
 
 ## Phase Details
@@ -70,7 +70,7 @@ Plans:
 3. After `polyrepo-sync` pulls new changes, the proxy target produces a cache miss (child Nx re-invoked)
 4. A failed git command (repo not synced, corrupt `.git`) does not produce a constant hash that permanently serves stale cached results
 5. Caching works correctly under `NX_DAEMON=true`, `NX_DAEMON=false`, and `NX_DAEMON` unset
-   **Plans:** 3/4 plans executed
+   **Plans:** 4/4 plans complete
 
 Plans:
 
@@ -111,7 +111,7 @@ Plans:
 | 12. Resolve cross-repo build cascade      | v1.1      | 2/2            | Complete    | 2026-03-21 |
 | 13. Verification and Tech Debt Cleanup    | v1.1      | 2/2            | Complete    | 2026-03-21 |
 | 14. Temp Directory Rename                 | v1.2      | 1/1            | Complete    | 2026-03-22 |
-| 15. Proxy Target Caching                  | 3/4       | In Progress    |             | -          |
+| 15. Proxy Target Caching                  | 4/4       | Complete       | 2026-03-22  | -          |
 | 16. Static Dependency Edges               | v1.2      | 0/TBD          | Not started | -          |
 
 ---
