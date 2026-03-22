@@ -79,7 +79,7 @@ vi.mock('./lib/graph/proxy-hash', () => ({
   toProxyHashEnvKey: vi.fn<typeof toProxyHashEnvKey>(),
 }));
 
-import {
+import plugin, {
   createNodesV2,
   createDependencies,
   preTasksExecution,
@@ -417,6 +417,21 @@ describe('createNodesV2 plugin', () => {
     expect(mockedLoggerWarn).toHaveBeenCalledWith(
       expect.stringContaining('extraction failed'),
     );
+  });
+});
+
+describe('default export', () => {
+  it('includes preTasksExecution for Nx plugin detection', () => {
+    expect(plugin).toBeDefined();
+    expect(plugin.preTasksExecution).toBe(preTasksExecution);
+  });
+
+  it('includes createNodesV2 for Nx plugin detection', () => {
+    expect(plugin.createNodesV2).toBe(createNodesV2);
+  });
+
+  it('includes createDependencies for Nx plugin detection', () => {
+    expect(plugin.createDependencies).toBe(createDependencies);
   });
 });
 
