@@ -5,9 +5,9 @@ milestone_name: Static edges and proxy caching
 status: active
 stopped_at: null
 last_updated: "2026-03-22"
-last_activity: 2026-03-22 --- Milestone v1.2 started
+last_activity: 2026-03-22 --- Roadmap created (3 phases, 12 requirements mapped)
 progress:
-  total_phases: 0
+  total_phases: 3
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -21,14 +21,29 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-22)
 
 **Core value:** `nx graph` displays projects from all synced repos with cross-repo dependency edges, and all relevant Nx CLI commands output projects from multiple repos
-**Current focus:** v1.2 Static edges and proxy caching
+**Current focus:** v1.2 Phase 14 -- Temp Directory Rename
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 14 of 16 (Temp Directory Rename)
 Plan: ---
-Status: Defining requirements
-Last activity: 2026-03-22 --- Milestone v1.2 started
+Status: Ready to plan
+Last activity: 2026-03-22 --- Roadmap created (3 phases, 12 requirements mapped)
+
+Progress: [░░░░░░░░░░] 0%
+
+## Performance Metrics
+
+**Velocity:**
+- Total plans completed: 0
+- Average duration: ---
+- Total execution time: 0 hours
+
+**By Phase:**
+
+| Phase | Plans | Total | Avg/Plan |
+|-------|-------|-------|----------|
+| - | - | - | - |
 
 ## Pending Todos
 
@@ -39,8 +54,13 @@ Last activity: 2026-03-22 --- Milestone v1.2 started
 - [executor] Rename .tmp to tmp in child repo temp directories
 - [executor] Run external repo Nx commands in devcontainer sidecar
 
+## Blockers/Concerns
+
+- Nx daemon caches runtime input results (nrwl/nx#30170) -- Phase 15 must validate with NX_DAEMON=false first, then NX_DAEMON=true
+- Static edge sourceFile validation has two distinct crash modes (graph construction vs. task hashing) -- Phase 16 needs both nx graph and nx affected verification
+
 ## Session Continuity
 
 Last session: 2026-03-22
-Stopped at: Defining requirements for v1.2
-Resume: Continue milestone setup
+Stopped at: Roadmap created for v1.2
+Resume: `/gsd:plan-phase 14`

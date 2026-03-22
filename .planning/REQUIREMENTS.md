@@ -53,28 +53,26 @@ Deferred to future releases. Tracked but not in current roadmap.
 
 ## Traceability
 
-Which phases cover which requirements. Updated during roadmap creation.
-
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| EXEC-01 | TBD | Pending |
-| EXEC-02 | TBD | Pending |
-| DETECT-01 | TBD | Pending |
-| DETECT-02 | TBD | Pending |
-| DETECT-03 | TBD | Pending |
-| DETECT-04 | TBD | Pending |
-| DETECT-05 | TBD | Pending |
-| PROXY-01 | TBD | Pending |
-| PROXY-02 | TBD | Pending |
-| PROXY-03 | TBD | Pending |
-| PROXY-04 | TBD | Pending |
-| PROXY-05 | TBD | Pending |
+| EXEC-01 | Phase 14 | Pending |
+| EXEC-02 | Phase 14 | Pending |
+| DETECT-01 | Phase 16 | Pending |
+| DETECT-02 | Phase 16 | Pending |
+| DETECT-03 | Phase 16 | Pending |
+| DETECT-04 | Phase 16 | Pending |
+| DETECT-05 | Phase 16 | Pending |
+| PROXY-01 | Phase 15 | Pending |
+| PROXY-02 | Phase 15 | Pending |
+| PROXY-03 | Phase 15 | Pending |
+| PROXY-04 | Phase 15 | Pending |
+| PROXY-05 | Phase 15 | Pending |
 
 **Coverage:**
 - v1.2 requirements: 12 total
-- Mapped to phases: 0
-- Unmapped: 12 (pending roadmap creation)
+- Mapped to phases: 12
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-22*
-*Last updated: 2026-03-22 after initial definition*
+*Last updated: 2026-03-22 after roadmap creation*
