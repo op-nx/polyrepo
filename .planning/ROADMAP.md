@@ -50,7 +50,10 @@
   2. Graph extraction creates a `tmp/` directory (not `.tmp/`) inside `.repos/<alias>/` for extraction temp isolation
   3. A synced Nx workspace using the default `create-nx-workspace` `.gitignore` (which includes `tmp`) does not need any additional gitignore entries for plugin temp directories
   4. All existing unit tests pass with updated path assertions
-**Plans**: TBD
+**Plans:** 1 plan
+
+Plans:
+- [ ] 14-01-PLAN.md -- Rename .tmp to tmp in production code and tests
 
 ### Phase 15: Proxy Target Caching
 **Goal**: Proxy targets skip child Nx bootstrap when the child repo's git state is unchanged, eliminating 2-5s overhead per cached target invocation
@@ -93,7 +96,7 @@
 | 11. Full Nx Daemon Support | v1.1 | 3/3 | Complete | 2026-03-21 |
 | 12. Resolve cross-repo build cascade | v1.1 | 2/2 | Complete | 2026-03-21 |
 | 13. Verification and Tech Debt Cleanup | v1.1 | 2/2 | Complete | 2026-03-21 |
-| 14. Temp Directory Rename | v1.2 | 0/TBD | Not started | - |
+| 14. Temp Directory Rename | v1.2 | 0/1 | Planning | - |
 | 15. Proxy Target Caching | v1.2 | 0/TBD | Not started | - |
 | 16. Static Dependency Edges | v1.2 | 0/TBD | Not started | - |
 
