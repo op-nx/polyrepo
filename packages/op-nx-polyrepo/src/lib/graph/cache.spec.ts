@@ -709,21 +709,19 @@ describe('cache', () => {
       );
 
       expect(callArgs).toBeDefined();
-      expect(callArgs![0][0]).toBe('1.0.0');
+      expect(callArgs?.[0][0]).toBe('1.0.0');
     });
 
     it('produces different hash when plugin version changes', async () => {
       expect.hasAssertions();
 
       // First module load with version 1.0.0
-      const mocks1 = await (async () => {
+      await (async () => {
         vi.clearAllMocks();
         vi.resetModules();
 
         const m = await loadMocks();
         setupMocksForExtraction(m);
-
-        return m;
       })();
 
       const mod1 = await loadCacheModule();
@@ -809,7 +807,7 @@ describe('cache', () => {
       );
 
       expect(hash).toBeDefined();
-      expect(typeof hash).toBe('string');
+      expectTypeOf(hash).toBeString();
 
       // hashArray should still have been called (fallback version included)
       expect(mocks.hashArray).toHaveBeenCalled();

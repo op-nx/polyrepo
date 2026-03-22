@@ -9,6 +9,26 @@ import type { PolyrepoConfig } from '../config/schema';
 import type { TransformedNode, PolyrepoGraphReport } from './types';
 
 /**
+ * Plugin version read once at module load time for cache key invalidation.
+ * When the plugin is upgraded, the version changes, invalidating all per-repo
+ * disk caches — ensuring stale target configs (e.g., old `cache: false`) are
+ * never served after an upgrade.
+ */
+const PLUGIN_VERSION: string = (() => {
+  try {
+    const pkg = readJsonFile<{ version: string }>(
+      join(__dirname, '..', '..', '..', 'package.json'),
+    );
+
+    return pkg.version;
+  } catch {
+    // Fallback: if package.json is unreadable, use a constant that
+    // changes on every process start (forces re-extraction).
+    return `dev-${String(Date.now())}`;
+  }
+})();
+
+/**
  * Per-repo graph data stored in both in-memory and disk caches.
  */
 interface RepoGraphData {
@@ -88,7 +108,9 @@ export function writePerRepoCache(
 }
 
 /**
- * Compute a per-repo hash from the repos config hash, alias, HEAD SHA, and dirty files.
+ * Compute a per-repo hash from the plugin version, repos config hash, alias,
+ * HEAD SHA, and dirty files. The plugin version is included first so that
+ * upgrading the plugin invalidates all disk caches automatically.
  * Exported for the sync executor to pre-cache after install.
  */
 export async function computeRepoHash(
@@ -99,7 +121,13 @@ export async function computeRepoHash(
   const headSha = await getHeadSha(repoPath);
   const dirtyFiles = await getDirtyFiles(repoPath);
 
-  return hashArray([reposConfigHash, alias, headSha, dirtyFiles]);
+  return hashArray([
+    PLUGIN_VERSION,
+    reposConfigHash,
+    alias,
+    headSha,
+    dirtyFiles,
+  ]);
 }
 
 /**
