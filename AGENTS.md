@@ -2,6 +2,10 @@
 
 Never stage `.planning/config.json` fields prefixed with `_` (e.g., `workflow._auto_chain_active`). These are transient runtime state injected by the GSD workflow system. If the file has been modified only by the addition or change of `_`-prefixed fields, do not stage it at all.
 
+## Gotchas
+
+- **Extensionless imports in plugin source** (`packages/op-nx-polyrepo/src/`): Use `'./foo'` not `'./foo.js'`. Nx loads local plugins via `@swc-node/register` (CJS) which can't remap `.js` → `.ts`. Extensionless works for both SWC dev-time loading and `@nx/js:tsc` builds.
+
 <!-- nx configuration start-->
 <!-- Leave the start & end comments to automatically receive updates. -->
 
