@@ -22,8 +22,8 @@ Requirements for v1.2: Static edges and proxy caching.
 
 ### Proxy
 
-- [ ] **PROXY-01**: Proxy targets set `cache: true` to enable host-level Nx caching
-- [ ] **PROXY-02**: Proxy targets include compound runtime input: `git rev-parse HEAD` + `git diff HEAD` per repo alias, capturing both sync changes and uncommitted edits
+- [x] **PROXY-01**: Proxy targets set `cache: true` to enable host-level Nx caching
+- [x] **PROXY-02**: Proxy targets include compound runtime input: `git rev-parse HEAD` + `git diff HEAD` per repo alias, capturing both sync changes and uncommitted edits
 - [ ] **PROXY-03**: Runtime input commands include a fallback guard so failed git commands (repo not synced, corrupt git) do not produce a constant hash that permanently returns stale cached results
 - [ ] **PROXY-04**: `polyrepo-sync` executor runs `nx reset` after sync completes to flush the daemon's stale runtime input cache (workaround for nrwl/nx#30170)
 - [ ] **PROXY-05**: Proxy caching works correctly with `NX_DAEMON=true`, `NX_DAEMON=false`, and `NX_DAEMON` unset
@@ -62,8 +62,8 @@ Deferred to future releases. Tracked but not in current roadmap.
 | DETECT-03   | Phase 16 | Pending  |
 | DETECT-04   | Phase 16 | Pending  |
 | DETECT-05   | Phase 16 | Pending  |
-| PROXY-01    | Phase 15 | Pending  |
-| PROXY-02    | Phase 15 | Pending  |
+| PROXY-01    | Phase 15 | Complete |
+| PROXY-02    | Phase 15 | Complete |
 | PROXY-03    | Phase 15 | Pending  |
 | PROXY-04    | Phase 15 | Pending  |
 | PROXY-05    | Phase 15 | Pending  |
