@@ -644,6 +644,29 @@ export default async function syncExecutor(
     }
   }
 
+  // PROXY-04 fallback: If preTasksExecution + env inputs approach fails
+  // verification (e.g., daemon still caches stale results), uncomment this
+  // block to flush the daemon's stale state after sync.
+  //
+  // The primary approach (preTasksExecution sets POLYREPO_HASH_<ALIAS> env
+  // vars, proxy targets use { env: "..." } inputs) bypasses nrwl/nx#30170
+  // entirely because env inputs use the stateless hash_env.rs code path.
+  // This fallback is only needed if that assumption proves incorrect.
+  //
+  // if (synced > 0 || warned > 0) {
+  //   try {
+  //     const { exec } = await import('node:child_process');
+  //     await new Promise<void>((resolve) => {
+  //       exec('nx reset', { cwd: context.root, windowsHide: true }, () => {
+  //         resolve();
+  //       });
+  //     });
+  //     logger.info('Flushed Nx daemon cache after sync (PROXY-04 workaround).');
+  //   } catch {
+  //     logger.warn('Failed to run nx reset after sync. Daemon may serve stale cached results.');
+  //   }
+  // }
+
   const formattedRows = formatAlignedTable(tableRows);
 
   logger.info('');

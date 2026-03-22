@@ -3,8 +3,10 @@ import type {
   CreateNodesContextV2,
   CreateDependenciesContext,
 } from '@nx/devkit';
+import type * as NodeCrypto from 'node:crypto';
 import type * as NodeFsPromises from 'node:fs/promises';
 import type * as NodeFs from 'node:fs';
+import type * as ConfigSchema from './lib/config/schema';
 
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof NodeFsPromises>();
@@ -25,7 +27,7 @@ vi.mock('node:fs', async (importOriginal) => {
 });
 
 vi.mock('node:crypto', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:crypto')>();
+  const actual = await importOriginal<typeof NodeCrypto>();
 
   return {
     ...actual,
@@ -60,7 +62,7 @@ vi.mock('./lib/graph/detect', () => ({
 }));
 
 vi.mock('./lib/config/schema', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./lib/config/schema')>();
+  const actual = await importOriginal<typeof ConfigSchema>();
 
   return {
     ...actual,
@@ -94,7 +96,6 @@ import { normalizeRepos } from './lib/config/schema';
 import { getHeadSha, getStatusPorcelain } from './lib/git/detect';
 import { toProxyHashEnvKey } from './lib/graph/proxy-hash';
 import type { PolyrepoGraphReport } from './lib/graph/types';
-import type { PreTasksExecution } from 'nx/src/project-graph/plugins/public-api';
 import { assertDefined } from './lib/testing/asserts';
 
 function setup() {
@@ -798,7 +799,7 @@ describe(createDependencies, () => {
   });
 });
 
-describe('preTasksExecution', () => {
+describe(preTasksExecution, () => {
   const mockedNormalizeRepos = vi.mocked(normalizeRepos);
   const mockedGetHeadSha = vi.mocked(getHeadSha);
   const mockedGetStatusPorcelain = vi.mocked(getStatusPorcelain);
@@ -820,9 +821,7 @@ describe('preTasksExecution', () => {
     mockedGetHeadSha.mockResolvedValue('abc123');
     mockedGetStatusPorcelain.mockResolvedValue('');
     mockedHashArray.mockReturnValue('deterministic-hash');
-    mockedRandomUUID.mockReturnValue(
-      '550e8400-e29b-41d4-a716-446655440000' as `${string}-${string}-${string}-${string}-${string}`,
-    );
+    mockedRandomUUID.mockReturnValue('550e8400-e29b-41d4-a716-446655440000');
   }
 
   const baseContext = {
@@ -917,17 +916,19 @@ describe('preTasksExecution', () => {
     expect(mockedNormalizeRepos).not.toHaveBeenCalled();
   });
 
-  it('returns early when options has no repos key', async () => {
+  it('returns early when options has empty repos (no entries)', async () => {
     expect.hasAssertions();
 
     setupPreTasksExecution();
+    mockedNormalizeRepos.mockReturnValue([]);
 
     await preTasksExecution(
-      {} as Parameters<typeof preTasksExecution>[0],
+      { repos: { placeholder: 'https://example.com/r.git' } },
       baseContext,
     );
 
-    expect(mockedNormalizeRepos).not.toHaveBeenCalled();
+    // normalizeRepos returns empty -> no env vars set
+    expect(mockedGetHeadSha).not.toHaveBeenCalled();
   });
 
   it('sets env var to random UUID when getHeadSha throws', async () => {

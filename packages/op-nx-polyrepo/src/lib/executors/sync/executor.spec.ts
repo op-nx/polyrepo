@@ -2408,4 +2408,37 @@ describe(syncExecutor, () => {
       expect(mockRmSync).not.toHaveBeenCalled();
     });
   });
+
+  describe('proxy-04 conditional nx reset', () => {
+    it('does not run nx reset after sync by default (primary caching approach bypasses daemon bug)', async () => {
+      expect.hasAssertions();
+
+      setup();
+      setupPluginConfig([
+        {
+          type: 'remote',
+          alias: 'repo-a',
+          url: 'https://github.com/org/repo-a.git',
+          depth: 1,
+          disableHooks: true,
+        },
+      ]);
+      mockDetectRepoState.mockReturnValue('not-synced');
+
+      await syncExecutor({}, createTestContext());
+
+      // Verify that 'nx reset' is NOT called. The PROXY-04 fallback is
+      // commented out by default because the primary caching approach
+      // (preTasksExecution sets POLYREPO_HASH_<ALIAS> env vars, proxy
+      // targets use { env: "..." } inputs) bypasses nrwl/nx#30170 entirely.
+      // If PROXY-04 is later activated, this test would be updated to
+      // verify the nx reset call.
+      const logCalls = mockLoggerInfo.mock.calls.map((call) => String(call[0]));
+      const nxResetLogs = logCalls.filter((msg) =>
+        msg.includes('Flushed Nx daemon cache'),
+      );
+
+      expect(nxResetLogs).toHaveLength(0);
+    });
+  });
 });
