@@ -24,6 +24,15 @@ vi.mock('node:fs', async (importOriginal) => {
   };
 });
 
+vi.mock('node:crypto', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:crypto')>();
+
+  return {
+    ...actual,
+    randomUUID: vi.fn<() => string>(),
+  };
+});
+
 vi.mock('@nx/devkit', () => ({
   logger: {
     warn: vi.fn<(...args: unknown[]) => void>(),
@@ -35,6 +44,7 @@ vi.mock('@nx/devkit', () => ({
     dynamic: 'dynamic',
     implicit: 'implicit',
   },
+  hashArray: vi.fn<(input: string[]) => string>(),
 }));
 
 vi.mock('nx/src/devkit-internals', () => ({
@@ -49,14 +59,32 @@ vi.mock('./lib/graph/detect', () => ({
   detectCrossRepoDependencies: vi.fn<typeof detectCrossRepoDependencies>(),
 }));
 
-import { createNodesV2, createDependencies } from './index';
-import { DependencyType, logger } from '@nx/devkit';
+vi.mock('./lib/config/schema', () => ({
+  normalizeRepos: vi.fn<typeof normalizeRepos>(),
+}));
+
+vi.mock('./lib/git/detect', () => ({
+  getHeadSha: vi.fn<typeof getHeadSha>(),
+  getStatusPorcelain: vi.fn<typeof getStatusPorcelain>(),
+}));
+
+vi.mock('./lib/graph/proxy-hash', () => ({
+  toProxyHashEnvKey: vi.fn<typeof toProxyHashEnvKey>(),
+}));
+
+import { createNodesV2, createDependencies, preTasksExecution } from './index';
+import { DependencyType, logger, hashArray } from '@nx/devkit';
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { hashObject } from 'nx/src/devkit-internals';
 import { populateGraphReport } from './lib/graph/cache';
 import { detectCrossRepoDependencies } from './lib/graph/detect';
+import { normalizeRepos } from './lib/config/schema';
+import { getHeadSha, getStatusPorcelain } from './lib/git/detect';
+import { toProxyHashEnvKey } from './lib/graph/proxy-hash';
 import type { PolyrepoGraphReport } from './lib/graph/types';
+import type { PreTasksExecution } from 'nx/src/project-graph/plugins/public-api';
 import { assertDefined } from './lib/testing/asserts';
 
 function setup() {
@@ -757,5 +785,382 @@ describe(createDependencies, () => {
       target: 'repo-a/my-lib',
       type: 'implicit',
     });
+  });
+});
+
+describe('preTasksExecution', () => {
+  const mockedNormalizeRepos = vi.mocked(normalizeRepos);
+  const mockedGetHeadSha = vi.mocked(getHeadSha);
+  const mockedGetStatusPorcelain = vi.mocked(getStatusPorcelain);
+  const mockedHashArray = vi.mocked(hashArray);
+  const mockedRandomUUID = vi.mocked(randomUUID);
+  const mockedToProxyHashEnvKey = vi.mocked(toProxyHashEnvKey);
+  const mockedExistsSync = vi.mocked(existsSync);
+  const mockedLoggerWarn = vi.mocked(logger.warn);
+
+  function setupPreTasksExecution() {
+    vi.clearAllMocks();
+
+    mockedToProxyHashEnvKey.mockImplementation(
+      (alias: string) =>
+        `POLYREPO_HASH_${alias.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`,
+    );
+    mockedExistsSync.mockReturnValue(true);
+    mockedGetHeadSha.mockResolvedValue('abc123');
+    mockedGetStatusPorcelain.mockResolvedValue('');
+    mockedHashArray.mockReturnValue('deterministic-hash');
+    mockedRandomUUID.mockReturnValue(
+      '550e8400-e29b-41d4-a716-446655440000' as `${string}-${string}-${string}-${string}-${string}`,
+    );
+  }
+
+  const baseContext = {
+    id: 'test-id',
+    workspaceRoot: '/workspace',
+    nxJsonConfiguration: {},
+    argv: [],
+  };
+
+  /**
+   * Save and restore a process.env key around a test.
+   */
+  function withEnvCleanup(key: string): () => void {
+    const saved = process.env[key];
+
+    return () => {
+      if (saved === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = saved;
+      }
+    };
+  }
+
+  it('sets env var to deterministic hash for synced repo with no dirty files', async () => {
+    expect.hasAssertions();
+
+    setupPreTasksExecution();
+    mockedNormalizeRepos.mockReturnValue([
+      {
+        type: 'remote',
+        alias: 'repo-a',
+        url: 'https://github.com/org/repo-a.git',
+        depth: 1,
+        disableHooks: true,
+      },
+    ]);
+
+    const cleanup = withEnvCleanup('POLYREPO_HASH_REPO_A');
+
+    try {
+      await preTasksExecution(
+        { repos: { 'repo-a': 'https://github.com/org/repo-a.git' } },
+        baseContext,
+      );
+
+      expect(process.env['POLYREPO_HASH_REPO_A']).toBe('deterministic-hash');
+      expect(mockedHashArray).toHaveBeenCalledWith(['abc123', 'clean']);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('sets env var to hash of HEAD + dirty for repo with modified files', async () => {
+    expect.hasAssertions();
+
+    setupPreTasksExecution();
+    mockedGetStatusPorcelain.mockResolvedValue('M file.ts');
+    mockedHashArray.mockReturnValue('dirty-hash');
+    mockedNormalizeRepos.mockReturnValue([
+      {
+        type: 'remote',
+        alias: 'repo-a',
+        url: 'https://github.com/org/repo-a.git',
+        depth: 1,
+        disableHooks: true,
+      },
+    ]);
+
+    const cleanup = withEnvCleanup('POLYREPO_HASH_REPO_A');
+
+    try {
+      await preTasksExecution(
+        { repos: { 'repo-a': 'https://github.com/org/repo-a.git' } },
+        baseContext,
+      );
+
+      expect(process.env['POLYREPO_HASH_REPO_A']).toBe('dirty-hash');
+      expect(mockedHashArray).toHaveBeenCalledWith(['abc123', 'dirty']);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('returns early when options is undefined (no env vars set)', async () => {
+    expect.hasAssertions();
+
+    setupPreTasksExecution();
+
+    await preTasksExecution(undefined, baseContext);
+
+    expect(mockedNormalizeRepos).not.toHaveBeenCalled();
+  });
+
+  it('returns early when options has no repos key', async () => {
+    expect.hasAssertions();
+
+    setupPreTasksExecution();
+
+    await preTasksExecution(
+      {} as Parameters<typeof preTasksExecution>[0],
+      baseContext,
+    );
+
+    expect(mockedNormalizeRepos).not.toHaveBeenCalled();
+  });
+
+  it('sets env var to random UUID when getHeadSha throws', async () => {
+    expect.hasAssertions();
+
+    setupPreTasksExecution();
+    mockedGetHeadSha.mockRejectedValue(new Error('git failed'));
+    mockedNormalizeRepos.mockReturnValue([
+      {
+        type: 'remote',
+        alias: 'repo-a',
+        url: 'https://github.com/org/repo-a.git',
+        depth: 1,
+        disableHooks: true,
+      },
+    ]);
+
+    const cleanup = withEnvCleanup('POLYREPO_HASH_REPO_A');
+
+    try {
+      await preTasksExecution(
+        { repos: { 'repo-a': 'https://github.com/org/repo-a.git' } },
+        baseContext,
+      );
+
+      expect(process.env['POLYREPO_HASH_REPO_A']).toBe(
+        '550e8400-e29b-41d4-a716-446655440000',
+      );
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('sets env var to random UUID when .git directory does not exist', async () => {
+    expect.hasAssertions();
+
+    setupPreTasksExecution();
+    mockedExistsSync.mockReturnValue(false);
+    mockedNormalizeRepos.mockReturnValue([
+      {
+        type: 'remote',
+        alias: 'repo-a',
+        url: 'https://github.com/org/repo-a.git',
+        depth: 1,
+        disableHooks: true,
+      },
+    ]);
+
+    const cleanup = withEnvCleanup('POLYREPO_HASH_REPO_A');
+
+    try {
+      await preTasksExecution(
+        { repos: { 'repo-a': 'https://github.com/org/repo-a.git' } },
+        baseContext,
+      );
+
+      expect(process.env['POLYREPO_HASH_REPO_A']).toBe(
+        '550e8400-e29b-41d4-a716-446655440000',
+      );
+      expect(mockedGetHeadSha).not.toHaveBeenCalled();
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('logs warning with alias name when git fails', async () => {
+    expect.hasAssertions();
+
+    setupPreTasksExecution();
+    mockedGetHeadSha.mockRejectedValue(new Error('git failed'));
+    mockedNormalizeRepos.mockReturnValue([
+      {
+        type: 'remote',
+        alias: 'repo-a',
+        url: 'https://github.com/org/repo-a.git',
+        depth: 1,
+        disableHooks: true,
+      },
+    ]);
+
+    const cleanup = withEnvCleanup('POLYREPO_HASH_REPO_A');
+
+    try {
+      await preTasksExecution(
+        { repos: { 'repo-a': 'https://github.com/org/repo-a.git' } },
+        baseContext,
+      );
+
+      expect(mockedLoggerWarn).toHaveBeenCalledWith(
+        expect.stringContaining("'repo-a'"),
+      );
+      expect(mockedLoggerWarn).toHaveBeenCalledWith(
+        expect.stringContaining('polyrepo-sync'),
+      );
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('does not log warning twice for same alias', async () => {
+    expect.hasAssertions();
+
+    setupPreTasksExecution();
+    mockedExistsSync.mockReturnValue(false);
+    mockedNormalizeRepos.mockReturnValue([
+      {
+        type: 'remote',
+        alias: 'repo-a',
+        url: 'https://github.com/org/repo-a.git',
+        depth: 1,
+        disableHooks: true,
+      },
+    ]);
+
+    const cleanupA = withEnvCleanup('POLYREPO_HASH_REPO_A');
+
+    try {
+      // Call twice with same alias
+      await preTasksExecution(
+        { repos: { 'repo-a': 'https://github.com/org/repo-a.git' } },
+        baseContext,
+      );
+      await preTasksExecution(
+        { repos: { 'repo-a': 'https://github.com/org/repo-a.git' } },
+        baseContext,
+      );
+
+      // Warning should only appear once for repo-a
+      const repoAWarnings = mockedLoggerWarn.mock.calls.filter(
+        (call) => typeof call[0] === 'string' && call[0].includes("'repo-a'"),
+      );
+
+      expect(repoAWarnings).toHaveLength(1);
+    } finally {
+      cleanupA();
+    }
+  });
+
+  it('continues to next repo when one repo fails (per-repo isolation)', async () => {
+    expect.hasAssertions();
+
+    setupPreTasksExecution();
+    mockedNormalizeRepos.mockReturnValue([
+      {
+        type: 'remote',
+        alias: 'repo-a',
+        url: 'https://github.com/org/repo-a.git',
+        depth: 1,
+        disableHooks: true,
+      },
+      {
+        type: 'remote',
+        alias: 'repo-b',
+        url: 'https://github.com/org/repo-b.git',
+        depth: 1,
+        disableHooks: true,
+      },
+    ]);
+    mockedGetHeadSha.mockRejectedValueOnce(new Error('git failed'));
+    mockedGetHeadSha.mockResolvedValueOnce('def456');
+
+    const cleanupA = withEnvCleanup('POLYREPO_HASH_REPO_A');
+    const cleanupB = withEnvCleanup('POLYREPO_HASH_REPO_B');
+
+    try {
+      await preTasksExecution(
+        {
+          repos: {
+            'repo-a': 'https://github.com/org/repo-a.git',
+            'repo-b': 'https://github.com/org/repo-b.git',
+          },
+        },
+        baseContext,
+      );
+
+      // repo-a failed -> UUID
+      expect(process.env['POLYREPO_HASH_REPO_A']).toBe(
+        '550e8400-e29b-41d4-a716-446655440000',
+      );
+      // repo-b succeeded -> deterministic hash
+      expect(process.env['POLYREPO_HASH_REPO_B']).toBe('deterministic-hash');
+    } finally {
+      cleanupA();
+      cleanupB();
+    }
+  });
+
+  it('computes repo path as join(workspaceRoot, .repos, alias) for remote repos', async () => {
+    expect.hasAssertions();
+
+    setupPreTasksExecution();
+    mockedNormalizeRepos.mockReturnValue([
+      {
+        type: 'remote',
+        alias: 'repo-a',
+        url: 'https://github.com/org/repo-a.git',
+        depth: 1,
+        disableHooks: true,
+      },
+    ]);
+
+    const cleanup = withEnvCleanup('POLYREPO_HASH_REPO_A');
+
+    try {
+      await preTasksExecution(
+        { repos: { 'repo-a': 'https://github.com/org/repo-a.git' } },
+        baseContext,
+      );
+
+      // existsSync should be called with path joining workspaceRoot/.repos/repo-a/.git
+      expect(mockedExistsSync).toHaveBeenCalledWith(
+        expect.stringContaining('.repos'),
+      );
+      expect(mockedGetHeadSha).toHaveBeenCalledWith(
+        expect.stringContaining('.repos'),
+      );
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('uses entry.path directly for local repos', async () => {
+    expect.hasAssertions();
+
+    setupPreTasksExecution();
+    mockedNormalizeRepos.mockReturnValue([
+      {
+        type: 'local',
+        alias: 'local-repo',
+        path: 'D:/projects/local-repo',
+      },
+    ]);
+
+    const cleanup = withEnvCleanup('POLYREPO_HASH_LOCAL_REPO');
+
+    try {
+      await preTasksExecution(
+        { repos: { 'local-repo': { path: 'D:/projects/local-repo' } } },
+        baseContext,
+      );
+
+      expect(mockedGetHeadSha).toHaveBeenCalledWith('D:/projects/local-repo');
+    } finally {
+      cleanup();
+    }
   });
 });
