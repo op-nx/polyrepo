@@ -25,6 +25,7 @@ import {
   getWorkingTreeState,
   getAheadBehind,
   isGitTag,
+  getStatusPorcelain,
 } from './detect';
 
 function createExecError(message: string, code?: string): ExecFileException {
@@ -682,5 +683,49 @@ describe(isGitTag, () => {
 
     expect(result).toBe(false);
     expect(mockExecFile).not.toHaveBeenCalled();
+  });
+});
+
+describe(getStatusPorcelain, () => {
+  it('returns trimmed output of git status --porcelain', async () => {
+    expect.hasAssertions();
+
+    const { mockExecFile } = setup(' M src/file.ts\n?? newfile.ts\n');
+
+    const result = await getStatusPorcelain('/workspace/.repos/repo');
+
+    expect(result).toBe(' M src/file.ts\n?? newfile.ts');
+    expect(mockExecFile).toHaveBeenCalledWith(
+      'git',
+      ['status', '--porcelain'],
+      expect.objectContaining({ cwd: '/workspace/.repos/repo' }),
+      expect.any(Function),
+    );
+  });
+
+  it('returns empty string for a clean working tree', async () => {
+    expect.hasAssertions();
+
+    setup('');
+
+    const result = await getStatusPorcelain('/workspace/.repos/repo');
+
+    expect(result).toBe('');
+  });
+
+  it('rejects when git command fails', async () => {
+    expect.hasAssertions();
+
+    const { mockExecFile } = setup('');
+
+    mockExecFileImpl(mockExecFile, (_args, callback) => {
+      if (callback) {
+        callback(createExecError('not a git repo'), '', 'not a git repo');
+      }
+    });
+
+    await expect(
+      getStatusPorcelain('/workspace/.repos/repo'),
+    ).rejects.toThrowError('not a git repo');
   });
 });
