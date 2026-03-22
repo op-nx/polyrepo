@@ -4,6 +4,7 @@
   "license": "MIT",
   "private": true,
   "scripts": {
+    "prepare": "git config core.hooksPath .githooks",
     "build": "nx run-many -t build --exclude tag:polyrepo:external --skip-sync",
     "build:polyrepo": "nx run-many -t build --skip-sync",
     "build:external": "nx run-many -t build -p tag:polyrepo:external --skip-sync",
