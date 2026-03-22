@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { TargetConfiguration } from '@nx/devkit';
 import type { ExternalGraphJson, TransformedNode } from './types';
+import { toProxyHashEnvKey } from './proxy-hash.js';
 
 /**
  * Normalize all path separators to forward slashes.
@@ -107,12 +108,13 @@ function createProxyTarget(
   rawTargetConfig: unknown,
 ): TargetConfiguration {
   const config = isRecord(rawTargetConfig) ? rawTargetConfig : {};
+  const envKey = toProxyHashEnvKey(repoAlias);
 
   return {
     executor: '@op-nx/polyrepo:run',
     options: { repoAlias, originalProject, targetName },
-    inputs: [],
-    cache: false,
+    inputs: [{ env: envKey }],
+    cache: true,
     dependsOn: rewriteDependsOn(config['dependsOn'], repoAlias),
     configurations: isRecordOfRecords(config['configurations'])
       ? config['configurations']

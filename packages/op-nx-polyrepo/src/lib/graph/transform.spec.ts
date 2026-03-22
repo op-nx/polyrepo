@@ -327,7 +327,7 @@ describe(transformGraphForRepo, () => {
       });
     });
 
-    it('sets inputs to empty array (prevents native hasher from resolving external files)', () => {
+    it('sets inputs to env-based proxy hash input per repo alias', () => {
       const graph = makeFixtureGraph();
       const result = transformGraphForRepo(repoAlias, graph, workspaceRoot);
       const buildTarget = getTarget(
@@ -335,7 +335,9 @@ describe(transformGraphForRepo, () => {
         'build',
       );
 
-      expect(buildTarget.inputs).toStrictEqual([]);
+      expect(buildTarget.inputs).toStrictEqual([
+        { env: 'POLYREPO_HASH_REPO_B' },
+      ]);
     });
 
     it('omits outputs from proxy target (child repo manages its own outputs)', () => {
@@ -349,14 +351,14 @@ describe(transformGraphForRepo, () => {
       expect(testTarget.outputs).toBeUndefined();
     });
 
-    it('sets cache to false on proxy targets (child repo handles caching)', () => {
+    it('sets cache to true on proxy targets (host-level caching via env input)', () => {
       const graph = makeFixtureGraph();
       const result = transformGraphForRepo(repoAlias, graph, workspaceRoot);
 
       expect(
         getTarget(getNode(result.nodes, 'repo-b/my-lib').targets, 'build')
           .cache,
-      ).toBe(false);
+      ).toBe(true);
     });
 
     it('copies parallelism from original target', () => {
