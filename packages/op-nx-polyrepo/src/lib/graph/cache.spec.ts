@@ -187,7 +187,17 @@ describe('cache', () => {
       },
     );
 
-    mocks.readJsonFile.mockImplementation(() => {
+    mocks.readJsonFile.mockImplementation((path: unknown) => {
+      const ps = String(path);
+
+      // Return plugin version when cache.ts reads its own package.json
+      if (
+        ps.includes('package.json') &&
+        !ps.includes('.polyrepo-graph-cache')
+      ) {
+        return { version: '1.0.0' };
+      }
+
       throw new Error('File not found');
     });
 
@@ -271,9 +281,16 @@ describe('cache', () => {
       // Use a stable hash so we can match it
       mocks.hashArray.mockReturnValue('stable-hash');
 
-      // Mock per-repo disk cache for repo-a only
+      // Mock per-repo disk cache for repo-a only (and plugin version)
       mocks.readJsonFile.mockImplementation((path: unknown) => {
         const ps = String(path);
+
+        if (
+          ps.includes('package.json') &&
+          !ps.includes('.polyrepo-graph-cache')
+        ) {
+          return { version: '1.0.0' };
+        }
 
         if (
           ps.includes('repo-a') &&
@@ -667,6 +684,135 @@ describe('cache', () => {
 
       // getHeadSha should only be called for repo-a
       expect(mocks.getHeadSha).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('plugin version in cache key (PROXY-01)', () => {
+    it('computeRepoHash includes plugin version in hash input', async () => {
+      expect.hasAssertions();
+
+      const { mocks } = await setup();
+
+      // Plugin version 1.0.0 (set by setupMocksForExtraction)
+      const { computeRepoHash } = await loadCacheModule();
+
+      await computeRepoHash('opts-hash', 'repo-a', '/workspace/.repos/repo-a');
+
+      // hashArray should have been called with the plugin version as first element
+      expect(mocks.hashArray).toHaveBeenCalledWith(
+        expect.arrayContaining(['1.0.0']),
+      );
+
+      // Verify the version is the first element (convention from plan)
+      const callArgs = mocks.hashArray.mock.calls.find(
+        (call) => Array.isArray(call[0]) && call[0].includes('1.0.0'),
+      );
+
+      expect(callArgs).toBeDefined();
+      expect(callArgs![0][0]).toBe('1.0.0');
+    });
+
+    it('produces different hash when plugin version changes', async () => {
+      expect.hasAssertions();
+
+      // First module load with version 1.0.0
+      const mocks1 = await (async () => {
+        vi.clearAllMocks();
+        vi.resetModules();
+
+        const m = await loadMocks();
+        setupMocksForExtraction(m);
+
+        return m;
+      })();
+
+      const mod1 = await loadCacheModule();
+      const hash1 = await mod1.computeRepoHash(
+        'opts-hash',
+        'repo-a',
+        '/workspace/.repos/repo-a',
+      );
+
+      // Second module load with version 2.0.0
+      vi.clearAllMocks();
+      vi.resetModules();
+
+      const mocks2 = await loadMocks();
+      setupMocksForExtraction(mocks2);
+
+      // Override version to 2.0.0
+      mocks2.readJsonFile.mockImplementation((path: unknown) => {
+        const ps = String(path);
+
+        if (
+          ps.includes('package.json') &&
+          !ps.includes('.polyrepo-graph-cache')
+        ) {
+          return { version: '2.0.0' };
+        }
+
+        throw new Error('File not found');
+      });
+
+      const mod2 = await loadCacheModule();
+      const hash2 = await mod2.computeRepoHash(
+        'opts-hash',
+        'repo-a',
+        '/workspace/.repos/repo-a',
+      );
+
+      expect(hash1).not.toBe(hash2);
+    });
+
+    it('produces stable hash when called twice with same plugin version', async () => {
+      expect.hasAssertions();
+
+      await setup();
+
+      const { computeRepoHash } = await loadCacheModule();
+
+      const hash1 = await computeRepoHash(
+        'opts-hash',
+        'repo-a',
+        '/workspace/.repos/repo-a',
+      );
+      const hash2 = await computeRepoHash(
+        'opts-hash',
+        'repo-a',
+        '/workspace/.repos/repo-a',
+      );
+
+      expect(hash1).toBe(hash2);
+    });
+
+    it('falls back to dev timestamp when package.json is unreadable', async () => {
+      expect.hasAssertions();
+
+      vi.clearAllMocks();
+      vi.resetModules();
+
+      const mocks = await loadMocks();
+      setupMocksForExtraction(mocks);
+
+      // Override readJsonFile to throw for package.json (simulating unreadable)
+      mocks.readJsonFile.mockImplementation(() => {
+        throw new Error('File not found');
+      });
+
+      const { computeRepoHash } = await loadCacheModule();
+
+      // Should still work (uses fallback version)
+      const hash = await computeRepoHash(
+        'opts-hash',
+        'repo-a',
+        '/workspace/.repos/repo-a',
+      );
+
+      expect(hash).toBeDefined();
+      expect(typeof hash).toBe('string');
+
+      // hashArray should still have been called (fallback version included)
+      expect(mocks.hashArray).toHaveBeenCalled();
     });
   });
 
