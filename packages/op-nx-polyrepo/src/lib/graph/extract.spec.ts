@@ -135,7 +135,7 @@ describe(extractGraphFromRepo, () => {
     );
   });
 
-  it('sets env with NX_DAEMON, NX_VERBOSE_LOGGING, and NX_PERF_LOGGING all false', async () => {
+  it('sets env with NX_DAEMON=false, NX_VERBOSE/PERF_LOGGING=false, and TEMP/TMP/TMPDIR to repo tmp dir', async () => {
     expect.hasAssertions();
 
     const { mockExec } = setupExecSuccess(
@@ -151,6 +151,9 @@ describe(extractGraphFromRepo, () => {
           NX_DAEMON: 'false',
           NX_VERBOSE_LOGGING: 'false',
           NX_PERF_LOGGING: 'false',
+          TEMP: '/workspace/.repos/repo-a/tmp',
+          TMP: '/workspace/.repos/repo-a/tmp',
+          TMPDIR: '/workspace/.repos/repo-a/tmp',
         }),
       }),
       expect.any(Function),
