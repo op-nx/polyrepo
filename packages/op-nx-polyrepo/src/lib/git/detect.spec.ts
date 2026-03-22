@@ -690,11 +690,11 @@ describe(getStatusPorcelain, () => {
   it('returns trimmed output of git status --porcelain', async () => {
     expect.hasAssertions();
 
-    const { mockExecFile } = setup(' M src/file.ts\n?? newfile.ts\n');
+    const { mockExecFile } = setup('M  src/file.ts\n?? newfile.ts\n');
 
     const result = await getStatusPorcelain('/workspace/.repos/repo');
 
-    expect(result).toBe(' M src/file.ts\n?? newfile.ts');
+    expect(result).toBe('M  src/file.ts\n?? newfile.ts');
     expect(mockExecFile).toHaveBeenCalledWith(
       'git',
       ['status', '--porcelain'],

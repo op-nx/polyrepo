@@ -194,6 +194,14 @@ export async function getWorkingTreeState(
   return state;
 }
 
+/**
+ * Returns `git status --porcelain` output. Non-empty means the working tree
+ * has changes (modified, staged, deleted, or untracked files).
+ */
+export async function getStatusPorcelain(cwd: string): Promise<string> {
+  return execGitOutput(['status', '--porcelain'], cwd);
+}
+
 export async function getAheadBehind(cwd: string): Promise<AheadBehind | null> {
   try {
     const output = await execGitOutput(
