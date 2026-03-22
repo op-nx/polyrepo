@@ -38,8 +38,8 @@ export default async function runExecutor(
   // targets for the same repo run concurrently. Tools that use os.tmpdir()
   // (Node.js), GetTempPath() (Windows native), or $TMPDIR (POSIX) all
   // resolve to this isolated path instead of the shared system %TEMP%.
-  const repoTmpDir = normalizePath(join(repoPath, '.tmp'));
-  mkdirSync(join(repoPath, '.tmp'), { recursive: true });
+  const repoTmpDir = normalizePath(join(repoPath, 'tmp'));
+  mkdirSync(join(repoPath, 'tmp'), { recursive: true });
 
   try {
     const result = await runCommandsImpl(

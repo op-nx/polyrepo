@@ -88,8 +88,8 @@ export function extractGraphFromRepo(
   // Ensure the temp directory exists before spawning the child process.
   // Same isolation as the proxy executor: prevents lock contention and
   // "path not found" errors when .nx/ was deleted.
-  const repoTmpDir = normalizePath(join(repoPath, '.tmp'));
-  mkdirSync(join(repoPath, '.tmp'), { recursive: true });
+  const repoTmpDir = normalizePath(join(repoPath, 'tmp'));
+  mkdirSync(join(repoPath, 'tmp'), { recursive: true });
 
   return new Promise((resolve, reject) => {
     exec(

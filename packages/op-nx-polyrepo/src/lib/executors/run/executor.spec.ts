@@ -297,9 +297,9 @@ describe(runExecutor, () => {
     assertDefined(env, 'env should be defined');
 
     expect(env['NX_DAEMON']).toBe('false');
-    expect(env['TEMP']).toBe('/workspace/.repos/repo-a/.tmp');
-    expect(env['TMP']).toBe('/workspace/.repos/repo-a/.tmp');
-    expect(env['TMPDIR']).toBe('/workspace/.repos/repo-a/.tmp');
+    expect(env['TEMP']).toBe('/workspace/.repos/repo-a/tmp');
+    expect(env['TMP']).toBe('/workspace/.repos/repo-a/tmp');
+    expect(env['TMPDIR']).toBe('/workspace/.repos/repo-a/tmp');
     expect(env['NX_WORKSPACE_DATA_DIRECTORY']).toBe(
       '/workspace/.repos/repo-a/.nx/workspace-data',
     );
