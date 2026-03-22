@@ -1,4 +1,5 @@
-import { readFileSync, writeFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type {
   CreateNodesV2,
@@ -8,11 +9,15 @@ import type {
   RawProjectGraphDependency,
   ProjectConfiguration,
 } from '@nx/devkit';
-import { DependencyType, logger } from '@nx/devkit';
+import { DependencyType, hashArray, logger } from '@nx/devkit';
 import { hashObject } from 'nx/src/devkit-internals';
+import { type PreTasksExecution } from 'nx/src/project-graph/plugins/public-api';
 import type { PolyrepoConfig } from './lib/config/schema';
+import { normalizeRepos } from './lib/config/schema';
+import { getHeadSha, getStatusPorcelain } from './lib/git/detect';
 import { populateGraphReport } from './lib/graph/cache';
 import { detectCrossRepoDependencies } from './lib/graph/detect';
+import { toProxyHashEnvKey } from './lib/graph/proxy-hash';
 import type { PolyrepoGraphReport } from './lib/graph/types';
 import {
   validateConfig,
@@ -21,6 +26,28 @@ import {
 } from './lib/config/validate';
 
 const PROXY_EXECUTOR = '@op-nx/polyrepo:run';
+
+const warnedAliases = new Set<string>();
+
+function warnGitFailure(alias: string): void {
+  if (warnedAliases.has(alias)) {
+    return;
+  }
+
+  warnedAliases.add(alias);
+  logger.warn(
+    `polyrepo: git state check failed for '${alias}', proxy target cache bypassed. ` +
+      `Hint: run 'nx polyrepo-sync' if repo is not yet cloned.`,
+  );
+}
+
+/**
+ * @internal Exposed for test cleanup only. Clears the module-level
+ * deduplicated-warning tracker so tests start with a clean slate.
+ */
+export function _resetWarnedAliases(): void {
+  warnedAliases.clear();
+}
 
 /**
  * Ensure nx.json has an empty targetDefaults entry keyed by our proxy
@@ -246,4 +273,51 @@ export const createDependencies: CreateDependencies<PolyrepoConfig> = async (
   }
 
   return dependencies;
+};
+
+/**
+ * Compute per-repo git state hashes and set `POLYREPO_HASH_<ALIAS>` env vars
+ * before Nx task hashing. Nx reads these via `{ env: "..." }` inputs declared
+ * on proxy targets, producing a cache key that changes whenever a synced repo's
+ * HEAD or dirty state changes.
+ *
+ * Runs once per `nx run` invocation. Each repo is hashed independently -- a
+ * failed git command for one repo does not prevent others from being hashed.
+ * On failure, a random UUID is used (cache miss every invocation) and a
+ * deduplicated warning is logged.
+ */
+export const preTasksExecution: PreTasksExecution<PolyrepoConfig> = async (
+  options,
+  context,
+): Promise<void> => {
+  if (!options?.repos) {
+    return;
+  }
+
+  const entries = normalizeRepos(options);
+
+  for (const entry of entries) {
+    const repoPath =
+      entry.type === 'remote'
+        ? join(context.workspaceRoot, '.repos', entry.alias)
+        : entry.path;
+    const envKey = toProxyHashEnvKey(entry.alias);
+
+    if (!existsSync(join(repoPath, '.git'))) {
+      process.env[envKey] = randomUUID();
+      warnGitFailure(entry.alias);
+
+      continue;
+    }
+
+    try {
+      const headSha = await getHeadSha(repoPath);
+      const porcelain = await getStatusPorcelain(repoPath);
+      const dirty = porcelain.length > 0;
+      process.env[envKey] = hashArray([headSha, dirty ? 'dirty' : 'clean']);
+    } catch {
+      process.env[envKey] = randomUUID();
+      warnGitFailure(entry.alias);
+    }
+  }
 };

@@ -59,9 +59,14 @@ vi.mock('./lib/graph/detect', () => ({
   detectCrossRepoDependencies: vi.fn<typeof detectCrossRepoDependencies>(),
 }));
 
-vi.mock('./lib/config/schema', () => ({
-  normalizeRepos: vi.fn<typeof normalizeRepos>(),
-}));
+vi.mock('./lib/config/schema', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./lib/config/schema')>();
+
+  return {
+    ...actual,
+    normalizeRepos: vi.fn<typeof normalizeRepos>(actual.normalizeRepos),
+  };
+});
 
 vi.mock('./lib/git/detect', () => ({
   getHeadSha: vi.fn<typeof getHeadSha>(),
@@ -72,7 +77,12 @@ vi.mock('./lib/graph/proxy-hash', () => ({
   toProxyHashEnvKey: vi.fn<typeof toProxyHashEnvKey>(),
 }));
 
-import { createNodesV2, createDependencies, preTasksExecution } from './index';
+import {
+  createNodesV2,
+  createDependencies,
+  preTasksExecution,
+  _resetWarnedAliases,
+} from './index';
 import { DependencyType, logger, hashArray } from '@nx/devkit';
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
@@ -800,6 +810,7 @@ describe('preTasksExecution', () => {
 
   function setupPreTasksExecution() {
     vi.clearAllMocks();
+    _resetWarnedAliases();
 
     mockedToProxyHashEnvKey.mockImplementation(
       (alias: string) =>
