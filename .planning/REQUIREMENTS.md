@@ -9,8 +9,8 @@ Requirements for v1.2: Static edges and proxy caching.
 
 ### Executor
 
-- [ ] **EXEC-01**: Child repo temp directories use `tmp/` instead of `.tmp/` to align with Nx default `.gitignore` convention
-- [ ] **EXEC-02**: Graph extraction temp directory uses `tmp/` instead of `.tmp/`
+- [x] **EXEC-01**: Child repo temp directories use `tmp/` instead of `.tmp/` to align with Nx default `.gitignore` convention
+- [x] **EXEC-02**: Graph extraction temp directory uses `tmp/` instead of `.tmp/`
 
 ### Detection
 
@@ -55,8 +55,8 @@ Deferred to future releases. Tracked but not in current roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| EXEC-01 | Phase 14 | Pending |
-| EXEC-02 | Phase 14 | Pending |
+| EXEC-01 | Phase 14 | Complete |
+| EXEC-02 | Phase 14 | Complete |
 | DETECT-01 | Phase 16 | Pending |
 | DETECT-02 | Phase 16 | Pending |
 | DETECT-03 | Phase 16 | Pending |
