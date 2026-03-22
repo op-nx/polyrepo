@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Static Edges and Proxy Caching
 status: in-progress
-stopped_at: Completed 15-01-PLAN.md
-last_updated: '2026-03-22T11:23:42.000Z'
-last_activity: 2026-03-22 --- Phase 15 Plan 01 executed (proxy-hash utility + cache-enabled proxy targets)
+stopped_at: Completed 15-02-PLAN.md
+last_updated: '2026-03-22T11:40:42.000Z'
+last_activity: 2026-03-22 --- Phase 15 Plan 02 executed (preTasksExecution hook + PROXY-04 fallback)
 progress:
   total_phases: 3
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 4
-  completed_plans: 2
-  percent: 50
+  completed_plans: 3
+  percent: 75
 ---
 
 # Project State
@@ -26,26 +26,26 @@ See: .planning/PROJECT.md (updated 2026-03-22)
 ## Current Position
 
 Phase: 15 of 16 (Proxy Target Caching)
-Plan: 01 of 02 (complete)
-Status: Phase 15 in progress
-Last activity: 2026-03-22 --- Phase 15 Plan 01 executed (proxy-hash utility + cache-enabled proxy targets)
+Plan: 02 of 02 (complete)
+Status: Phase 15 complete
+Last activity: 2026-03-22 --- Phase 15 Plan 02 executed (preTasksExecution hook + PROXY-04 fallback)
 
-Progress: [█████-----] 50%
+Progress: [████████--] 75%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 2
-- Average duration: 8min
-- Total execution time: 0.27 hours
+- Total plans completed: 3
+- Average duration: 9min
+- Total execution time: 0.43 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 | ----- | ----- | ----- | -------- |
 | 14    | 1     | 8min  | 8min     |
-| 15    | 1     | 8min  | 8min     |
+| 15    | 2     | 18min | 9min     |
 
 ## Pending Todos
 
@@ -53,7 +53,7 @@ Progress: [█████-----] 50%
 
 - [sync] Parse pnpm ndjson reporter for concise install progress
 - [detection] Migrate auto-detected edges from implicit to static
-- [proxy] Enable host-level caching for proxy targets using runtime inputs tied to child repo git HEAD
+- ~[proxy] Enable host-level caching for proxy targets using runtime inputs tied to child repo git HEAD~ (done, Phase 15)
 - ~[executor] Rename .tmp to tmp in child repo temp directories~ (done, Phase 14)
 - [executor] Run external repo Nx commands in devcontainer sidecar
 
@@ -66,9 +66,11 @@ Progress: [█████-----] 50%
 
 - [Phase 15-01] toProxyHashEnvKey placed in dedicated proxy-hash.ts module for shared import between createProxyTarget and preTasksExecution
 - [Phase 15-01] getStatusPorcelain uses execGitOutput (trimmed) since only empty vs non-empty matters for dirty detection
+- [Phase 15-02] Module-level warnedAliases Set for warning deduplication, with \_resetWarnedAliases export for test cleanup
+- [Phase 15-02] PROXY-04 nx reset fallback kept as commented-out code since env inputs bypass the daemon caching bug entirely
 
 ## Session Continuity
 
-Last session: 2026-03-22T11:23:42.000Z
-Stopped at: Completed 15-01-PLAN.md
-Resume: `/gsd:execute-phase 15` (continue with plan 02)
+Last session: 2026-03-22T11:40:42.000Z
+Stopped at: Completed 15-02-PLAN.md
+Resume: `/gsd:execute-phase 16` (next phase)
