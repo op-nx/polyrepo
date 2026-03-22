@@ -36,7 +36,7 @@
 ### v1.2 Static Edges and Proxy Caching
 
 - [x] **Phase 14: Temp Directory Rename** - Replace `.tmp` with `tmp` in child repo temp directories to align with Nx default `.gitignore` convention (completed 2026-03-22)
-- [x] **Phase 15: Proxy Target Caching** - Enable host-level Nx caching for proxy targets using git-based runtime inputs, with daemon workaround and fallback guards (completed 2026-03-22)
+- [ ] **Phase 15: Proxy Target Caching** - Enable host-level Nx caching for proxy targets using git-based runtime inputs, with daemon workaround and fallback guards (gap closure in progress)
 - [ ] **Phase 16: Static Dependency Edges** - Upgrade host-sourced auto-detected edges from implicit to static with sourceFile provenance; external-sourced and override edges stay implicit
 
 ## Phase Details
@@ -70,12 +70,14 @@ Plans:
 3. After `polyrepo-sync` pulls new changes, the proxy target produces a cache miss (child Nx re-invoked)
 4. A failed git command (repo not synced, corrupt `.git`) does not produce a constant hash that permanently serves stale cached results
 5. Caching works correctly under `NX_DAEMON=true`, `NX_DAEMON=false`, and `NX_DAEMON` unset
-   **Plans:** 2/2 plans complete
+   **Plans:** 4 plans (2 complete, 2 gap closure)
 
 Plans:
 
-- [ ] 15-01-PLAN.md -- Proxy hash utility, git status helper, and createProxyTarget cache enablement
-- [ ] 15-02-PLAN.md -- preTasksExecution hook and conditional nx reset fallback
+- [x] 15-01-PLAN.md -- Proxy hash utility, git status helper, and createProxyTarget cache enablement
+- [x] 15-02-PLAN.md -- preTasksExecution hook and conditional nx reset fallback
+- [ ] 15-03-PLAN.md -- Fix preTasksExecution hook not firing (gap closure)
+- [ ] 15-04-PLAN.md -- Include plugin version in graph disk cache key (gap closure)
 
 ### Phase 16: Static Dependency Edges
 
@@ -109,7 +111,7 @@ Plans:
 | 12. Resolve cross-repo build cascade      | v1.1      | 2/2            | Complete    | 2026-03-21 |
 | 13. Verification and Tech Debt Cleanup    | v1.1      | 2/2            | Complete    | 2026-03-21 |
 | 14. Temp Directory Rename                 | v1.2      | 1/1            | Complete    | 2026-03-22 |
-| 15. Proxy Target Caching                  | 2/2       | Complete       | 2026-03-22  | -          |
+| 15. Proxy Target Caching                  | v1.2      | 2/4            | Gap closure | -          |
 | 16. Static Dependency Edges               | v1.2      | 0/TBD          | Not started | -          |
 
 ---
