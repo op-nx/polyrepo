@@ -70,7 +70,12 @@ Plans:
 3. After `polyrepo-sync` pulls new changes, the proxy target produces a cache miss (child Nx re-invoked)
 4. A failed git command (repo not synced, corrupt `.git`) does not produce a constant hash that permanently serves stale cached results
 5. Caching works correctly under `NX_DAEMON=true`, `NX_DAEMON=false`, and `NX_DAEMON` unset
-   **Plans**: TBD
+   **Plans:** 2 plans
+
+Plans:
+
+- [ ] 15-01-PLAN.md -- Proxy hash utility, git status helper, and createProxyTarget cache enablement
+- [ ] 15-02-PLAN.md -- preTasksExecution hook and conditional nx reset fallback
 
 ### Phase 16: Static Dependency Edges
 
@@ -103,8 +108,8 @@ Plans:
 | 11. Full Nx Daemon Support                | v1.1      | 3/3            | Complete    | 2026-03-21 |
 | 12. Resolve cross-repo build cascade      | v1.1      | 2/2            | Complete    | 2026-03-21 |
 | 13. Verification and Tech Debt Cleanup    | v1.1      | 2/2            | Complete    | 2026-03-21 |
-| 14. Temp Directory Rename                 | 1/1       | Complete       | 2026-03-22  | -          |
-| 15. Proxy Target Caching                  | v1.2      | 0/TBD          | Not started | -          |
+| 14. Temp Directory Rename                 | v1.2      | 1/1            | Complete    | 2026-03-22 |
+| 15. Proxy Target Caching                  | v1.2      | 0/2            | Not started | -          |
 | 16. Static Dependency Edges               | v1.2      | 0/TBD          | Not started | -          |
 
 ---
