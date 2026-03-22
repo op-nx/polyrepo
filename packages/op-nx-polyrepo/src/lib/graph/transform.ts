@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { TargetConfiguration } from '@nx/devkit';
 import type { ExternalGraphJson, TransformedNode } from './types';
-import { toProxyHashEnvKey } from './proxy-hash.js';
+import { toProxyHashEnvKey } from './proxy-hash';
 
 /**
  * Normalize all path separators to forward slashes.
