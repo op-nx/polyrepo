@@ -321,3 +321,14 @@ export const preTasksExecution: PreTasksExecution<PolyrepoConfig> = async (
     }
   }
 };
+
+/**
+ * Explicit default export for Nx plugin detection. Nx's `importPluginModule`
+ * checks `m.default` first (lines 12-18 of `load-resolved-plugin.js`) for
+ * known plugin hooks like `createNodesV2`, `createDependencies`, and
+ * `preTasksExecution`. While the CJS fallback (`return m`, line 21) also
+ * works for named exports, providing a default export ensures the plugin
+ * is discoverable through the preferred detection path.
+ */
+const plugin = { createNodesV2, createDependencies, preTasksExecution };
+export default plugin;
