@@ -38,10 +38,10 @@ Phase 8 extends the plugin config schema and extraction pipeline to produce the 
 ```typescript
 interface TransformedNode {
   // ... existing fields ...
-  packageName?: string;          // npm package name from metadata.js
-  dependencies?: string[];       // package names from package.json dependencies
-  devDependencies?: string[];    // package names from package.json devDependencies
-  peerDependencies?: string[];   // package names from package.json peerDependencies
+  packageName?: string; // npm package name from metadata.js
+  dependencies?: string[]; // package names from package.json dependencies
+  devDependencies?: string[]; // package names from package.json devDependencies
+  peerDependencies?: string[]; // package names from package.json peerDependencies
 }
 ```
 
@@ -54,10 +54,10 @@ interface TransformedNode {
 
 **Decision:** Hybrid approach leveraging Nx's own data where available:
 
-| Data | External projects | Host projects |
-|------|-------------------|---------------|
+| Data             | External projects                                           | Host projects                                              |
+| ---------------- | ----------------------------------------------------------- | ---------------------------------------------------------- |
 | **Package name** | `metadata.js.packageName` from `nx graph --print` (Phase 8) | `context.projects[name].metadata.js.packageName` (Phase 9) |
-| **Dep lists** | Read `package.json` from `.repos/<alias>/<root>/` (Phase 8) | Read `package.json` from `<root>/` (Phase 9) |
+| **Dep lists**    | Read `package.json` from `.repos/<alias>/<root>/` (Phase 8) | Read `package.json` from `<root>/` (Phase 9)               |
 
 - **Key finding:** `nx graph --print` already includes `metadata.js.packageName` in node data. We just need to extend the Zod schema to capture it — no separate package.json read needed for package names.
 - **Key finding:** `nx graph --print` does NOT include `npm:` dependency edges or `externalNodes`. Dep lists must come from package.json on disk.
@@ -79,16 +79,16 @@ interface TransformedNode {
 
 ### Files to modify (Phase 8)
 
-| File | Change |
-|------|--------|
-| `packages/op-nx-polyrepo/src/lib/config/schema.ts` | Add `implicitDependencies` to Zod config schema (optional record of string arrays with minimatch support) |
-| `packages/op-nx-polyrepo/src/lib/graph/types.ts` | Extend `externalProjectNodeDataSchema` to capture `metadata.js.packageName`. Add `packageName`, `dependencies`, `devDependencies`, `peerDependencies` to `TransformedNode`. |
+| File                                                 | Change                                                                                                                                                                                 |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/op-nx-polyrepo/src/lib/config/schema.ts`   | Add `implicitDependencies` to Zod config schema (optional record of string arrays with minimatch support)                                                                              |
+| `packages/op-nx-polyrepo/src/lib/graph/types.ts`     | Extend `externalProjectNodeDataSchema` to capture `metadata.js.packageName`. Add `packageName`, `dependencies`, `devDependencies`, `peerDependencies` to `TransformedNode`.            |
 | `packages/op-nx-polyrepo/src/lib/graph/transform.ts` | Read `metadata.js.packageName` from graph data. Read `package.json` from disk for dep lists. Populate new `TransformedNode` fields. Use `workspaceRoot` parameter (remove `_` prefix). |
 
 ### Files to modify (Phase 9, downstream)
 
-| File | Change |
-|------|--------|
+| File                                   | Change                                                                                                                                                                                                                 |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `packages/op-nx-polyrepo/src/index.ts` | In `createDependencies`: build package-name-to-project lookup from all nodes (external + host via `context.projects`). Scan dep lists for cross-repo matches. Process `implicitDependencies` overrides with minimatch. |
 
 ## Deferred Ideas
@@ -98,5 +98,6 @@ interface TransformedNode {
 - **Dependency edge type control** — letting users specify `implicit`/`static`/`dynamic` edge type on overrides. Default to `implicit` for now, revisit if users request granularity.
 
 ---
-*Context for Phase 8 — guides research and planning agents*
-*Discussed: 2026-03-17*
+
+_Context for Phase 8 — guides research and planning agents_
+_Discussed: 2026-03-17_

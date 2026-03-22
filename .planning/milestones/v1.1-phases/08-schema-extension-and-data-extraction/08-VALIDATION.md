@@ -15,13 +15,13 @@ created: 2026-03-17
 
 ## Test Infrastructure
 
-| Property | Value |
-|----------|-------|
-| **Framework** | Vitest 4.0.0 |
-| **Config file** | `packages/op-nx-polyrepo/vitest.config.mts` |
-| **Quick run command** | `npm exec nx test @op-nx/polyrepo --output-style=static` |
+| Property               | Value                                                    |
+| ---------------------- | -------------------------------------------------------- |
+| **Framework**          | Vitest 4.0.0                                             |
+| **Config file**        | `packages/op-nx-polyrepo/vitest.config.mts`              |
+| **Quick run command**  | `npm exec nx test @op-nx/polyrepo --output-style=static` |
 | **Full suite command** | `npm exec nx test @op-nx/polyrepo --output-style=static` |
-| **Estimated runtime** | ~5 seconds |
+| **Estimated runtime**  | ~5 seconds                                               |
 
 ---
 
@@ -36,15 +36,15 @@ created: 2026-03-17
 
 ## Per-Task Verification Map
 
-| Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
-|---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 08-01-01 | 01 | 1 | DETECT-05 | unit | `npm exec nx test @op-nx/polyrepo --output-style=static -- --testPathPattern schema.spec` | Yes | pending |
-| 08-01-02 | 01 | 1 | DETECT-05 | unit | `npm exec nx test @op-nx/polyrepo --output-style=static -- --testPathPattern schema.spec` | Yes | pending |
-| 08-02-01 | 02 | 1 | DETECT-05 | unit | `npm exec nx test @op-nx/polyrepo --output-style=static -- --testPathPattern transform.spec` | Yes | pending |
-| 08-02-02 | 02 | 1 | DETECT-05 | unit | `npm exec nx test @op-nx/polyrepo --output-style=static -- --testPathPattern transform.spec` | Yes | pending |
-| 08-02-03 | 02 | 1 | DETECT-05 | unit | `npm exec nx test @op-nx/polyrepo --output-style=static -- --testPathPattern transform.spec` | Yes | pending |
+| Task ID  | Plan | Wave | Requirement | Test Type | Automated Command                                                                            | File Exists | Status  |
+| -------- | ---- | ---- | ----------- | --------- | -------------------------------------------------------------------------------------------- | ----------- | ------- |
+| 08-01-01 | 01   | 1    | DETECT-05   | unit      | `npm exec nx test @op-nx/polyrepo --output-style=static -- --testPathPattern schema.spec`    | Yes         | pending |
+| 08-01-02 | 01   | 1    | DETECT-05   | unit      | `npm exec nx test @op-nx/polyrepo --output-style=static -- --testPathPattern schema.spec`    | Yes         | pending |
+| 08-02-01 | 02   | 1    | DETECT-05   | unit      | `npm exec nx test @op-nx/polyrepo --output-style=static -- --testPathPattern transform.spec` | Yes         | pending |
+| 08-02-02 | 02   | 1    | DETECT-05   | unit      | `npm exec nx test @op-nx/polyrepo --output-style=static -- --testPathPattern transform.spec` | Yes         | pending |
+| 08-02-03 | 02   | 1    | DETECT-05   | unit      | `npm exec nx test @op-nx/polyrepo --output-style=static -- --testPathPattern transform.spec` | Yes         | pending |
 
-*Status: pending / green / red / flaky*
+_Status: pending / green / red / flaky_
 
 ---
 

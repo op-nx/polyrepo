@@ -33,7 +33,13 @@ function createChildProcessStub(): ChildProcess {
     stdin: null,
     stdout: null,
     stderr: null,
-    stdio: [null, null, null, undefined, undefined] satisfies ChildProcess['stdio'],
+    stdio: [
+      null,
+      null,
+      null,
+      undefined,
+      undefined,
+    ] satisfies ChildProcess['stdio'],
     pid: undefined,
     connected: false,
     exitCode: null,
@@ -77,16 +83,18 @@ function mockExecFileImpl(
     callback: ExecFileCallback | undefined,
   ) => void,
 ): void {
-  mock.mockImplementation((
-    _file: string,
-    _args: readonly string[] | null | undefined,
-    _options: unknown,
-    callback?: ExecFileCallback | null,
-  ) => {
-    handler(_args, callback ?? undefined);
+  mock.mockImplementation(
+    (
+      _file: string,
+      _args: readonly string[] | null | undefined,
+      _options: unknown,
+      callback?: ExecFileCallback | null,
+    ) => {
+      handler(_args, callback ?? undefined);
 
-    return createChildProcessStub();
-  });
+      return createChildProcessStub();
+    },
+  );
 }
 
 function setup() {

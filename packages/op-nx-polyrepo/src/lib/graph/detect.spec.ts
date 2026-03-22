@@ -21,7 +21,10 @@ function makeConfig(): PolyrepoConfig {
 }
 
 function makeContext(
-  projects: Record<string, { root: string; metadata?: Record<string, unknown> }> = {},
+  projects: Record<
+    string,
+    { root: string; metadata?: Record<string, unknown> }
+  > = {},
   workspaceRoot = '/workspace',
 ): CreateDependenciesContext {
   return {
@@ -48,19 +51,15 @@ function makeExternalNode(
   };
 }
 
-function makeReport(
-  repos: PolyrepoGraphReport['repos'],
-): PolyrepoGraphReport {
+function makeReport(repos: PolyrepoGraphReport['repos']): PolyrepoGraphReport {
   return { repos };
 }
-
 
 // ---------------------------------------------------------------------------
 // describe(detectCrossRepoDependencies)
 // ---------------------------------------------------------------------------
 
 describe('detectCrossRepoDependencies', () => {
-
   // -------------------------------------------------------------------------
   // Lookup map from external nodes
   // -------------------------------------------------------------------------
@@ -154,7 +153,9 @@ describe('detectCrossRepoDependencies', () => {
       function setup() {
         vi.clearAllMocks();
 
-        const packageJson = JSON.stringify({ dependencies: { '@scope/my-lib': '^1.0.0' } });
+        const packageJson = JSON.stringify({
+          dependencies: { '@scope/my-lib': '^1.0.0' },
+        });
         vi.mocked(readFileSync).mockReturnValue(packageJson);
 
         const report = makeReport({
@@ -1034,7 +1035,9 @@ describe('detectCrossRepoDependencies', () => {
 
       const { report, config, context } = setup();
 
-      expect(() => detectCrossRepoDependencies(report, config, context)).not.toThrow();
+      expect(() =>
+        detectCrossRepoDependencies(report, config, context),
+      ).not.toThrow();
     });
 
     it('alias value with filename strips filename and walks up segments to find matching root', () => {
@@ -1138,7 +1141,9 @@ describe('detectCrossRepoDependencies', () => {
 
       const { report, config, context } = setup();
 
-      expect(() => detectCrossRepoDependencies(report, config, context)).not.toThrow();
+      expect(() =>
+        detectCrossRepoDependencies(report, config, context),
+      ).not.toThrow();
       const edges = detectCrossRepoDependencies(report, config, context);
       expect(edges).toHaveLength(0);
     });
@@ -1244,7 +1249,9 @@ describe('detectCrossRepoDependencies', () => {
 
       const { report, config, context } = setup();
 
-      expect(() => detectCrossRepoDependencies(report, config, context)).not.toThrow();
+      expect(() =>
+        detectCrossRepoDependencies(report, config, context),
+      ).not.toThrow();
     });
   });
 
@@ -1671,9 +1678,9 @@ describe('detectCrossRepoDependencies', () => {
 
       const { report, config, context } = setup();
 
-      expect(() => detectCrossRepoDependencies(report, config, context)).toThrow(
-        'Unknown projects in implicitDependencies: nx/missing-lib',
-      );
+      expect(() =>
+        detectCrossRepoDependencies(report, config, context),
+      ).toThrow('Unknown projects in implicitDependencies: nx/missing-lib');
     });
 
     it('unknown target pattern that matches zero projects throws with the unknown name', () => {
@@ -1707,9 +1714,9 @@ describe('detectCrossRepoDependencies', () => {
 
       const { report, config, context } = setup();
 
-      expect(() => detectCrossRepoDependencies(report, config, context)).toThrow(
-        'Unknown projects in implicitDependencies: repo-b/ghost',
-      );
+      expect(() =>
+        detectCrossRepoDependencies(report, config, context),
+      ).toThrow('Unknown projects in implicitDependencies: repo-b/ghost');
     });
 
     it('both unknown key AND unknown target are reported in a single throw', () => {
@@ -1733,7 +1740,9 @@ describe('detectCrossRepoDependencies', () => {
 
       const { report, config, context } = setup();
 
-      expect(() => detectCrossRepoDependencies(report, config, context)).toThrow(
+      expect(() =>
+        detectCrossRepoDependencies(report, config, context),
+      ).toThrow(
         /Unknown projects in implicitDependencies:.*nx\/missing-lib.*repo-b\/ghost/,
       );
     });
@@ -1769,9 +1778,9 @@ describe('detectCrossRepoDependencies', () => {
 
       const { report, config, context } = setup();
 
-      expect(() => detectCrossRepoDependencies(report, config, context)).toThrow(
-        'Unknown projects in implicitDependencies: repo-b/ghost',
-      );
+      expect(() =>
+        detectCrossRepoDependencies(report, config, context),
+      ).toThrow('Unknown projects in implicitDependencies: repo-b/ghost');
     });
 
     it('config with no implicitDependencies field does not throw', () => {
@@ -1799,8 +1808,9 @@ describe('detectCrossRepoDependencies', () => {
 
       const { report, config, context } = setup();
 
-      expect(() => detectCrossRepoDependencies(report, config, context)).not.toThrow();
+      expect(() =>
+        detectCrossRepoDependencies(report, config, context),
+      ).not.toThrow();
     });
   });
-
 });

@@ -24,28 +24,28 @@ The **pragmatically safer approach** is to keep npm for the host workspace but o
 
 ### Module Resolution Strategies for Docker e2e
 
-| Criterion | npm (current) | pnpm isolated (default) | pnpm hoisted | pnpm PnP | Yarn PnP |
-|-----------|---------------|------------------------|--------------|----------|----------|
-| **node_modules created** | Yes (~30K files) | Yes (~50K+ files with .pnpm) | Yes (~30K files) | No | No |
-| **Overlay diff file count** | ~30K | ~50K+ | ~30K | ~5 files | ~5 files (.pnp.cjs, .yarn/cache/*.zip) |
-| **Overlay diff size** | ~200MB | ~400MB (store + symlinks) | ~200MB | ~100MB (cache zips) | ~100MB (cache zips) |
-| **docker commit speed** | Slow (30K file diff) | Slowest (50K+ file diff) | Slow (30K file diff) | Fast (~5 file diff) | Fast (~5 file diff) |
-| **Cold install time** | ~14s (50 deps) | ~4s (50 deps) | ~5s (50 deps) | ~4s | ~7s |
-| **Warm install time** | ~3s | ~1s | ~1s | ~1s | 0s (zero-install) |
-| **Nx 22.x compatibility** | Full | Full | Full | Experimental (bugs) | Documented, fragile |
-| **Shared cache feasibility** | npm cache global (but node_modules duplicated) | Same store = hardlinks (same FS only) | Same as isolated | N/A (no node_modules) | No global cross-project cache |
-| **Migration effort** | None (current) | Medium | Medium | High | High |
-| **Plugin code changes** | None | None | None | Yes (binary resolution) | Yes (binary resolution) |
+| Criterion                    | npm (current)                                  | pnpm isolated (default)               | pnpm hoisted         | pnpm PnP                | Yarn PnP                                |
+| ---------------------------- | ---------------------------------------------- | ------------------------------------- | -------------------- | ----------------------- | --------------------------------------- |
+| **node_modules created**     | Yes (~30K files)                               | Yes (~50K+ files with .pnpm)          | Yes (~30K files)     | No                      | No                                      |
+| **Overlay diff file count**  | ~30K                                           | ~50K+                                 | ~30K                 | ~5 files                | ~5 files (.pnp.cjs, .yarn/cache/\*.zip) |
+| **Overlay diff size**        | ~200MB                                         | ~400MB (store + symlinks)             | ~200MB               | ~100MB (cache zips)     | ~100MB (cache zips)                     |
+| **docker commit speed**      | Slow (30K file diff)                           | Slowest (50K+ file diff)              | Slow (30K file diff) | Fast (~5 file diff)     | Fast (~5 file diff)                     |
+| **Cold install time**        | ~14s (50 deps)                                 | ~4s (50 deps)                         | ~5s (50 deps)        | ~4s                     | ~7s                                     |
+| **Warm install time**        | ~3s                                            | ~1s                                   | ~1s                  | ~1s                     | 0s (zero-install)                       |
+| **Nx 22.x compatibility**    | Full                                           | Full                                  | Full                 | Experimental (bugs)     | Documented, fragile                     |
+| **Shared cache feasibility** | npm cache global (but node_modules duplicated) | Same store = hardlinks (same FS only) | Same as isolated     | N/A (no node_modules)   | No global cross-project cache           |
+| **Migration effort**         | None (current)                                 | Medium                                | Medium               | High                    | High                                    |
+| **Plugin code changes**      | None                                           | None                                  | None                 | Yes (binary resolution) | Yes (binary resolution)                 |
 
 ### Docker-Specific Pros/Cons
 
-| Strategy | Docker Pros | Docker Cons |
-|----------|-------------|-------------|
-| **npm (current)** | Simple, well-understood | Large diff layer from runtime node_modules |
-| **pnpm isolated** | Content-addressable store | Hardlinks become copies on overlay2; inflated diff; store + node_modules duplication in layers |
-| **pnpm hoisted** | Flat layout, fewer symlinks | Same overlay2 copy-up problem; no size advantage over npm |
-| **pnpm PnP** | No node_modules = tiny diff | Experimental in pnpm (bugs: still generates node_modules in some cases); binary resolution broken |
-| **Yarn PnP** | No node_modules = tiny diff; zero-install possible; `.yarn/cache/` is compressed zips (small, few files) | Breaking: `node_modules/.bin/` does not exist; needs `yarn run` or `yarn node`; package compatibility issues |
+| Strategy          | Docker Pros                                                                                              | Docker Cons                                                                                                  |
+| ----------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| **npm (current)** | Simple, well-understood                                                                                  | Large diff layer from runtime node_modules                                                                   |
+| **pnpm isolated** | Content-addressable store                                                                                | Hardlinks become copies on overlay2; inflated diff; store + node_modules duplication in layers               |
+| **pnpm hoisted**  | Flat layout, fewer symlinks                                                                              | Same overlay2 copy-up problem; no size advantage over npm                                                    |
+| **pnpm PnP**      | No node_modules = tiny diff                                                                              | Experimental in pnpm (bugs: still generates node_modules in some cases); binary resolution broken            |
+| **Yarn PnP**      | No node_modules = tiny diff; zero-install possible; `.yarn/cache/` is compressed zips (small, few files) | Breaking: `node_modules/.bin/` does not exist; needs `yarn run` or `yarn node`; package compatibility issues |
 
 ---
 
@@ -54,6 +54,7 @@ The **pragmatically safer approach** is to keep npm for the host workspace but o
 ### 1. Yarn PnP (Plug'n'Play)
 
 **How it works:**
+
 - No `node_modules` folder at all
 - `.pnp.cjs` is a generated resolver that maps package names to zip archives in `.yarn/cache/`
 - Packages are stored as compressed `.zip` files in `.yarn/cache/`
@@ -61,6 +62,7 @@ The **pragmatically safer approach** is to keep npm for the host workspace but o
 - Binaries are accessed via `yarn run <bin>` or `yarn exec <bin>`, NOT via `node_modules/.bin/`
 
 **Nx compatibility (MEDIUM confidence):**
+
 - Nx officially documents Yarn PnP support at [nx.dev/docs/guides/tips-n-tricks/yarn-pnp](https://nx.dev/docs/guides/tips-n-tricks/yarn-pnp)
 - `create-nx-workspace --pm=yarn` works with Yarn Berry
 - Nx defaults to `nodeLinker: node-modules` for backward compatibility
@@ -70,6 +72,7 @@ The **pragmatically safer approach** is to keep npm for the host workspace but o
 - **However:** The `@op-nx/polyrepo` plugin's `extractGraphFromRepo()` resolves `node_modules/.bin/nx` -- this path does not exist under PnP
 
 **Docker footprint:**
+
 - `.pnp.cjs`: ~2MB (single file)
 - `.yarn/cache/`: compressed zips, typically 50-70% smaller than expanded node_modules
 - For a typical Nx workspace with ~50 direct deps: `.yarn/cache/` would be ~60-80MB vs ~200MB expanded
@@ -77,6 +80,7 @@ The **pragmatically safer approach** is to keep npm for the host workspace but o
 - `docker commit` diff is dramatically smaller
 
 **Shared cache between workspaces:**
+
 - Yarn Berry does NOT provide a global shared cache across separate projects (unlike Yarn 1)
 - Each project maintains its own `.yarn/cache/`
 - Two Yarn PnP workspaces on the same machine cannot share a cache
@@ -89,12 +93,14 @@ The **pragmatically safer approach** is to keep npm for the host workspace but o
 #### node-modules (default / isolated)
 
 **How it works:**
+
 - Content-addressable store at `~/.local/share/pnpm/store/`
 - `node_modules/.pnpm/` contains hardlinks from store to per-package directories
 - `node_modules/<pkg>` are symlinks to `.pnpm/` entries
 - Strict dependency isolation (packages only see declared deps)
 
 **Docker problem:**
+
 - On overlay2, hardlinks from the store (lower layer) to node_modules (upper layer) trigger **copy-up** -- each hardlink effectively becomes a full file copy
 - The store AND node_modules both end up in the image, roughly doubling size
 - For the nrwl/nx repo: ~800MB store + ~800MB node_modules in the worst case
@@ -104,6 +110,7 @@ The **pragmatically safer approach** is to keep npm for the host workspace but o
 #### hoisted
 
 **How it works:**
+
 - Flat `node_modules` like npm (no `.pnpm/` virtual store, no symlinks)
 - `package-import-method: copy` avoids hardlink copy-up
 - Packages can accidentally access undeclared dependencies
@@ -115,11 +122,13 @@ The **pragmatically safer approach** is to keep npm for the host workspace but o
 #### pnp
 
 **How it works:**
+
 - Similar concept to Yarn PnP but implemented by pnpm
 - Should create no `node_modules`, generating a `.pnp.cjs` instead
 - Requires `symlink: false` alongside `node-linker: pnp`
 
 **Status: EXPERIMENTAL / BUGGY:**
+
 - [pnpm issue #8146](https://github.com/pnpm/pnpm/issues/8146): `node-linker=pnp` with `symlink=false` still generates `node_modules` in some cases (reported pnpm 9.1.3, May 2024)
 - pnpm's PnP implementation is less mature than Yarn's
 - No documented Nx compatibility testing with pnpm PnP
@@ -130,15 +139,16 @@ The **pragmatically safer approach** is to keep npm for the host workspace but o
 
 **Scenario:** Host workspace (npm or yarn) and `.repos/nx/` (pnpm) share many deps (@nx/devkit, typescript, etc.)
 
-| Cache Strategy | Feasibility | Why |
-|---------------|-------------|-----|
-| npm global cache (`~/.npm/_cacache/`) | Shared download cache, but node_modules still duplicated | npm caches tarballs, not installed packages |
-| pnpm store (both workspaces on pnpm) | Hardlinks share content on same FS | Requires both workspaces to use pnpm; hardlinks break on overlay2 cross-layer |
-| pnpm global virtual store (experimental) | Symlinks to shared store | Requires pnpm 11+, `enableGlobalVirtualStore: true`; experimental |
-| Yarn PnP cache | Per-project only | Yarn Berry has no global cross-project cache |
-| Mixed PM (npm + pnpm) | Not possible | Different package managers, different store formats |
+| Cache Strategy                           | Feasibility                                              | Why                                                                           |
+| ---------------------------------------- | -------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| npm global cache (`~/.npm/_cacache/`)    | Shared download cache, but node_modules still duplicated | npm caches tarballs, not installed packages                                   |
+| pnpm store (both workspaces on pnpm)     | Hardlinks share content on same FS                       | Requires both workspaces to use pnpm; hardlinks break on overlay2 cross-layer |
+| pnpm global virtual store (experimental) | Symlinks to shared store                                 | Requires pnpm 11+, `enableGlobalVirtualStore: true`; experimental             |
+| Yarn PnP cache                           | Per-project only                                         | Yarn Berry has no global cross-project cache                                  |
+| Mixed PM (npm + pnpm)                    | Not possible                                             | Different package managers, different store formats                           |
 
 **Verdict:** Shared caching between the two workspaces is NOT practically achievable because:
+
 1. They use different package managers (npm vs pnpm)
 2. Even with the same PM, overlay2 defeats hardlink-based sharing
 3. The synced repo's node_modules is already baked into an image layer (static, not re-installed at runtime)
@@ -152,6 +162,7 @@ The **pragmatically safer approach** is to keep npm for the host workspace but o
 `docker commit` captures the writable layer diff. The NaiveDiffDriver walks every file in the container's upper layer, comparing against lower layers. Performance is proportional to file count, not file size.
 
 **Current diff contents (runtime-created):**
+
 - `/workspace/node_modules/` -- ~30K files, ~200MB (npm install of plugin + deps)
 - `/workspace/nx.json` -- 1 file (written in global setup)
 - `/workspace/package.json` -- 1 file (modified by npm install)
@@ -162,17 +173,18 @@ The **pragmatically safer approach** is to keep npm for the host workspace but o
 The `.repos/nx/` directory is from a `COPY --link` layer and is read-only -- it does NOT appear in the diff.
 
 **Impact of eliminating host node_modules from diff:**
+
 - `docker commit` time: proportional to file count reduction
 - Portworx benchmarks show `docker commit` can be [800% faster](https://portworx.com/blog/lcfs-speed-up-docker-commit/) with fewer diff files
 - Going from ~30K files to ~100 files (Yarn PnP) would make commit near-instantaneous
 
 #### Bind mounts / volumes as alternatives
 
-| Approach | Pros | Cons |
-|----------|------|------|
-| Docker volume for node_modules | Bypasses overlay2 | Not captured by `docker commit` -- breaks snapshot pattern |
-| Bind mount for shared store | Host-speed I/O | Not captured by commit; path compatibility issues on Windows |
-| tmpfs for node_modules | RAM-speed I/O | Not captured by commit; ephemeral |
+| Approach                       | Pros              | Cons                                                         |
+| ------------------------------ | ----------------- | ------------------------------------------------------------ |
+| Docker volume for node_modules | Bypasses overlay2 | Not captured by `docker commit` -- breaks snapshot pattern   |
+| Bind mount for shared store    | Host-speed I/O    | Not captured by commit; path compatibility issues on Windows |
+| tmpfs for node_modules         | RAM-speed I/O     | Not captured by commit; ephemeral                            |
 
 **Verdict:** All mount-based approaches are incompatible with the `container.commit()` snapshot pattern because volume/tmpfs/bind mount contents are not included in commits. The snapshot pattern requires everything to be on the overlay2 filesystem.
 
@@ -181,10 +193,12 @@ The `.repos/nx/` directory is from a `COPY --link` layer and is read-only -- it 
 The `@op-nx/polyrepo` plugin has two module-resolution-sensitive code paths:
 
 **1. `extractGraphFromRepo()` in `extract.ts`:**
+
 ```typescript
 const nxBin = join(repoPath, 'node_modules', '.bin', 'nx');
 const command = `"${nxBin}" graph --print`;
 ```
+
 This directly resolves `node_modules/.bin/nx`. Under Yarn PnP, this path does not exist. The fix would be to use `yarn exec nx graph --print` or `npx nx graph --print` (npx works under PnP when the package is installed).
 
 **2. Host workspace module loading:**
@@ -194,6 +208,7 @@ When Nx loads the `@op-nx/polyrepo` plugin, it resolves it from `node_modules/@o
 These APIs receive `context.workspaceRoot` and project configs -- they do not directly resolve modules from `node_modules`. They are linker-agnostic.
 
 **Risk assessment for PnP migration:**
+
 - `extractGraphFromRepo()`: **MUST be patched** -- the hardcoded `node_modules/.bin/nx` path will fail
 - Plugin loading: **Should work** -- covered by Nx's documented PnP support
 - createNodesV2/createDependencies: **No risk** -- API-level, not filesystem-level
@@ -202,16 +217,16 @@ These APIs receive `context.workspaceRoot` and project configs -- they do not di
 
 #### Option A: Switch HOST workspace from npm to Yarn PnP
 
-| Step | Effort | Risk |
-|------|--------|------|
-| Install Yarn Berry, configure `.yarnrc.yml` with `nodeLinker: pnp` | Low | Low |
-| Run `yarn install`, resolve peer dependency errors with `packageExtensions` | Medium | Medium -- depends on how many Nx plugins have undeclared peers |
-| Fix `extractGraphFromRepo()` to not use `node_modules/.bin/nx` | Low | Low |
-| Update Dockerfile to use `yarn` instead of `npm` for workspace creation | Low | Low |
-| Update global-setup.ts to publish/install via yarn | Medium | Medium |
-| Test all Nx commands work under PnP (build, test, lint, graph) | High | Medium -- breakage likely with some tools |
-| Update CI workflows | Low | Low |
-| **Total** | **Medium-High** | **Medium** |
+| Step                                                                        | Effort          | Risk                                                           |
+| --------------------------------------------------------------------------- | --------------- | -------------------------------------------------------------- |
+| Install Yarn Berry, configure `.yarnrc.yml` with `nodeLinker: pnp`          | Low             | Low                                                            |
+| Run `yarn install`, resolve peer dependency errors with `packageExtensions` | Medium          | Medium -- depends on how many Nx plugins have undeclared peers |
+| Fix `extractGraphFromRepo()` to not use `node_modules/.bin/nx`              | Low             | Low                                                            |
+| Update Dockerfile to use `yarn` instead of `npm` for workspace creation     | Low             | Low                                                            |
+| Update global-setup.ts to publish/install via yarn                          | Medium          | Medium                                                         |
+| Test all Nx commands work under PnP (build, test, lint, graph)              | High            | Medium -- breakage likely with some tools                      |
+| Update CI workflows                                                         | Low             | Low                                                            |
+| **Total**                                                                   | **Medium-High** | **Medium**                                                     |
 
 **Can the synced repo stay on pnpm?** Yes. The synced repo is an independent workspace with its own package manager. The host workspace's PM choice does not affect the synced repo. The `extractGraphFromRepo()` function shells out to the synced repo's own nx binary -- it just needs to find that binary correctly (which it already does for pnpm repos via `node_modules/.bin/nx`).
 
@@ -219,12 +234,12 @@ These APIs receive `context.workspaceRoot` and project configs -- they do not di
 
 Instead of changing the package manager, move the host workspace's npm install into the Dockerfile so node_modules is in a static image layer (not the runtime diff).
 
-| Step | Effort | Risk |
-|------|--------|------|
-| Move `npm install @op-nx/polyrepo` into Dockerfile | Low | Low -- but requires publishing to a registry at build time, or using a local tarball |
-| Alternative: install a placeholder package set that matches the plugin's deps | Low | Low |
-| Result: node_modules is in a COPY/RUN layer, not in the writable diff | N/A | N/A |
-| **Total** | **Low** | **Low** |
+| Step                                                                          | Effort  | Risk                                                                                 |
+| ----------------------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------ |
+| Move `npm install @op-nx/polyrepo` into Dockerfile                            | Low     | Low -- but requires publishing to a registry at build time, or using a local tarball |
+| Alternative: install a placeholder package set that matches the plugin's deps | Low     | Low                                                                                  |
+| Result: node_modules is in a COPY/RUN layer, not in the writable diff         | N/A     | N/A                                                                                  |
+| **Total**                                                                     | **Low** | **Low**                                                                              |
 
 **Why this works:** The `docker commit` diff only captures changes to the writable layer. If node_modules already exists in a read-only image layer, the diff is near-empty (only modified files, not the full tree). The only new files in the diff would be `nx.json`, `package.json` changes, and the graph cache file.
 
@@ -240,35 +255,35 @@ If `docker commit` time is acceptable (measure first!), do nothing. The ~30K fil
 
 ### Install Time Comparison (50 direct / ~400 total dependencies)
 
-| Package Manager | Cold Install | Warm Install |
-|-----------------|-------------|--------------|
-| npm 11.x | ~14s | ~3s |
-| pnpm 10.x (isolated) | ~4s | ~1s |
-| pnpm (hoisted) | ~5s | ~1s |
-| Yarn 4.x (PnP) | ~7s | ~0s (zero-install) |
+| Package Manager      | Cold Install | Warm Install       |
+| -------------------- | ------------ | ------------------ |
+| npm 11.x             | ~14s         | ~3s                |
+| pnpm 10.x (isolated) | ~4s          | ~1s                |
+| pnpm (hoisted)       | ~5s          | ~1s                |
+| Yarn 4.x (PnP)       | ~7s          | ~0s (zero-install) |
 
 **Source:** [pnpm benchmarks](https://pnpm.io/benchmarks), [2026 PM comparison](https://windframe.dev/blog/pnpm-vs-npm-vs-yarn), [Syncfusion comparison](https://www.syncfusion.com/blogs/post/pnpm-vs-npm-vs-yarn)
 
 ### Docker Image Size Impact (estimated for host workspace ~50 deps)
 
-| Strategy | node_modules Size | File Count | docker commit Diff |
-|----------|------------------|------------|-------------------|
-| npm (current) | ~200MB | ~30,000 | ~200MB / 30K files |
-| pnpm isolated | ~400MB (store+nm) | ~50,000+ | ~400MB / 50K files |
-| pnpm hoisted | ~200MB | ~30,000 | ~200MB / 30K files |
-| Yarn PnP | 0 (no node_modules) | 0 | ~100MB / ~100 files (.yarn/cache/) |
-| Pre-baked npm (Option B) | ~200MB (in image layer) | 0 in diff | ~5MB / ~10 files (modified only) |
+| Strategy                 | node_modules Size       | File Count | docker commit Diff                 |
+| ------------------------ | ----------------------- | ---------- | ---------------------------------- |
+| npm (current)            | ~200MB                  | ~30,000    | ~200MB / 30K files                 |
+| pnpm isolated            | ~400MB (store+nm)       | ~50,000+   | ~400MB / 50K files                 |
+| pnpm hoisted             | ~200MB                  | ~30,000    | ~200MB / 30K files                 |
+| Yarn PnP                 | 0 (no node_modules)     | 0          | ~100MB / ~100 files (.yarn/cache/) |
+| Pre-baked npm (Option B) | ~200MB (in image layer) | 0 in diff  | ~5MB / ~10 files (modified only)   |
 
 ### `docker commit` Time Estimates
 
 Based on overlay2 NaiveDiffDriver behavior (file-count-proportional):
 
-| Scenario | Files in Diff | Estimated Commit Time |
-|----------|--------------|----------------------|
-| Current (npm, runtime install) | ~30,000 | 3-8s |
-| pnpm isolated | ~50,000+ | 5-12s |
-| Yarn PnP | ~100 | <1s |
-| Pre-baked npm (Option B) | ~10-50 | <1s |
+| Scenario                       | Files in Diff | Estimated Commit Time |
+| ------------------------------ | ------------- | --------------------- |
+| Current (npm, runtime install) | ~30,000       | 3-8s                  |
+| pnpm isolated                  | ~50,000+      | 5-12s                 |
+| Yarn PnP                       | ~100          | <1s                   |
+| Pre-baked npm (Option B)       | ~10-50        | <1s                   |
 
 **Confidence:** LOW for absolute times (not measured), HIGH for relative ordering.
 
@@ -306,6 +321,7 @@ If commit time is under 3 seconds, the optimization is premature. The 30K-file d
 If measurements show `docker commit` is a significant bottleneck AND pre-baking doesn't sufficiently reduce the diff, consider Yarn PnP for the host workspace. This is a higher-effort, higher-risk approach but provides the most aggressive file-count reduction.
 
 **Prerequisites for Yarn PnP migration:**
+
 1. Fix `extractGraphFromRepo()` to use `npx nx` or `yarn exec nx` instead of `node_modules/.bin/nx`
 2. Verify all Nx plugins work under PnP (build, test, lint, graph)
 3. Test the full e2e flow with Yarn PnP
@@ -330,6 +346,7 @@ If measurements show `docker commit` is a significant bottleneck AND pre-baking 
 ## Sources
 
 ### Official Documentation (HIGH confidence)
+
 - [Nx + Yarn PnP guide](https://nx.dev/docs/guides/tips-n-tricks/yarn-pnp) -- Nx's official PnP setup instructions and known limitations
 - [Yarn PnP feature docs](https://yarnpkg.com/features/pnp) -- How PnP works, migration guide
 - [pnpm Docker guide](https://pnpm.io/docker) -- BuildKit cache mounts, multi-stage builds
@@ -340,6 +357,7 @@ If measurements show `docker commit` is a significant bottleneck AND pre-baking 
 - [pnpm benchmarks](https://pnpm.io/benchmarks) -- Install time comparisons
 
 ### Issue Trackers (MEDIUM confidence)
+
 - [nrwl/nx#2386](https://github.com/nrwl/nx/issues/2386) -- Yarn 2 / PnP support request (2020, ongoing)
 - [nrwl/nx#11733](https://github.com/nrwl/nx/issues/11733) -- @nrwl/jest PnP mode failures
 - [nrwl/nx#15406](https://github.com/nrwl/nx/issues/15406) -- NestJS + Yarn PnP failures
@@ -349,6 +367,7 @@ If measurements show `docker commit` is a significant bottleneck AND pre-baking 
 - [yarnpkg/berry#3201](https://github.com/yarnpkg/berry/discussions/3201) -- Zero-installs with Docker
 
 ### Community / Benchmarks (LOW-MEDIUM confidence)
+
 - [Portworx: docker commit performance](https://portworx.com/blog/lcfs-speed-up-docker-commit/) -- 800% improvement with fewer files
 - [Klaviyo: Goodbye dependency installations](https://klaviyo.tech/goodbye-dependency-installations-a242ccf6fa40) -- Real-world Yarn PnP CI improvement (90% build time reduction)
 - [2026 PM comparison (windframe)](https://windframe.dev/blog/pnpm-vs-npm-vs-yarn) -- Install benchmarks
@@ -357,6 +376,7 @@ If measurements show `docker commit` is a significant bottleneck AND pre-baking 
 - [Docker commit size bloat](https://forums.docker.com/t/docker-image-size-is-becoming-huge-after-docker-commit/74351) -- Community reports on commit size
 
 ### Project-Internal (HIGH confidence)
+
 - `.planning/research/pnpm-linking-speed-docker.md` -- overlay2 copy-up analysis, pnpm linker comparison
 - `.planning/research/docker-io-optimization.md` -- Container filesystem I/O deep dive
 - `packages/op-nx-polyrepo/src/lib/graph/extract.ts` -- Plugin's hardcoded `node_modules/.bin/nx` path

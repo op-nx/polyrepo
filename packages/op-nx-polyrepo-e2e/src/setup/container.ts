@@ -15,7 +15,10 @@ export const nxVersion: string = require('nx/package.json').version;
  * matrix can run e2e tests under both daemon modes. When `NX_DAEMON`
  * is unset on the host, the container uses the Nx default (daemon enabled).
  */
-export async function startContainer(snapshotImage: string, name: string): Promise<StartedTestContainer> {
+export async function startContainer(
+  snapshotImage: string,
+  name: string,
+): Promise<StartedTestContainer> {
   let container = new GenericContainer(snapshotImage)
     .withName(`op-nx-polyrepo-e2e-${name}`)
     .withCommand(['sleep', 'infinity']);
@@ -36,7 +39,10 @@ export async function startContainer(snapshotImage: string, name: string): Promi
  */
 export async function getProjectGraph(ctr: StartedTestContainer): Promise<{
   nodes: Record<string, unknown>;
-  dependencies: Record<string, Array<{ source: string; target: string; type: string }>>;
+  dependencies: Record<
+    string,
+    Array<{ source: string; target: string; type: string }>
+  >;
 }> {
   const result = await ctr.exec(
     ['npx', 'nx', 'graph', '--print', '--output-style=static'],
@@ -52,15 +58,16 @@ export async function getProjectGraph(ctr: StartedTestContainer): Promise<{
   const jsonStart = result.stdout.indexOf('{');
 
   if (jsonStart === -1) {
-    throw new Error(
-      `No JSON found in nx graph output:\n${result.stdout}`,
-    );
+    throw new Error(`No JSON found in nx graph output:\n${result.stdout}`);
   }
 
   const parsed: {
     graph: {
       nodes: Record<string, unknown>;
-      dependencies: Record<string, Array<{ source: string; target: string; type: string }>>;
+      dependencies: Record<
+        string,
+        Array<{ source: string; target: string; type: string }>
+      >;
     };
   } = JSON.parse(result.stdout.substring(jsonStart));
 

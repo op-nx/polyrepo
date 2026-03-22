@@ -15,6 +15,7 @@ The Windows build fix requires passing `NX_DAEMON=false` and `NX_WORKSPACE_DATA_
 **Primary recommendation:** Preserve `dependsOn` from raw graph data in `createProxyTarget`, use `[]` for targets with no `dependsOn`, and add `NX_DAEMON=false` + `NX_WORKSPACE_DATA_DIRECTORY` to the proxy executor's environment.
 
 <user_constraints>
+
 ## User Constraints (from CONTEXT.md)
 
 ### Locked Decisions
@@ -35,7 +36,7 @@ The Windows build fix requires passing `NX_DAEMON=false` and `NX_WORKSPACE_DATA_
 
 - `rewriteDependsOn` function implementation details (parsing string vs object entries)
 - Exact Zod schema changes for validating dependsOn from raw target config
-- Research approach for Windows build investigation (order of experiments, which NX_ env vars to try first)
+- Research approach for Windows build investigation (order of experiments, which NX\_ env vars to try first)
 - Whether to extract repos in parallel or sequentially for build testing
 - Test organization for targetDefaults isolation tests
 
@@ -44,25 +45,28 @@ The Windows build fix requires passing `NX_DAEMON=false` and `NX_WORKSPACE_DATA_
 - `crossRepoCascade` config option
 - Preserving inputs/outputs/cache from external repos
 - `nx affected` cross-repo support (DETECT-07)
-</user_constraints>
+  </user_constraints>
 
 ## Standard Stack
 
 ### Core
-| Library | Version | Purpose | Why Standard |
-|---------|---------|---------|--------------|
-| `@nx/devkit` | workspace | TargetConfiguration types, dependsOn typing | Already the plugin's dependency |
-| `vitest` | workspace | Unit testing for transform and executor | Existing test framework |
-| `nx/src/executors/run-commands/run-commands.impl` | workspace | Proxy executor's process spawning | Already imported by executor |
+
+| Library                                           | Version   | Purpose                                     | Why Standard                    |
+| ------------------------------------------------- | --------- | ------------------------------------------- | ------------------------------- |
+| `@nx/devkit`                                      | workspace | TargetConfiguration types, dependsOn typing | Already the plugin's dependency |
+| `vitest`                                          | workspace | Unit testing for transform and executor     | Existing test framework         |
+| `nx/src/executors/run-commands/run-commands.impl` | workspace | Proxy executor's process spawning           | Already imported by executor    |
 
 ### Supporting
-| Library | Version | Purpose | When to Use |
-|---------|---------|---------|-------------|
-| `zod` | workspace | Schema validation for raw graph data | Already used in types.ts |
+
+| Library | Version   | Purpose                              | When to Use              |
+| ------- | --------- | ------------------------------------ | ------------------------ |
+| `zod`   | workspace | Schema validation for raw graph data | Already used in types.ts |
 
 ### Alternatives Considered
-| Instead of | Could Use | Tradeoff |
-|------------|-----------|----------|
+
+| Instead of               | Could Use                                            | Tradeoff                                                                                   |
+| ------------------------ | ---------------------------------------------------- | ------------------------------------------------------------------------------------------ |
 | Explicit `dependsOn: []` | `dependsOn: undefined` with targetDefaults filtering | Would require modifying how host-side Nx processes targets -- far more complex and fragile |
 
 **Installation:** No new dependencies needed.
@@ -70,6 +74,7 @@ The Windows build fix requires passing `NX_DAEMON=false` and `NX_WORKSPACE_DATA_
 ## Architecture Patterns
 
 ### Recommended Change Structure
+
 ```
 packages/op-nx-polyrepo/src/lib/
   graph/
@@ -82,9 +87,11 @@ packages/op-nx-polyrepo/src/lib/
 ```
 
 ### Pattern 1: dependsOn Preservation in createProxyTarget
+
 **What:** Extract `dependsOn` from raw target config and rewrite project references
 **When to use:** Every proxy target creation
 **Example:**
+
 ```typescript
 // Source: Nx project-configuration-utils.ts:981 -- confirms undefined triggers merge
 // When target has dependsOn from external repo's nx graph --print:
@@ -111,15 +118,26 @@ function createProxyTarget(
 ```
 
 ### Pattern 2: rewriteDependsOn Function
+
 **What:** Transform dependsOn entries from external repo context to host context
 **When to use:** Called by createProxyTarget for every proxy target
 **Example:**
+
 ```typescript
 // Source: Nx TargetDependencyConfig type -- node_modules/nx/src/config/workspace-json-project-json.d.ts:149
 function rewriteDependsOn(
   rawDependsOn: unknown,
   repoAlias: string,
-): (string | { target: string; projects?: string | string[]; params?: string; options?: string; dependencies?: boolean })[] {
+): (
+  | string
+  | {
+      target: string;
+      projects?: string | string[];
+      params?: string;
+      options?: string;
+      dependencies?: boolean;
+    }
+)[] {
   // No dependsOn in raw config -> explicit empty array blocks targetDefaults
   if (!Array.isArray(rawDependsOn)) {
     return [];
@@ -137,7 +155,7 @@ function rewriteDependsOn(
 
       if (Array.isArray(entry['projects'])) {
         result['projects'] = entry['projects'].map((p: unknown) =>
-          typeof p === 'string' ? `${repoAlias}/${p}` : p
+          typeof p === 'string' ? `${repoAlias}/${p}` : p,
         );
       }
       // projects: "self" passes through unchanged
@@ -151,9 +169,11 @@ function rewriteDependsOn(
 ```
 
 ### Pattern 3: Environment Isolation in Proxy Executor
+
 **What:** Pass env vars to child Nx process to isolate SQLite databases
 **When to use:** Every proxy executor invocation
 **Example:**
+
 ```typescript
 // Source: cache-directory.ts:88 -- NX_WORKSPACE_DATA_DIRECTORY overrides workspace-data path
 const result = await runCommandsImpl(
@@ -173,6 +193,7 @@ const result = await runCommandsImpl(
 ```
 
 ### Anti-Patterns to Avoid
+
 - **Filtering targetDefaults at the host level:** Attempting to modify how the host Nx applies targetDefaults to specific projects would require deep Nx internals patching and would break on Nx version updates.
 - **Omitting dependsOn (undefined) for targets that had no dependsOn:** This is the current bug. `undefined` means "apply targetDefaults." Must use `[]` for explicit "no dependencies."
 - **Namespacing bare string dependsOn entries as project references:** Bare strings like `"build-base"` in `dependsOn` are self-references (same-project target names), NOT project references. Do not namespace them.
@@ -180,47 +201,53 @@ const result = await runCommandsImpl(
 
 ## Don't Hand-Roll
 
-| Problem | Don't Build | Use Instead | Why |
-|---------|-------------|-------------|-----|
-| targetDefaults filtering | Custom plugin-level targetDefaults interceptor | Set explicit `dependsOn` on every proxy target | Nx's merge logic already respects explicit values -- just set them |
-| Environment isolation | Manual SQLite lock management | `NX_WORKSPACE_DATA_DIRECTORY` env var | Built into Nx's cache-directory.ts, tested across workspace setups |
-| Child process spawning | Custom `exec`/`spawn` in executor | `runCommandsImpl` with `env` option | Already used by executor, handles env passing, PATH management, PTY |
+| Problem                  | Don't Build                                    | Use Instead                                    | Why                                                                 |
+| ------------------------ | ---------------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------- |
+| targetDefaults filtering | Custom plugin-level targetDefaults interceptor | Set explicit `dependsOn` on every proxy target | Nx's merge logic already respects explicit values -- just set them  |
+| Environment isolation    | Manual SQLite lock management                  | `NX_WORKSPACE_DATA_DIRECTORY` env var          | Built into Nx's cache-directory.ts, tested across workspace setups  |
+| Child process spawning   | Custom `exec`/`spawn` in executor              | `runCommandsImpl` with `env` option            | Already used by executor, handles env passing, PATH management, PTY |
 
 **Key insight:** Both fixes leverage existing Nx mechanisms rather than fighting them. The targetDefaults isolation uses Nx's own merge behavior (explicit value blocks defaults). The environment isolation uses Nx's built-in env var support.
 
 ## Common Pitfalls
 
 ### Pitfall 1: Confusing dependsOn string entries as project references
+
 **What goes wrong:** Bare strings like `"build-base"` get namespaced to `"nx/build-base"`, which Nx interprets as running target `build-base` on project `nx/build-base` (nonexistent).
 **Why it happens:** In `dependsOn`, a bare string can mean either a target name (self-reference) or a project name (when used with caret). The distinction is: caret prefix (`^`) = run on dependency projects, no caret = run on same project.
 **How to avoid:** String entries pass through unchanged. Only object entries with explicit `projects` arrays need namespacing.
 **Warning signs:** `Could not find project "nx/build-native"` errors when running tasks.
 
 ### Pitfall 2: Using the wrong NX_WORKSPACE_DATA env var name
+
 **What goes wrong:** Setting `NX_WORKSPACE_DATA_CACHE_DIRECTORY` has no effect because Nx reads `NX_WORKSPACE_DATA_DIRECTORY`.
 **Why it happens:** Nx documentation has historically used `NX_WORKSPACE_DATA_CACHE_DIRECTORY` but the actual code reads `NX_WORKSPACE_DATA_DIRECTORY` (confirmed in `cache-directory.ts:88`).
 **How to avoid:** Use `NX_WORKSPACE_DATA_DIRECTORY` (verified from source).
 **Warning signs:** SQLite locking errors or stale cache despite setting the env var.
 
 ### Pitfall 3: Object dependsOn entries with `projects: "self"`
+
 **What goes wrong:** If `"self"` gets treated as a project name and namespaced to `"nx/self"`, the self-reference breaks.
 **Why it happens:** The `projects` field in `TargetDependencyConfig` can be `string | string[]`. The special value `"self"` means "this project." There are 209 such entries in the nrwl/nx repo.
 **How to avoid:** Only namespace when `projects` is an array. `projects: "self"` and `projects: "dependencies"` pass through unchanged.
 **Warning signs:** `Could not find project "nx/self"` errors.
 
 ### Pitfall 4: Tag-based project selectors in dependsOn
+
 **What goes wrong:** `{target: "build", projects: ["tag:npm:public"]}` gets namespaced to `{projects: ["nx/tag:npm:public"]}`, which is invalid.
 **Why it happens:** The `projects` array can contain tag selectors like `"tag:npm:public"` alongside actual project names.
 **How to avoid:** Detect entries starting with `"tag:"` and pass them through unchanged. The tags exist on the namespaced projects because `transformGraphForRepo` preserves original tags.
 **Warning signs:** `Cannot find projects matching "nx/tag:npm:public"` errors.
 
 ### Pitfall 5: Rust build-native target timeout or failure
+
 **What goes wrong:** `nx:build-native` uses `@monodon/rust:napi` which compiles Rust. If Rust toolchain is not installed or compilation is slow, the build times out.
 **Why it happens:** The nrwl/nx repo has native Rust code in `packages/nx/src/native/`. The `build-native` target compiles it.
 **How to avoid:** A `.node` binary already exists for `win32-arm64-msvc`. Nx's caching should skip `build-native` if the input hash (Rust files, Cargo.toml) hasn't changed. Set `NX_PLUGIN_NO_TIMEOUTS=true` for initial builds.
 **Warning signs:** `@monodon/rust:napi` errors, `cargo build` failures, NAPI compilation errors.
 
 ### Pitfall 6: Host `lint` target overwritten by targetDefaults
+
 **What goes wrong:** Host's `targetDefaults.lint.command: "eslint . --max-warnings=0"` currently leaks into ALL external project `lint` targets, replacing the proxy executor with `nx:run-commands`.
 **Why it happens:** The host `targetDefaults` for `lint` includes a `command` field. When `lint` targets have `undefined` for `command`, the targetDefault fills it in -- and Nx treats targets with `command` as `nx:run-commands`, overriding the proxy executor.
 **How to avoid:** This is already visible in the current project graph (verified: `nx/devkit:lint` has `executor: "nx:run-commands"` instead of `@op-nx/polyrepo:run`). The dependsOn fix (explicit values on all fields that matter) should also consider that the `executor` field is already set explicitly by `createProxyTarget`, so `command` from targetDefaults may still leak. Verify after fix.
@@ -231,6 +258,7 @@ const result = await runCommandsImpl(
 Verified patterns from source code inspection:
 
 ### Nx targetDefaults Merge Logic
+
 ```typescript
 // Source: .repos/nx/packages/nx/src/project-graph/utils/project-configuration-utils.ts:978-988
 // In mergeTargetDefaultWithTargetDefinition:
@@ -248,6 +276,7 @@ default: {
 ```
 
 ### Nx Test Confirming Empty Array Blocks Merge
+
 ```typescript
 // Source: .repos/nx/packages/nx/src/project-graph/utils/project-configuration-utils.spec.ts:2485-2523
 it('should not overwrite dependsOn', () => {
@@ -260,42 +289,45 @@ it('should not overwrite dependsOn', () => {
         build: {
           executor: 'nx:run-commands',
           options: { command: 'echo', cwd: '{workspaceRoot}' },
-          dependsOn: [],  // explicit empty array
+          dependsOn: [], // explicit empty array
         },
       },
     },
-    { dependsOn: ['^build'] },  // targetDefault
-    sourceMap
+    { dependsOn: ['^build'] }, // targetDefault
+    sourceMap,
   );
-  expect(result.dependsOn).toEqual([]);  // targetDefault NOT applied
+  expect(result.dependsOn).toEqual([]); // targetDefault NOT applied
 });
 ```
 
 ### RunCommandsOptions env Field
+
 ```typescript
 // Source: node_modules/nx/src/executors/run-commands/run-commands.impl.d.ts
 export interface RunCommandsOptions extends Json {
   command?: string | string[];
   cwd?: string;
-  env?: Record<string, string>;  // <-- env vars passed to child process
+  env?: Record<string, string>; // <-- env vars passed to child process
   __unparsed__: string[];
 }
 ```
 
 ### NX_WORKSPACE_DATA_DIRECTORY Resolution
+
 ```typescript
 // Source: .repos/nx/packages/nx/src/utils/cache-directory.ts:85-92
 export function workspaceDataDirectoryForWorkspace(workspaceRoot: string) {
   return absolutePath(
     workspaceRoot,
-    process.env.NX_WORKSPACE_DATA_DIRECTORY ??     // <-- correct env var
+    process.env.NX_WORKSPACE_DATA_DIRECTORY ?? // <-- correct env var
       process.env.NX_PROJECT_GRAPH_CACHE_DIRECTORY ?? // legacy fallback
-      defaultWorkspaceDataDirectory(workspaceRoot)     // .nx/workspace-data
+      defaultWorkspaceDataDirectory(workspaceRoot), // .nx/workspace-data
   );
 }
 ```
 
 ### Raw nx graph --print Output for devkit (Verified)
+
 ```json
 // Source: live extraction from .repos/nx/ on 2026-03-21
 {
@@ -319,6 +351,7 @@ export function workspaceDataDirectoryForWorkspace(workspaceRoot: string) {
 ```
 
 ### dependsOn Entry Types in nrwl/nx (Verified)
+
 ```
 Total projects: 149
 String entries: caret (^build) and bare target names (build-base) -- pass through
@@ -331,12 +364,13 @@ Object entries with tag selectors: {projects: ["tag:npm:public"]} -- pass throug
 
 ## State of the Art
 
-| Old Approach | Current Approach | When Changed | Impact |
-|--------------|------------------|--------------|--------|
-| `dependsOn: undefined` on proxy targets | `dependsOn: []` or preserved value | Phase 12 | Blocks host targetDefaults leak |
-| No env isolation in proxy executor | `NX_DAEMON=false` + `NX_WORKSPACE_DATA_DIRECTORY` | Phase 12 | Prevents SQLite locking between host and child Nx |
+| Old Approach                            | Current Approach                                  | When Changed | Impact                                            |
+| --------------------------------------- | ------------------------------------------------- | ------------ | ------------------------------------------------- |
+| `dependsOn: undefined` on proxy targets | `dependsOn: []` or preserved value                | Phase 12     | Blocks host targetDefaults leak                   |
+| No env isolation in proxy executor      | `NX_DAEMON=false` + `NX_WORKSPACE_DATA_DIRECTORY` | Phase 12     | Prevents SQLite locking between host and child Nx |
 
 **Current behavior (bug):**
+
 - Host `targetDefaults.test.dependsOn: ["^build"]` leaks into all ~150 `nx/*` test targets
 - Host `targetDefaults.lint.command: "eslint . --max-warnings=0"` overwrites proxy executor on lint targets
 - E2e tests require `--exclude-task-dependencies` workaround
@@ -366,30 +400,34 @@ Object entries with tag selectors: {projects: ["tag:npm:public"]} -- pass throug
 ## Validation Architecture
 
 ### Test Framework
-| Property | Value |
-|----------|-------|
-| Framework | vitest (workspace version) |
-| Config file | `packages/op-nx-polyrepo/vitest.config.mts` |
-| Quick run command | `npm exec nx -- test @op-nx/polyrepo` |
-| Full suite command | `npm exec nx -- test @op-nx/polyrepo` |
+
+| Property           | Value                                       |
+| ------------------ | ------------------------------------------- |
+| Framework          | vitest (workspace version)                  |
+| Config file        | `packages/op-nx-polyrepo/vitest.config.mts` |
+| Quick run command  | `npm exec nx -- test @op-nx/polyrepo`       |
+| Full suite command | `npm exec nx -- test @op-nx/polyrepo`       |
 
 ### Phase Requirements -> Test Map
-| Req ID | Behavior | Test Type | Automated Command | File Exists? |
-|--------|----------|-----------|-------------------|-------------|
-| (no mapped IDs) | dependsOn preserved with caret syntax | unit | `npm exec nx -- test @op-nx/polyrepo -- --testPathPattern transform` | Needs update (transform.spec.ts) |
-| (no mapped IDs) | dependsOn set to [] when absent from raw config | unit | `npm exec nx -- test @op-nx/polyrepo -- --testPathPattern transform` | Needs update (transform.spec.ts) |
-| (no mapped IDs) | Object dependsOn entries namespace projects array | unit | `npm exec nx -- test @op-nx/polyrepo -- --testPathPattern transform` | Wave 0 |
-| (no mapped IDs) | Object dependsOn with projects: "self" passes through | unit | `npm exec nx -- test @op-nx/polyrepo -- --testPathPattern transform` | Wave 0 |
-| (no mapped IDs) | Tag selectors in projects array pass through | unit | `npm exec nx -- test @op-nx/polyrepo -- --testPathPattern transform` | Wave 0 |
-| (no mapped IDs) | Proxy executor passes env vars to runCommandsImpl | unit | `npm exec nx -- test @op-nx/polyrepo -- --testPathPattern executor` | Wave 0 |
-| (no mapped IDs) | Windows build: nx/devkit:build succeeds via proxy | manual-only | Manual: `npm exec nx -- run nx/devkit:build` | N/A |
+
+| Req ID          | Behavior                                              | Test Type   | Automated Command                                                    | File Exists?                     |
+| --------------- | ----------------------------------------------------- | ----------- | -------------------------------------------------------------------- | -------------------------------- |
+| (no mapped IDs) | dependsOn preserved with caret syntax                 | unit        | `npm exec nx -- test @op-nx/polyrepo -- --testPathPattern transform` | Needs update (transform.spec.ts) |
+| (no mapped IDs) | dependsOn set to [] when absent from raw config       | unit        | `npm exec nx -- test @op-nx/polyrepo -- --testPathPattern transform` | Needs update (transform.spec.ts) |
+| (no mapped IDs) | Object dependsOn entries namespace projects array     | unit        | `npm exec nx -- test @op-nx/polyrepo -- --testPathPattern transform` | Wave 0                           |
+| (no mapped IDs) | Object dependsOn with projects: "self" passes through | unit        | `npm exec nx -- test @op-nx/polyrepo -- --testPathPattern transform` | Wave 0                           |
+| (no mapped IDs) | Tag selectors in projects array pass through          | unit        | `npm exec nx -- test @op-nx/polyrepo -- --testPathPattern transform` | Wave 0                           |
+| (no mapped IDs) | Proxy executor passes env vars to runCommandsImpl     | unit        | `npm exec nx -- test @op-nx/polyrepo -- --testPathPattern executor`  | Wave 0                           |
+| (no mapped IDs) | Windows build: nx/devkit:build succeeds via proxy     | manual-only | Manual: `npm exec nx -- run nx/devkit:build`                         | N/A                              |
 
 ### Sampling Rate
+
 - **Per task commit:** `npm exec nx -- test @op-nx/polyrepo`
 - **Per wave merge:** `npm exec nx -- test @op-nx/polyrepo`
 - **Phase gate:** Full suite green + manual build verification
 
 ### Wave 0 Gaps
+
 - [ ] Update `transform.spec.ts` "dependsOn omission" describe block -> "dependsOn preservation"
 - [ ] Add test cases for object-style dependsOn with projects array namespacing
 - [ ] Add test cases for projects: "self" pass-through
@@ -399,6 +437,7 @@ Object entries with tag selectors: {projects: ["tag:npm:public"]} -- pass throug
 ## Sources
 
 ### Primary (HIGH confidence)
+
 - `.repos/nx/packages/nx/src/project-graph/utils/project-configuration-utils.ts:978-988` - targetDefaults merge logic confirming `undefined` triggers default application
 - `.repos/nx/packages/nx/src/project-graph/utils/project-configuration-utils.spec.ts:2485-2523` - Nx test confirming `dependsOn: []` blocks targetDefault merge
 - `.repos/nx/packages/nx/src/utils/cache-directory.ts:85-92` - NX_WORKSPACE_DATA_DIRECTORY env var resolution
@@ -409,17 +448,20 @@ Object entries with tag selectors: {projects: ["tag:npm:public"]} -- pass throug
 - `.nx/workspace-data/project-graph.json` - Current host project graph showing targetDefaults leak
 
 ### Secondary (MEDIUM confidence)
+
 - [Nx targetDefaults documentation](https://nx.dev/docs/reference/nx-json) - Confirms overwrite (not merge) behavior
 - [GitHub Issue #10438](https://github.com/nrwl/nx/issues/10438) - Confirms project-level dependsOn replaces targetDefaults
 - [Nx Environment Variables](https://nx.dev/docs/reference/environment-variables) - Documents NX_WORKSPACE_DATA_DIRECTORY, NX_DAEMON, NX_PLUGIN_NO_TIMEOUTS
 - [GitHub Issue #28389](https://github.com/nrwl/nx/issues/28389) - Confirms NX_WORKSPACE_DATA_CACHE_DIRECTORY is NOT the correct env var name
 
 ### Tertiary (LOW confidence)
+
 - [Configuration Merging and Target Defaults (DeepWiki)](https://deepwiki.com/nrwl/nx/3.3-configuration-merging-and-target-defaults) - Third-party analysis of merge behavior
 
 ## Metadata
 
 **Confidence breakdown:**
+
 - Standard stack: HIGH - All libraries already in workspace, no new dependencies
 - Architecture (targetDefaults isolation): HIGH - Verified by reading Nx source code and tests, confirmed by live graph inspection
 - Architecture (Windows build): MEDIUM - Env var approach is verified, but actual build success depends on nrwl/nx build chain behavior which needs empirical testing

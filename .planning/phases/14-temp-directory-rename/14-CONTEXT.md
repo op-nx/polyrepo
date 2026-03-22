@@ -14,10 +14,12 @@ Replace `.tmp` with `tmp` in child repo temp directories so synced Nx workspaces
 ## Implementation Decisions
 
 ### Directory name
+
 - Rename `.tmp` to `tmp` in both usage sites (executor and graph extraction)
 - No other naming alternatives considered — `tmp` is the Nx convention
 
 ### Claude's Discretion
+
 - Whether to extract the directory name into a shared constant or keep it inline
 - Whether to clean up orphaned `.tmp/` directories from prior runs or leave them
 - Test assertion updates — mechanical, match new path
@@ -25,17 +27,21 @@ Replace `.tmp` with `tmp` in child repo temp directories so synced Nx workspaces
 </decisions>
 
 <code_context>
+
 ## Existing Code Insights
 
 ### Reusable Assets
+
 - None needed — this is a rename in existing code
 
 ### Established Patterns
+
 - `normalizePath(join(repoPath, '.tmp'))` pattern used identically in both files
 - `mkdirSync(join(repoPath, '.tmp'), { recursive: true })` pattern used identically in both files
 - TEMP/TMP/TMPDIR env vars set in executor for cross-platform temp isolation
 
 ### Integration Points
+
 - `packages/op-nx-polyrepo/src/lib/executors/run/executor.ts:41-42` — proxy executor temp dir creation + env vars
 - `packages/op-nx-polyrepo/src/lib/graph/extract.ts:91-92` — graph extraction temp dir creation + env vars
 - `packages/op-nx-polyrepo/src/lib/executors/run/executor.spec.ts:300-302` — test assertions for env var paths
@@ -58,5 +64,5 @@ None — discussion stayed within phase scope
 
 ---
 
-*Phase: 14-temp-directory-rename*
-*Context gathered: 2026-03-22*
+_Phase: 14-temp-directory-rename_
+_Context gathered: 2026-03-22_

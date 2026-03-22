@@ -21,9 +21,7 @@ function isRecordOfRecords(
     return false;
   }
 
-  return Object.values(value).every(
-    (v) => isRecord(v),
-  );
+  return Object.values(value).every((v) => isRecord(v));
 }
 
 /**
@@ -69,17 +67,12 @@ function rewriteDependsOn(
         const projects: unknown[] = entry['projects'];
         dep.projects = projects
           .filter((p): p is string => typeof p === 'string')
-          .map((p) =>
-            p.startsWith('tag:') ? p : `${repoAlias}/${p}`,
-          );
+          .map((p) => (p.startsWith('tag:') ? p : `${repoAlias}/${p}`));
       } else if (typeof entry['projects'] === 'string') {
         dep.projects = entry['projects'];
       }
 
-      if (
-        entry['params'] === 'ignore' ||
-        entry['params'] === 'forward'
-      ) {
+      if (entry['params'] === 'ignore' || entry['params'] === 'forward') {
         dep.params = entry['params'];
       }
 
@@ -124,12 +117,11 @@ function createProxyTarget(
     configurations: isRecordOfRecords(config['configurations'])
       ? config['configurations']
       : undefined,
-    parallelism: typeof config['parallelism'] === 'boolean'
-      ? config['parallelism']
-      : undefined,
-    metadata: isRecord(config['metadata'])
-      ? config['metadata']
-      : undefined,
+    parallelism:
+      typeof config['parallelism'] === 'boolean'
+        ? config['parallelism']
+        : undefined,
+    metadata: isRecord(config['metadata']) ? config['metadata'] : undefined,
   };
 }
 

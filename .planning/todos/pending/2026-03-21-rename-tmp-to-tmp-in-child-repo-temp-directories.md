@@ -18,6 +18,7 @@ Nx workspaces already gitignore `tmp/` by default (it's in the `create-nx-worksp
 ## Solution
 
 Rename `.tmp` to `tmp` in two locations:
+
 1. `run/executor.ts:41-42` — proxy executor temp dir creation and env var
 2. `extract.ts:91-92` — graph extraction temp dir creation and env var
 

@@ -7,6 +7,7 @@
 **Overall:** Nx Plugin — event-driven graph extension with proxy executor delegation
 
 **Key Characteristics:**
+
 - Plugin registers with Nx via `createNodesV2` and `createDependencies` hooks in `packages/op-nx-polyrepo/src/index.ts`
 - External repos are cloned/referenced at `.repos/<alias>/` and projected as namespaced virtual projects into the host Nx graph
 - All external project targets are replaced with `@op-nx/polyrepo:run` proxy targets that delegate execution back into the child repo
@@ -16,6 +17,7 @@
 ## Layers
 
 **Plugin Entry Point:**
+
 - Purpose: Implements the two Nx graph extension contracts
 - Location: `packages/op-nx-polyrepo/src/index.ts`
 - Contains: `createNodesV2` (project node registration), `createDependencies` (dependency edge emission), `ensureTargetDefaultsShield` (one-time nx.json mutation)
@@ -23,6 +25,7 @@
 - Used by: Nx daemon / graph computation pipeline
 
 **Config Layer:**
+
 - Purpose: Schema definition, validation, normalization of plugin options from `nx.json`
 - Location: `packages/op-nx-polyrepo/src/lib/config/`
 - Contains: `schema.ts` (Zod schemas, `PolyrepoConfig`, `NormalizedRepoEntry`, `normalizeRepos`), `validate.ts` (runtime validation, gitignore/unsynced warnings), `resolve.ts` (reads plugin options directly from `nx.json` for use inside executors)
@@ -30,6 +33,7 @@
 - Used by: plugin entry point, all three executors
 
 **Graph Layer:**
+
 - Purpose: Extract, transform, cache, and detect cross-repo dependency data
 - Location: `packages/op-nx-polyrepo/src/lib/graph/`
 - Contains: `extract.ts` (spawns `nx graph --print` in child repo), `transform.ts` (namespaces project names/roots, rewrites targets as proxies, injects auto-tags), `cache.ts` (three-layer cache, hash computation, exponential backoff on failure), `detect.ts` (cross-repo dependency detection via package.json + tsconfig paths), `types.ts` (Zod schema for external graph JSON, `TransformedNode`, `PolyrepoGraphReport`)
@@ -37,6 +41,7 @@
 - Used by: plugin entry point, sync executor
 
 **Git Layer:**
+
 - Purpose: All git operations and repo state detection
 - Location: `packages/op-nx-polyrepo/src/lib/git/`
 - Contains: `commands.ts` (clone, pull, fetch, rebase, ff-only, checkout, fetch-tag via `execFile('git', ...)`), `detect.ts` (repo state, HEAD SHA, dirty files, ahead/behind, working tree state), `normalize-url.ts` (git URL canonicalization), `patterns.ts` (git URL regex)
@@ -44,6 +49,7 @@
 - Used by: config layer (URL validation), graph cache layer (hash inputs), all three executors
 
 **Executors:**
+
 - Purpose: Three user-facing Nx targets
 - Location: `packages/op-nx-polyrepo/src/lib/executors/`
 - Contains:
@@ -54,6 +60,7 @@
 - Used by: Nx task runner (invoked by user or host project task graphs)
 
 **Format Layer:**
+
 - Purpose: Aligned table output for CLI display
 - Location: `packages/op-nx-polyrepo/src/lib/format/table.ts`
 - Contains: `formatAlignedTable(rows: ColumnDef[][])` — pads columns to uniform widths, joins with two-space separator
@@ -61,6 +68,7 @@
 - Used by: sync executor, status executor
 
 **Testing Utilities:**
+
 - Purpose: Shared test helpers
 - Location: `packages/op-nx-polyrepo/src/lib/testing/`
 - Contains: `mock-child-process.ts` (typed `ChildProcess` mock factory built from `EventEmitter`), `asserts.ts` (`assertDefined<T>` type-narrowing assertion)
@@ -102,26 +110,31 @@
 ## Key Abstractions
 
 **PolyrepoGraphReport:**
+
 - Purpose: Aggregate of all per-repo extracted and transformed graph data; the central in-memory + disk-cached structure
 - Examples: `packages/op-nx-polyrepo/src/lib/graph/types.ts`
 - Pattern: `{ repos: Record<alias, { nodes: Record<name, TransformedNode>; dependencies: Array<{source, target, type}> }> }`
 
 **TransformedNode:**
+
 - Purpose: A single external project as seen by the host workspace — namespaced name, rewritten root, proxy targets, injected tags, and extracted dep lists for cross-repo detection
 - Examples: `packages/op-nx-polyrepo/src/lib/graph/types.ts`
 - Pattern: Extends Nx `ProjectConfiguration` shape with additional `packageName`, `dependencies`, `devDependencies`, `peerDependencies` fields
 
 **NormalizedRepoEntry:**
+
 - Purpose: Unified discriminated union for remote vs. local repo config, with defaults applied
 - Examples: `packages/op-nx-polyrepo/src/lib/config/schema.ts`
 - Pattern: `{ type: 'remote'; alias; url; ref?; depth; disableHooks } | { type: 'local'; alias; path }`
 
 **Three-Layer Cache:**
+
 - Purpose: Minimize `nx graph --print` child process invocations (expensive due to JVM init in gradle repos)
 - Examples: `packages/op-nx-polyrepo/src/lib/graph/cache.ts`
 - Pattern: Module-level `Map` (survives daemon session) → per-repo `.repos/<alias>/.polyrepo-graph-cache.json` → live extraction with exponential backoff on failure
 
 **Proxy Target:**
+
 - Purpose: Replace every external project target with a uniform `@op-nx/polyrepo:run` executor entry that preserves `dependsOn`, `configurations`, `parallelism` from the original
 - Examples: `packages/op-nx-polyrepo/src/lib/graph/transform.ts` (`createProxyTarget`)
 - Pattern: `{ executor: '@op-nx/polyrepo:run', options: { repoAlias, originalProject, targetName }, inputs: [], cache: false, dependsOn: rewrittenDependsOn }`
@@ -129,26 +142,31 @@
 ## Entry Points
 
 **`createNodesV2` (Nx plugin hook):**
+
 - Location: `packages/op-nx-polyrepo/src/index.ts`
 - Triggers: Nx project graph computation (daemon startup, `nx graph`, any `nx run`)
 - Responsibilities: Validate config, ensure targetDefaults shield, populate graph report via cache, emit project nodes for root workspace and all external projects
 
 **`createDependencies` (Nx plugin hook):**
+
 - Location: `packages/op-nx-polyrepo/src/index.ts`
 - Triggers: Nx dependency graph computation (same pipeline as `createNodesV2`)
 - Responsibilities: Emit intra-repo implicit dependency edges; emit cross-repo edges via `detectCrossRepoDependencies`
 
 **`syncExecutor` (Nx executor):**
+
 - Location: `packages/op-nx-polyrepo/src/lib/executors/sync/executor.ts`
 - Triggers: `nx polyrepo-sync` (or `nx run @op-nx/source:polyrepo-sync`)
 - Responsibilities: Clone/update all configured repos, install dependencies, pre-cache graph
 
 **`statusExecutor` (Nx executor):**
+
 - Location: `packages/op-nx-polyrepo/src/lib/executors/status/executor.ts`
 - Triggers: `nx polyrepo-status`
 - Responsibilities: Fetch all repos, display aligned table of branch/dirty/ahead-behind/project-count per repo
 
 **`runExecutor` (Nx proxy executor):**
+
 - Location: `packages/op-nx-polyrepo/src/lib/executors/run/executor.ts`
 - Triggers: Any `nx run <alias>/<project>:<target>` (resolved automatically via proxy target config)
 - Responsibilities: Delegate target execution into the child repo's Nx workspace via `runCommandsImpl`
@@ -158,6 +176,7 @@
 **Strategy:** Defensive isolation — per-repo failures do not fail other repos; graph extraction failures degrade to missing projects (warning emitted), not hard crashes
 
 **Patterns:**
+
 - Graph extraction failures: caught in `createNodesV2`, logged as warnings; `populateGraphReport` uses exponential backoff (2s→4s→8s→16s→30s cap) per repo
 - Config validation errors: thrown immediately via Zod `safeParse` rejection; cross-repo override validation (`OVRD-03`) intentionally propagates to surface user config errors
 - Git command failures: `execFile` errors bubble up as `Error` with stderr text; `syncExecutor` catches per-repo and continues; `statusExecutor` continues past failed fetches
@@ -176,4 +195,4 @@
 
 ---
 
-*Architecture analysis: 2026-03-22*
+_Architecture analysis: 2026-03-22_

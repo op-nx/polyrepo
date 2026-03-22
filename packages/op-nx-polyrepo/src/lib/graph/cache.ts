@@ -160,10 +160,7 @@ function shouldSkipExtraction(alias: string, currentHash: string): boolean {
   }
 
   // Exponential backoff: 2s, 4s, 8s, 16s, 30s cap
-  const backoffMs = Math.min(
-    2000 * Math.pow(2, state.attemptCount - 1),
-    30000,
-  );
+  const backoffMs = Math.min(2000 * Math.pow(2, state.attemptCount - 1), 30000);
   const elapsed = Date.now() - state.lastAttemptTime;
 
   return elapsed < backoffMs;
@@ -312,11 +309,7 @@ export async function populateGraphReport(
 
     try {
       const rawGraph = await extractGraphFromRepo(repoPath);
-      const transformed = transformGraphForRepo(
-        alias,
-        rawGraph,
-        workspaceRoot,
-      );
+      const transformed = transformGraphForRepo(alias, rawGraph, workspaceRoot);
 
       perRepoCache.set(alias, { hash: repoHash, report: transformed });
       writePerRepoCache(workspaceRoot, alias, repoHash, transformed);

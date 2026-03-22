@@ -2,7 +2,15 @@
 phase: 10-integration-and-end-to-end-validation
 plan: 01
 subsystem: graph
-tags: [nx-plugin, createDependencies, cross-repo, dependency-detection, DETECT-06, DETECT-07]
+tags:
+  [
+    nx-plugin,
+    createDependencies,
+    cross-repo,
+    dependency-detection,
+    DETECT-06,
+    DETECT-07,
+  ]
 
 # Dependency graph
 requires:
@@ -27,11 +35,11 @@ key-files:
     - packages/op-nx-polyrepo/src/index.spec.ts
 
 key-decisions:
-  - "Extraction try/catch restructured so config and report survive to detection call while OVRD-03 errors propagate"
-  - "DETECT-07 deferral documented inline in index.ts near the detection call with root cause and future solution"
+  - 'Extraction try/catch restructured so config and report survive to detection call while OVRD-03 errors propagate'
+  - 'DETECT-07 deferral documented inline in index.ts near the detection call with root cause and future solution'
 
 patterns-established:
-  - "Separated error paths: extraction failures degrade gracefully, detection validation errors propagate loudly"
+  - 'Separated error paths: extraction failures degrade gracefully, detection validation errors propagate loudly'
 
 requirements-completed: [DETECT-06, DETECT-07]
 
@@ -53,6 +61,7 @@ completed: 2026-03-18
 - **Files modified:** 2
 
 ## Accomplishments
+
 - detectCrossRepoDependencies called in createDependencies after successful extraction, merging cross-repo edges into the returned dependency array
 - OVRD-03 validation errors propagate to Nx (not caught by extraction try/catch) so users see clear error messages
 - Extraction failures still degrade gracefully with empty array without calling detection
@@ -73,10 +82,12 @@ Each task was committed atomically:
 **Plan metadata:** pending (docs: complete plan)
 
 ## Files Created/Modified
+
 - `packages/op-nx-polyrepo/src/index.ts` - Added detectCrossRepoDependencies import, restructured createDependencies with separated error paths, added DETECT-07 documentation comment
 - `packages/op-nx-polyrepo/src/index.spec.ts` - Added vi.mock for detect module, 4 new integration tests for cross-repo wiring, imported DependencyType for type-safe assertions
 
 ## Decisions Made
+
 - Restructured createDependencies try/catch so config is declared with `let` outside the block, allowing detection to run after extraction succeeds while extraction errors still return empty array
 - Used DependencyType.static (enum member) instead of string literal in test mock return values for type safety
 
@@ -85,6 +96,7 @@ Each task was committed atomically:
 ### Auto-fixed Issues
 
 **1. [Rule 1 - Bug] Fixed TypeScript type error in test mock return value**
+
 - **Found during:** Task 1 (GREEN phase verification)
 - **Issue:** `type: 'static' as const` not assignable to `DependencyType` enum type in `RawProjectGraphDependency`
 - **Fix:** Imported `DependencyType` from `@nx/devkit` and used `DependencyType.static` instead of string literal
@@ -98,6 +110,7 @@ Each task was committed atomically:
 **Impact on plan:** Minor type safety correction. No scope creep.
 
 ## Issues Encountered
+
 - Pre-existing lint errors in detect.spec.ts, schema.spec.ts, transform.spec.ts (55 errors total) -- all out of scope, not in files modified by this plan
 - Pre-existing typecheck error in detect.spec.ts:513 ('edge' possibly undefined) -- out of scope
 - nx sync warning about TypeScript project references -- pre-existing, unrelated to changes
@@ -107,6 +120,7 @@ Each task was committed atomically:
 None - no external service configuration required.
 
 ## Next Phase Readiness
+
 - Cross-repo detection is now fully wired into the Nx plugin pipeline
 - Ready for e2e validation (Plan 02) to verify cross-repo edges appear in nx graph output inside containers
 - DETECT-07 documented and deferred -- no blocker for Phase 10 completion
@@ -122,5 +136,6 @@ None - no external service configuration required.
 - [x] Commit b463e85 exists (docs DETECT-07)
 
 ---
-*Phase: 10-integration-and-end-to-end-validation*
-*Completed: 2026-03-18*
+
+_Phase: 10-integration-and-end-to-end-validation_
+_Completed: 2026-03-18_

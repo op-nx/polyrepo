@@ -1,6 +1,6 @@
 ---
 status: diagnosed
-trigger: "diagnose why negation e2e test was removed"
+trigger: 'diagnose why negation e2e test was removed'
 created: 2026-03-18T22:00:00Z
 updated: 2026-03-18T22:00:00Z
 ---
@@ -44,7 +44,7 @@ started: d5fbbb7 introduced the tests; every subsequent commit tried to work aro
 
 - timestamp: 2026-03-18T22:00:00Z
   checked: detect.ts lines 237-260 (Step 1c — tsconfig path alias expansion)
-  found: fallback detection via tsconfig paths could theoretically match if nrwl/nx repo had tsconfig.base.json with @nx/* path aliases pointing to project roots. The nrwl/nx repo DOES have such aliases. However, the e2e fixture uses depth:1 clone which may not include all necessary files.
+  found: fallback detection via tsconfig paths could theoretically match if nrwl/nx repo had tsconfig.base.json with @nx/\* path aliases pointing to project roots. The nrwl/nx repo DOES have such aliases. However, the e2e fixture uses depth:1 clone which may not include all necessary files.
   implication: tsconfig path alias fallback might work but was never tested in the e2e environment
 
 - timestamp: 2026-03-18T22:00:00Z

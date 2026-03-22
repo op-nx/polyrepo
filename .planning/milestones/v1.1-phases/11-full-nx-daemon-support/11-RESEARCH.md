@@ -15,27 +15,32 @@ The e2e infrastructure change is well-scoped. The Dockerfile's `workspace` stage
 **Primary recommendation:** Two plans. Plan 1: Per-repo cache refactor + pre-caching during sync + error recovery with backoff (the core daemon support work). Plan 2: E2e daemon mode verification (Dockerfile change, container env forwarding, CI matrix, four-combo verification).
 
 <user_constraints>
+
 ## User Constraints (from CONTEXT.md)
 
 ### Locked Decisions
 
 **Per-repo Cache Architecture**
+
 - Migrate from single cache file to per-repo cache files. Each synced repo gets its own cache at `.repos/<alias>/.polyrepo-graph-cache.json` containing `{ hash, report }` for that repo only.
 - Three-layer cache with global gate: (1) Global in-memory hash gate (combines all per-repo hashes -- existing pattern from `cache.ts:84-87`), (2) Per-repo disk cache, (3) Per-repo extraction on miss. Each layer is progressively more expensive, only reached when the cheaper layer misses.
 - Keep existing hash inputs. Per-repo hash: `hashArray([reposConfigHash, alias, headSha, dirtyFiles])`. Lockfile hash was considered but `headSha + dirtyFiles` already covers lockfile changes via `git status --porcelain`. Adding it provides marginal benefit with unnecessary coupling to sync executor internals.
 - Scalability target: Multiple repos with 500+ Nx projects. In-memory hit: ~0ms. Disk hit: ~50-200ms. Only stale repos re-extract.
 
 **Pre-caching During Sync**
+
 - polyrepo-sync writes per-repo disk cache after install. After clone/pull + dep install, run `extractGraphFromRepo` and write the per-repo cache file. First daemon invocation hits warm disk cache.
 - Progress logging at multiple points. Sync must log progress during extraction so output doesn't feel stuck (e.g., "Extracting graph for repo-x...", "Cached graph for repo-x (149 projects)").
 - Warn and continue on extraction failure. Matches existing degradation pattern (`createNodesV2` and `createDependencies` both catch extraction errors and warn). The repo is still cloned and installed; plugin falls back to inline extraction on next Nx command.
 
 **Cache Invalidation Under Daemon**
+
 - Hash-based invalidation (existing approach, no event-driven watcher). `computeOuterHash` runs per Nx command: `git rev-parse HEAD` + `git status --porcelain` per repo. 10 repos = ~100-200ms total. <1% overhead on typical Nx commands (2-30s).
 - Natural invalidation after sync. Sync with no new commits: hash unchanged, in-memory hit, zero cost. Sync with changes: hash changes, per-repo disk cache hit (pre-cached by sync), ~100-200ms recovery. No daemon restart or refresh signal needed.
 - This is a synthetic monorepo. Users actively develop in `.repos/<alias>/` directories. Extraction inside the daemon is the common path, not a rare edge case. Cache must be responsive to frequent local changes.
 
 **E2e Daemon Testing**
+
 - Both daemon modes verified in e2e. E2e tests must pass with `NX_DAEMON=true` and `NX_DAEMON=false`.
 - Separate test runs, CI matrix. Same test files, run twice with different env. CI matrix controls `NX_DAEMON`. Local e2e defaults to `NX_DAEMON` unset (daemon enabled, Nx default).
 - Remove `ENV NX_DAEMON=false` from Dockerfile `workspace` stage (line 58). Keep `CI=true`. Build-time `RUN` commands already have inline `NX_DAEMON=false` (lines 89, 116). `nx-prep` stage (line 14) keeps its `ENV` -- build-time only, never runtime.
@@ -44,6 +49,7 @@ The e2e infrastructure change is well-scoped. The Dockerfile's `workspace` stage
 - Also verify with `--skip-nx-cache`. Four combinations: daemon on/off x cache on/off. All must produce correct results.
 
 **Error Recovery**
+
 - Per-repo isolation. One repo's extraction failure does not affect other repos. Failed repo's projects drop from graph; other repos served from their own caches.
 - No stale cache fallback. In a synthetic monorepo, users actively develop across repos. Stale data means incorrect dependency edges. Show the real state, warn clearly.
 - Short exponential retries with hash-change reset. After extraction failure, skip re-extraction with growing cooldown: 2s, 4s, 8s, 16s, 30s cap. Prevents repeated 30-60s extraction penalties on rapid Nx command sequences. Hash change (any file edit, commit, or sync in the failing repo) resets to attempt 1 immediately.
@@ -64,28 +70,31 @@ The e2e infrastructure change is well-scoped. The Dockerfile's `workspace` stage
 - Automated build-time regression assertion -- CI check that fails if Docker build exceeds baseline + margin. Manual verification chosen for this phase; revisit if build times regress.
 - `nx affected` cross-repo support (DETECT-07) -- Carried from Phase 10. Requires `polyrepo-affected` executor. Separate milestone.
 - Consumer-side tsconfig path resolution -- Carried from Phase 9/10. Deferred to v1.2+.
-</user_constraints>
+  </user_constraints>
 
 ## Standard Stack
 
 ### Core
-| Library | Version | Purpose | Why Standard |
-|---------|---------|---------|--------------|
-| `@nx/devkit` | >=20.0.0 | `hashArray`, `readJsonFile`, `writeJsonFile`, `logger` | Nx plugin API; already used in `cache.ts` |
-| `vitest` | (workspace) | Unit + e2e test runner | Already in use for all project tests |
-| `testcontainers` | ^11.12.0 | Docker container lifecycle for e2e tests | Already established e2e infrastructure |
+
+| Library          | Version     | Purpose                                                | Why Standard                              |
+| ---------------- | ----------- | ------------------------------------------------------ | ----------------------------------------- |
+| `@nx/devkit`     | >=20.0.0    | `hashArray`, `readJsonFile`, `writeJsonFile`, `logger` | Nx plugin API; already used in `cache.ts` |
+| `vitest`         | (workspace) | Unit + e2e test runner                                 | Already in use for all project tests      |
+| `testcontainers` | ^11.12.0    | Docker container lifecycle for e2e tests               | Already established e2e infrastructure    |
 
 ### Supporting
-| Library | Version | Purpose | When to Use |
-|---------|---------|---------|-------------|
-| `zod` | ^4.0.0 | Schema validation for cache file parsing | Already a production dependency |
+
+| Library | Version | Purpose                                  | When to Use                     |
+| ------- | ------- | ---------------------------------------- | ------------------------------- |
+| `zod`   | ^4.0.0  | Schema validation for cache file parsing | Already a production dependency |
 
 ### Alternatives Considered
-| Instead of | Could Use | Tradeoff |
-|------------|-----------|----------|
-| Per-repo disk files | Single file with per-repo sections | Single file requires atomic read/write of entire cache; per-repo files allow independent invalidation and are naturally scoped to the repo directory |
-| `hashArray` from `@nx/devkit` | `node:crypto` SHA256 | `hashArray` is already used throughout the codebase and is deterministic for arrays of strings |
-| Timestamp-based backoff | `setTimeout` delay | Timestamp comparison works in the daemon's persistent process without blocking; `setTimeout` would block the plugin worker thread |
+
+| Instead of                    | Could Use                          | Tradeoff                                                                                                                                             |
+| ----------------------------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Per-repo disk files           | Single file with per-repo sections | Single file requires atomic read/write of entire cache; per-repo files allow independent invalidation and are naturally scoped to the repo directory |
+| `hashArray` from `@nx/devkit` | `node:crypto` SHA256               | `hashArray` is already used throughout the codebase and is deterministic for arrays of strings                                                       |
+| Timestamp-based backoff       | `setTimeout` delay                 | Timestamp comparison works in the daemon's persistent process without blocking; `setTimeout` would block the plugin worker thread                    |
 
 **Installation:**
 No new dependencies needed. All libraries already in the workspace.
@@ -105,6 +114,7 @@ No new dependencies needed. All libraries already in the workspace.
 ```
 
 Each `.polyrepo-graph-cache.json` contains:
+
 ```json
 {
   "hash": "<hashArray([reposConfigHash, alias, headSha, dirtyFiles])>",
@@ -121,7 +131,8 @@ The old monolithic `.repos/.polyrepo-graph-cache.json` is removed.
 
 ```typescript
 // Module-level state (persists under daemon)
-const perRepoCache: Map<string, { hash: string; report: RepoGraphData }> = new Map();
+const perRepoCache: Map<string, { hash: string; report: RepoGraphData }> =
+  new Map();
 let globalHash: string | undefined;
 
 async function populateGraphReport(
@@ -130,7 +141,11 @@ async function populateGraphReport(
   reposConfigHash: string,
 ): Promise<PolyrepoGraphReport> {
   // Layer 0: Global gate -- combine all per-repo hashes
-  const newGlobalHash = await computeGlobalHash(config, workspaceRoot, reposConfigHash);
+  const newGlobalHash = await computeGlobalHash(
+    config,
+    workspaceRoot,
+    reposConfigHash,
+  );
 
   if (newGlobalHash === globalHash) {
     // Nothing changed across all repos -- return assembled report from memory
@@ -142,7 +157,11 @@ async function populateGraphReport(
   const report: PolyrepoGraphReport = { repos: {} };
 
   for (const entry of syncedEntries) {
-    const repoHash = await computeRepoHash(reposConfigHash, entry, workspaceRoot);
+    const repoHash = await computeRepoHash(
+      reposConfigHash,
+      entry,
+      workspaceRoot,
+    );
     const cached = perRepoCache.get(entry.alias);
 
     if (cached && cached.hash === repoHash) {
@@ -193,7 +212,10 @@ async function preCacheGraph(
     const transformed = transformGraphForRepo(alias, rawGraph, workspaceRoot);
     const hash = await computeRepoHash(reposConfigHash, alias, repoPath);
 
-    writePerRepoCache(workspaceRoot, alias, hash, { nodes: transformed.nodes, dependencies: transformed.dependencies });
+    writePerRepoCache(workspaceRoot, alias, hash, {
+      nodes: transformed.nodes,
+      dependencies: transformed.dependencies,
+    });
 
     const projectCount = Object.keys(transformed.nodes).length;
     logger.info(`Cached graph for ${alias} (${String(projectCount)} projects)`);
@@ -216,7 +238,7 @@ async function preCacheGraph(
 interface FailureState {
   lastAttemptTime: number;
   attemptCount: number;
-  lastHash: string;  // Hash at time of failure
+  lastHash: string; // Hash at time of failure
 }
 
 const failureStates: Map<string, FailureState> = new Map();
@@ -263,55 +285,62 @@ function recordFailure(alias: string, currentHash: string): void {
 
 ## Don't Hand-Roll
 
-| Problem | Don't Build | Use Instead | Why |
-|---------|-------------|-------------|-----|
-| Hash computation | Custom SHA256 | `hashArray` from `@nx/devkit` | Already used throughout `cache.ts`; deterministic for string arrays |
-| JSON disk cache I/O | Custom JSON reader/writer | `readJsonFile`/`writeJsonFile` from `@nx/devkit` | Already used in `cache.ts`; handles UTF-8 encoding, atomic writes |
-| File existence checks | `fs.accessSync` | `existsSync` from `node:fs` | Already used throughout codebase; simpler API |
-| Container env forwarding | Manual Docker env args | `testcontainers` `withEnvironment()` | Already available in testcontainers ^11.12.0; type-safe Record<string, string> |
-| Retry timing | setTimeout-based delay | Timestamp comparison with `Date.now()` | Non-blocking in synchronous plugin worker context |
+| Problem                  | Don't Build               | Use Instead                                      | Why                                                                            |
+| ------------------------ | ------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------ |
+| Hash computation         | Custom SHA256             | `hashArray` from `@nx/devkit`                    | Already used throughout `cache.ts`; deterministic for string arrays            |
+| JSON disk cache I/O      | Custom JSON reader/writer | `readJsonFile`/`writeJsonFile` from `@nx/devkit` | Already used in `cache.ts`; handles UTF-8 encoding, atomic writes              |
+| File existence checks    | `fs.accessSync`           | `existsSync` from `node:fs`                      | Already used throughout codebase; simpler API                                  |
+| Container env forwarding | Manual Docker env args    | `testcontainers` `withEnvironment()`             | Already available in testcontainers ^11.12.0; type-safe Record<string, string> |
+| Retry timing             | setTimeout-based delay    | Timestamp comparison with `Date.now()`           | Non-blocking in synchronous plugin worker context                              |
 
 **Key insight:** The per-repo cache refactor changes the serialization and invalidation topology, not the core graph extraction/transformation pipeline. `extractGraphFromRepo`, `transformGraphForRepo`, and the hash input functions (`getHeadSha`, `getDirtyFiles`) remain unchanged.
 
 ## Common Pitfalls
 
 ### Pitfall 1: Module-Level State Reset on `vi.resetModules()`
+
 **What goes wrong:** Unit tests for the per-repo cache must reset module-level state between test cases (the `Map` and `globalHash`). Without `vi.resetModules()`, state leaks between tests.
 **Why it happens:** The existing `cache.spec.ts` already uses `vi.resetModules()` at line 99 and dynamically imports the module. The per-repo refactor adds more module-level state (Map instead of single variables).
 **How to avoid:** Follow the existing pattern in `cache.spec.ts`. Each test calls `vi.resetModules()` and dynamically re-imports `cache.ts`. The `setup()` function already does this.
 **Warning signs:** Tests pass individually but fail when run together.
 
 ### Pitfall 2: Race Condition in Parallel Per-Repo Extraction
+
 **What goes wrong:** When multiple repos need extraction simultaneously (Layer 3 miss for multiple repos), parallel `extractGraphFromRepo` calls spawn multiple child Nx processes. Under the daemon, the plugin worker is single-threaded but async operations interleave.
 **Why it happens:** `Promise.all` is used for extraction (existing pattern at `cache.ts:114`). Each extraction spawns a child `nx graph --print` process. These are I/O-bound (child process exec), so they can run concurrently.
 **How to avoid:** Keep parallel extraction (it is the correct approach for I/O-bound work). Each extraction writes its own per-repo cache file independently. No shared mutable state between extractions beyond the `perRepoCache` Map, which is only written after extraction completes.
 **Warning signs:** Corrupt cache files or partial writes. Mitigated by writing each file independently.
 
 ### Pitfall 3: Pre-cache Hash Mismatch with Plugin Hash
+
 **What goes wrong:** The sync executor computes a per-repo hash for pre-caching, but the plugin computes a different hash. The pre-cached data is never used because the hash doesn't match.
 **Why it happens:** The sync executor and the plugin must use identical hash inputs. The plugin hashes `[reposConfigHash, alias, headSha, dirtyFiles]`. The sync executor needs access to `reposConfigHash` (which comes from `hashObject(config.repos ?? {})`).
 **How to avoid:** Extract the hash computation into a shared function that both `cache.ts` and the sync executor can call. `resolvePluginConfig()` (in `config/resolve.ts`) already returns `{ config, entries }` where `config` is the full `PolyrepoConfig` -- verified in source. The sync executor can compute `hashObject(config.repos ?? {})` using the same `hashObject` from `nx/src/devkit-internals`. Export `computeRepoHash` from `cache.ts` so both consumers use the identical function.
 **Warning signs:** Cache miss on first Nx command after sync despite pre-caching. Check hash values in the cache file vs. what the plugin computes.
 
 ### Pitfall 4: Dockerfile ENV Removal Breaks Build-Time Commands
+
 **What goes wrong:** Removing `ENV NX_DAEMON=false` from the `workspace` stage causes build-time `RUN` commands to try starting a daemon inside Docker build.
 **Why it happens:** The `workspace` stage has two `RUN` commands that invoke Nx (lines 89 and 116 in the snapshot stage). These already have inline `NX_DAEMON=false` prefixes. But if there are others without the inline prefix, they could try to start a daemon.
 **How to avoid:** Audit all `RUN` commands in the `workspace` and `snapshot` stages. Line 89 (`NX_DAEMON=false npx nx show projects`) and line 116 (`NX_DAEMON=false npx nx show projects`) already have inline NX_DAEMON=false. The `workspace` stage line 76 (`cd /workspace && git init && git add . && git commit -m "initial"`) does not invoke Nx. Safe to remove the `ENV`.
 **Warning signs:** Docker build hanging at a `RUN` step that invokes Nx. The daemon cannot start properly during `docker build` because there is no persistent process.
 
 ### Pitfall 5: E2e Container Daemon Startup Timing
+
 **What goes wrong:** Container starts with `NX_DAEMON=true` (or unset, which defaults to daemon enabled). First `nx graph --print` command may fail because the daemon needs time to start and build the initial graph.
 **Why it happens:** The daemon is a background process that starts on the first Nx command. Graph computation happens asynchronously. If the command returns before the daemon has fully initialized, results may be incomplete or the command may timeout.
 **How to avoid:** The testcontainers start with `sleep infinity` as the command. The first `exec` call triggers daemon startup. Allow sufficient timeout (the existing 300s test timeout should be adequate). If flaky, add a warmup `exec` call that runs `npx nx show projects` before the actual test assertion.
 **Warning signs:** Flaky failures on the first `nx graph --print` call with timeout or stale data. Succeeds on retry.
 
 ### Pitfall 6: Backoff State Survives Across Test Cases
+
 **What goes wrong:** Unit tests for the backoff mechanism leave failure state in the module-level `failureStates` Map. Subsequent tests see unexpected backoff behavior.
 **Why it happens:** Module-level state persists within a test file's module instance.
 **How to avoid:** Use `vi.resetModules()` and dynamic imports, same pattern as existing `cache.spec.ts`. Alternatively, export a `resetFailureStates()` function for testing (guarded by `process.env.NODE_ENV === 'test'` or similar).
 **Warning signs:** Backoff tests pass individually but fail when run after failure-recording tests.
 
 ### Pitfall 7: `reposConfigHash` vs `pluginOptionsHash` Naming
+
 **What goes wrong:** The existing code uses `pluginOptionsHash` which was recently changed to hash only `config.repos` (not the full options including `implicitDependencies`). The naming is inconsistent.
 **Why it happens:** Phase 10 decision (see STATE.md): "Cache key uses only repos config hash, not full options hash -- detection-only options (overrides, negations) don't invalidate extraction cache." The variable name `pluginOptionsHash` in `populateGraphReport` signature is stale.
 **How to avoid:** Rename the parameter to `reposConfigHash` during the refactor to match its actual semantics. This is a naming-only change with no behavioral impact.
@@ -331,16 +360,24 @@ const PER_REPO_CACHE_FILENAME = '.polyrepo-graph-cache.json';
 
 interface PerRepoCacheFile {
   hash: string;
-  report: { nodes: Record<string, TransformedNode>; dependencies: Array<{ source: string; target: string; type: string }> };
+  report: {
+    nodes: Record<string, TransformedNode>;
+    dependencies: Array<{ source: string; target: string; type: string }>;
+  };
 }
 
 function getPerRepoCachePath(workspaceRoot: string, alias: string): string {
   return join(workspaceRoot, '.repos', alias, PER_REPO_CACHE_FILENAME);
 }
 
-function tryReadPerRepoCache(workspaceRoot: string, alias: string): PerRepoCacheFile | undefined {
+function tryReadPerRepoCache(
+  workspaceRoot: string,
+  alias: string,
+): PerRepoCacheFile | undefined {
   try {
-    return readJsonFile<PerRepoCacheFile>(getPerRepoCachePath(workspaceRoot, alias));
+    return readJsonFile<PerRepoCacheFile>(
+      getPerRepoCachePath(workspaceRoot, alias),
+    );
   } catch {
     return undefined;
   }
@@ -398,7 +435,12 @@ export async function startContainer(
 // The pre-cache call goes after successful install, inside syncRepo():
 
 // After installDeps succeeds:
-const installed = await tryInstallDeps(repoPath, entry.alias, verbose, workspaceRoot);
+const installed = await tryInstallDeps(
+  repoPath,
+  entry.alias,
+  verbose,
+  workspaceRoot,
+);
 
 if (installed) {
   // Pre-cache graph for daemon warm start
@@ -424,14 +466,15 @@ function logExtractionFailure(alias: string, error: unknown): void {
 
 ## State of the Art
 
-| Old Approach | Current Approach | When Changed | Impact |
-|--------------|------------------|--------------|--------|
-| Single monolithic cache file (`.repos/.polyrepo-graph-cache.json`) | Per-repo cache files (`.repos/<alias>/.polyrepo-graph-cache.json`) | Phase 11 (now) | Independent invalidation per repo; scales to 10+ repos without re-reading entire cache |
-| Cold start requires `NX_DAEMON=false` | Daemon-compatible with pre-caching during sync | Phase 11 (now) | First Nx command after sync hits warm disk cache; no manual `NX_DAEMON=false` needed |
-| No error recovery | Exponential backoff with hash-change reset per repo | Phase 11 (now) | Failed repos don't repeatedly penalize every Nx command; user fixes are detected immediately |
-| E2e tests run only with `NX_DAEMON=false` | E2e tests verify both daemon modes via CI matrix | Phase 11 (now) | Confidence that the plugin works under production daemon mode |
+| Old Approach                                                       | Current Approach                                                   | When Changed   | Impact                                                                                       |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------ | -------------- | -------------------------------------------------------------------------------------------- |
+| Single monolithic cache file (`.repos/.polyrepo-graph-cache.json`) | Per-repo cache files (`.repos/<alias>/.polyrepo-graph-cache.json`) | Phase 11 (now) | Independent invalidation per repo; scales to 10+ repos without re-reading entire cache       |
+| Cold start requires `NX_DAEMON=false`                              | Daemon-compatible with pre-caching during sync                     | Phase 11 (now) | First Nx command after sync hits warm disk cache; no manual `NX_DAEMON=false` needed         |
+| No error recovery                                                  | Exponential backoff with hash-change reset per repo                | Phase 11 (now) | Failed repos don't repeatedly penalize every Nx command; user fixes are detected immediately |
+| E2e tests run only with `NX_DAEMON=false`                          | E2e tests verify both daemon modes via CI matrix                   | Phase 11 (now) | Confidence that the plugin works under production daemon mode                                |
 
 **Deprecated/outdated:**
+
 - The monolithic `.repos/.polyrepo-graph-cache.json` file is replaced by per-repo files. The old file path should be cleaned up (deleted if present) during the first invocation of the new cache.
 
 ## Open Questions
@@ -452,37 +495,40 @@ function logExtractionFailure(alias: string, error: unknown): void {
 ## Validation Architecture
 
 ### Test Framework
-| Property | Value |
-|----------|-------|
-| Framework | Vitest (workspace version) |
-| Config file | `packages/op-nx-polyrepo/vitest.config.mts` (unit) and `packages/op-nx-polyrepo-e2e/vitest.config.mts` (e2e) |
-| Quick run command | `npm exec nx -- test @op-nx/polyrepo --output-style=static` |
-| Full suite command | `npm exec nx -- run-many -t test,e2e --output-style=static` |
+
+| Property           | Value                                                                                                        |
+| ------------------ | ------------------------------------------------------------------------------------------------------------ |
+| Framework          | Vitest (workspace version)                                                                                   |
+| Config file        | `packages/op-nx-polyrepo/vitest.config.mts` (unit) and `packages/op-nx-polyrepo-e2e/vitest.config.mts` (e2e) |
+| Quick run command  | `npm exec nx -- test @op-nx/polyrepo --output-style=static`                                                  |
+| Full suite command | `npm exec nx -- run-many -t test,e2e --output-style=static`                                                  |
 
 ### Phase Requirements -> Test Map
 
 Phase 11 has no explicit requirement IDs from REQUIREMENTS.md. Requirements are derived from CONTEXT.md decisions.
 
-| Req ID | Behavior | Test Type | Automated Command | File Exists? |
-|--------|----------|-----------|-------------------|-------------|
-| DAEMON-01 | Per-repo cache: in-memory hit returns instantly (global gate) | unit | `npm exec nx -- test @op-nx/polyrepo --output-style=static -- --run -t "global gate"` | Partial -- `cache.spec.ts` exists, needs refactoring for per-repo |
-| DAEMON-02 | Per-repo cache: disk hit restores per-repo data | unit | `npm exec nx -- test @op-nx/polyrepo --output-style=static -- --run -t "disk cache"` | Partial -- `cache.spec.ts` exists, needs new per-repo tests |
-| DAEMON-03 | Per-repo cache: changed repo re-extracts, unchanged repos stay cached | unit | `npm exec nx -- test @op-nx/polyrepo --output-style=static -- --run -t "selective"` | No -- new test |
-| DAEMON-04 | Pre-caching during sync writes per-repo cache after install | unit | `npm exec nx -- test @op-nx/polyrepo --output-style=static -- --run -t "pre-cache"` | No -- new test in `executor.spec.ts` |
-| DAEMON-05 | Pre-caching failure warns and continues | unit | `npm exec nx -- test @op-nx/polyrepo --output-style=static -- --run -t "pre-cache.*warn"` | No -- new test |
-| DAEMON-06 | Exponential backoff skips extraction during cooldown | unit | `npm exec nx -- test @op-nx/polyrepo --output-style=static -- --run -t "backoff"` | No -- new test |
-| DAEMON-07 | Hash change resets backoff immediately | unit | `npm exec nx -- test @op-nx/polyrepo --output-style=static -- --run -t "hash.*reset"` | No -- new test |
-| DAEMON-08 | Actionable warning logged on extraction failure | unit | `npm exec nx -- test @op-nx/polyrepo --output-style=static -- --run -t "warning"` | No -- new test |
-| DAEMON-09 | E2e: graph correct with NX_DAEMON=true | e2e | `NX_DAEMON=true npm exec nx -- e2e op-nx-polyrepo-e2e --output-style=static` | No -- needs env forwarding in container.ts |
-| DAEMON-10 | E2e: graph correct with NX_DAEMON=false | e2e | `NX_DAEMON=false npm exec nx -- e2e op-nx-polyrepo-e2e --output-style=static` | Partial -- existing tests run this way |
-| DAEMON-11 | E2e: graph correct with --skip-nx-cache | e2e | `npm exec nx -- e2e op-nx-polyrepo-e2e --output-style=static` | No -- new assertion |
+| Req ID    | Behavior                                                              | Test Type | Automated Command                                                                         | File Exists?                                                      |
+| --------- | --------------------------------------------------------------------- | --------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| DAEMON-01 | Per-repo cache: in-memory hit returns instantly (global gate)         | unit      | `npm exec nx -- test @op-nx/polyrepo --output-style=static -- --run -t "global gate"`     | Partial -- `cache.spec.ts` exists, needs refactoring for per-repo |
+| DAEMON-02 | Per-repo cache: disk hit restores per-repo data                       | unit      | `npm exec nx -- test @op-nx/polyrepo --output-style=static -- --run -t "disk cache"`      | Partial -- `cache.spec.ts` exists, needs new per-repo tests       |
+| DAEMON-03 | Per-repo cache: changed repo re-extracts, unchanged repos stay cached | unit      | `npm exec nx -- test @op-nx/polyrepo --output-style=static -- --run -t "selective"`       | No -- new test                                                    |
+| DAEMON-04 | Pre-caching during sync writes per-repo cache after install           | unit      | `npm exec nx -- test @op-nx/polyrepo --output-style=static -- --run -t "pre-cache"`       | No -- new test in `executor.spec.ts`                              |
+| DAEMON-05 | Pre-caching failure warns and continues                               | unit      | `npm exec nx -- test @op-nx/polyrepo --output-style=static -- --run -t "pre-cache.*warn"` | No -- new test                                                    |
+| DAEMON-06 | Exponential backoff skips extraction during cooldown                  | unit      | `npm exec nx -- test @op-nx/polyrepo --output-style=static -- --run -t "backoff"`         | No -- new test                                                    |
+| DAEMON-07 | Hash change resets backoff immediately                                | unit      | `npm exec nx -- test @op-nx/polyrepo --output-style=static -- --run -t "hash.*reset"`     | No -- new test                                                    |
+| DAEMON-08 | Actionable warning logged on extraction failure                       | unit      | `npm exec nx -- test @op-nx/polyrepo --output-style=static -- --run -t "warning"`         | No -- new test                                                    |
+| DAEMON-09 | E2e: graph correct with NX_DAEMON=true                                | e2e       | `NX_DAEMON=true npm exec nx -- e2e op-nx-polyrepo-e2e --output-style=static`              | No -- needs env forwarding in container.ts                        |
+| DAEMON-10 | E2e: graph correct with NX_DAEMON=false                               | e2e       | `NX_DAEMON=false npm exec nx -- e2e op-nx-polyrepo-e2e --output-style=static`             | Partial -- existing tests run this way                            |
+| DAEMON-11 | E2e: graph correct with --skip-nx-cache                               | e2e       | `npm exec nx -- e2e op-nx-polyrepo-e2e --output-style=static`                             | No -- new assertion                                               |
 
 ### Sampling Rate
+
 - **Per task commit:** `npm exec nx -- test @op-nx/polyrepo --output-style=static`
 - **Per wave merge:** `npm exec nx -- run-many -t test,lint --output-style=static`
 - **Phase gate:** `npm exec nx -- run-many -t test,lint,e2e --output-style=static` (full suite green before `/gsd:verify-work`)
 
 ### Wave 0 Gaps
+
 - [ ] Refactor `cache.spec.ts` tests for per-repo cache architecture (update existing tests, add new per-repo scenarios)
 - [ ] New tests in `cache.spec.ts` for backoff/retry mechanism
 - [ ] New tests in `executor.spec.ts` for pre-cache during sync
@@ -492,6 +538,7 @@ Phase 11 has no explicit requirement IDs from REQUIREMENTS.md. Requirements are 
 ## Sources
 
 ### Primary (HIGH confidence)
+
 - `packages/op-nx-polyrepo/src/lib/graph/cache.ts` -- current cache implementation (155 lines), module-level state pattern, two-layer cache
 - `packages/op-nx-polyrepo/src/lib/graph/extract.ts` -- graph extraction (147 lines), child process with `NX_DAEMON=false`
 - `packages/op-nx-polyrepo/src/lib/graph/cache.spec.ts` -- existing cache tests (396 lines), `vi.resetModules()` pattern for module-level state
@@ -505,6 +552,7 @@ Phase 11 has no explicit requirement IDs from REQUIREMENTS.md. Requirements are 
 - Testcontainers `withEnvironment()` API -- verified via runtime check: `GenericContainer.prototype.withEnvironment` accepts `Record<string, string>`
 
 ### Secondary (MEDIUM confidence)
+
 - [Nx Daemon docs](https://nx.dev/docs/concepts/nx-daemon) -- daemon lifecycle, `NX_DAEMON` env var, cache invalidation
 - [Nx plugin graph docs](https://nx.dev/docs/extending-nx/project-graph-plugins) -- `createNodesV2`/`createDependencies` API, plugin isolation
 - [nrwl/nx#29374](https://github.com/nrwl/nx/issues/29374) -- 5-second plugin worker socket timeout
@@ -513,11 +561,13 @@ Phase 11 has no explicit requirement IDs from REQUIREMENTS.md. Requirements are 
 - [Testcontainers Node docs](https://node.testcontainers.org/features/containers/) -- `withEnvironment` API
 
 ### Tertiary (LOW confidence)
+
 - None -- all findings verified against source code or official docs
 
 ## Metadata
 
 **Confidence breakdown:**
+
 - Standard stack: HIGH -- no new libraries, all existing infrastructure
 - Architecture: HIGH -- per-repo cache is a natural refactor of existing code; all integration points verified in source
 - Pitfalls: HIGH -- patterns verified against existing codebase; daemon behavior confirmed via Nx docs and issues

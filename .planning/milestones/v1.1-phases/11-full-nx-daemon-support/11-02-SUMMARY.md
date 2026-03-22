@@ -8,17 +8,18 @@ tags: [nx-daemon, pre-caching, graph-extraction, sync-executor]
 requires:
   - phase: 11-full-nx-daemon-support
     plan: 01
-    provides: "computeRepoHash, writePerRepoCache exports from cache.ts"
+    provides: 'computeRepoHash, writePerRepoCache exports from cache.ts'
 provides:
-  - "Pre-caching of graph data during polyrepo-sync for warm daemon startup"
-  - "Progress logging during graph extraction and caching"
-  - "Warn-and-continue on pre-cache extraction failure"
+  - 'Pre-caching of graph data during polyrepo-sync for warm daemon startup'
+  - 'Progress logging during graph extraction and caching'
+  - 'Warn-and-continue on pre-cache extraction failure'
 affects: [11-03]
 
 # Tech tracking
 tech-stack:
   added: []
-  patterns: ["pre-cache graph after sync using shared hash function from cache.ts"]
+  patterns:
+    ['pre-cache graph after sync using shared hash function from cache.ts']
 
 key-files:
   created: []
@@ -27,13 +28,13 @@ key-files:
     - packages/op-nx-polyrepo/src/lib/executors/sync/executor.spec.ts
 
 key-decisions:
-  - "Pre-cache at every syncRepo exit point where repo was successfully updated (clone, tag sync, pull/fetch, local pull) -- not just when install runs"
-  - "hashObject(config.repos) computes reposConfigHash identically to index.ts, ensuring hash consistency between sync pre-cache and plugin cache"
-  - "Pre-cache failure is non-blocking -- warns and continues, plugin extracts on next Nx command"
+  - 'Pre-cache at every syncRepo exit point where repo was successfully updated (clone, tag sync, pull/fetch, local pull) -- not just when install runs'
+  - 'hashObject(config.repos) computes reposConfigHash identically to index.ts, ensuring hash consistency between sync pre-cache and plugin cache'
+  - 'Pre-cache failure is non-blocking -- warns and continues, plugin extracts on next Nx command'
 
 patterns-established:
-  - "preCacheGraph helper encapsulates extract/transform/hash/write pipeline"
-  - "Pre-caching runs regardless of whether install was needed, because source changes affect the graph even without lockfile changes"
+  - 'preCacheGraph helper encapsulates extract/transform/hash/write pipeline'
+  - 'Pre-caching runs regardless of whether install was needed, because source changes affect the graph even without lockfile changes'
 
 requirements-completed: [DAEMON-04, DAEMON-05]
 
@@ -55,6 +56,7 @@ completed: 2026-03-20
 - **Files modified:** 2
 
 ## Accomplishments
+
 - Added `preCacheGraph` helper that runs extract/transform/hash/write pipeline after each successful repo sync
 - Pre-caching runs at all 8 syncRepo exit points where the repo was updated (clone, tag sync with install, tag sync without install, pull with install, pull without install, local with install, local without install)
 - Progress logging: "Extracting graph for ALIAS..." and "Cached graph for ALIAS (N projects)"
@@ -73,10 +75,12 @@ Each task was committed atomically:
    - `1bcbb7a` (refactor) -- Remove unnecessary nullish coalescing on config.repos
 
 ## Files Created/Modified
+
 - `packages/op-nx-polyrepo/src/lib/executors/sync/executor.ts` - Added preCacheGraph helper, imported graph pipeline modules, wired pre-caching into all syncRepo exit points
 - `packages/op-nx-polyrepo/src/lib/executors/sync/executor.spec.ts` - 10 new tests in describe('pre-caching') block covering success, failure, dry-run, install-fail, local repos, and hash consistency
 
 ## Decisions Made
+
 - Pre-cache at every syncRepo exit point where the repo was updated -- not just when install runs. Source changes (pull/fetch) affect the graph even without lockfile changes, so the cache should always be refreshed.
 - `hashObject(config.repos)` used instead of `hashObject(config.repos ?? {})` because `config` from `resolvePluginConfig` is already validated, so `repos` is always defined.
 - Pre-cache failure is non-blocking: warns "Plugin will extract on next Nx command" and lets the sync succeed.
@@ -86,6 +90,7 @@ Each task was committed atomically:
 ### Auto-fixed Issues
 
 **1. [Rule 1 - Bug] Fixed unnecessary nullish coalescing lint error**
+
 - **Found during:** Task 1 (GREEN step)
 - **Issue:** `hashObject(config.repos ?? {})` flagged by `@typescript-eslint/no-unnecessary-condition` because `config.repos` is always defined after validation
 - **Fix:** Changed to `hashObject(config.repos)`
@@ -99,12 +104,15 @@ Each task was committed atomically:
 **Impact on plan:** Minimal -- type-safe improvement, no scope creep.
 
 ## Issues Encountered
+
 - Path separator mismatch in test assertions: `join()` on Windows produces backslashes, but test assertions initially used `expect.stringContaining('.repos/repo-a')` with forward slashes. Fixed by using `expect.stringMatching(/\.repos[\\/]repo-a/)` for cross-platform compatibility.
 
 ## User Setup Required
+
 None - no external service configuration required.
 
 ## Next Phase Readiness
+
 - Pre-caching is complete and tested, ready for e2e verification in Plan 03
 - The daemon's first graph computation after sync now reads from disk (~50-200ms) instead of spawning child `nx graph --print` processes (~4-60s per repo)
 - All graph pipeline functions (extract, transform, computeRepoHash, writePerRepoCache) are exercised both by the plugin (cache.ts) and by the sync executor
@@ -114,5 +122,6 @@ None - no external service configuration required.
 All 2 modified files verified on disk. All 3 commits verified in git log.
 
 ---
-*Phase: 11-full-nx-daemon-support*
-*Completed: 2026-03-20*
+
+_Phase: 11-full-nx-daemon-support_
+_Completed: 2026-03-20_

@@ -7,19 +7,23 @@ tags: [nx-daemon, per-repo-cache, exponential-backoff, cache-invalidation]
 # Dependency graph
 requires:
   - phase: 10-integration-and-end-to-end-validation
-    provides: "populateGraphReport with monolithic single-file cache, extraction/transform pipeline"
+    provides: 'populateGraphReport with monolithic single-file cache, extraction/transform pipeline'
 provides:
-  - "Three-layer per-repo cache (global gate, per-repo disk, per-repo extraction)"
-  - "Exported computeRepoHash and writePerRepoCache for sync pre-caching (Plan 02)"
-  - "Exponential backoff with hash-change reset for extraction failures"
-  - "Actionable troubleshooting warnings on extraction failure"
-  - "Old monolithic cache cleanup on first invocation"
+  - 'Three-layer per-repo cache (global gate, per-repo disk, per-repo extraction)'
+  - 'Exported computeRepoHash and writePerRepoCache for sync pre-caching (Plan 02)'
+  - 'Exponential backoff with hash-change reset for extraction failures'
+  - 'Actionable troubleshooting warnings on extraction failure'
+  - 'Old monolithic cache cleanup on first invocation'
 affects: [11-02, 11-03]
 
 # Tech tracking
 tech-stack:
   added: []
-  patterns: ["per-repo cache invalidation with global in-memory gate", "exponential backoff with hash-change reset"]
+  patterns:
+    [
+      'per-repo cache invalidation with global in-memory gate',
+      'exponential backoff with hash-change reset',
+    ]
 
 key-files:
   created: []
@@ -29,17 +33,18 @@ key-files:
     - packages/op-nx-polyrepo/src/index.ts
 
 key-decisions:
-  - "Per-repo hash uses hashArray([reposConfigHash, alias, headSha, dirtyFiles]) -- lockfile hash unnecessary"
-  - "Backoff formula: min(2000 * 2^(attempt-1), 30000)ms with immediate reset on hash change"
-  - "Global gate checks both hash match and all-repos-cached to retry failed repos"
-  - "RepoGraphData uses interface instead of type alias for consistency"
+  - 'Per-repo hash uses hashArray([reposConfigHash, alias, headSha, dirtyFiles]) -- lockfile hash unnecessary'
+  - 'Backoff formula: min(2000 * 2^(attempt-1), 30000)ms with immediate reset on hash change'
+  - 'Global gate checks both hash match and all-repos-cached to retry failed repos'
+  - 'RepoGraphData uses interface instead of type alias for consistency'
 
 patterns-established:
-  - "Per-repo cache files at .repos/<alias>/.polyrepo-graph-cache.json"
-  - "Module-level failureStates Map for daemon-persistent backoff tracking"
-  - "computeRepoHash/writePerRepoCache exported for cross-module pre-caching"
+  - 'Per-repo cache files at .repos/<alias>/.polyrepo-graph-cache.json'
+  - 'Module-level failureStates Map for daemon-persistent backoff tracking'
+  - 'computeRepoHash/writePerRepoCache exported for cross-module pre-caching'
 
-requirements-completed: [DAEMON-01, DAEMON-02, DAEMON-03, DAEMON-06, DAEMON-07, DAEMON-08]
+requirements-completed:
+  [DAEMON-01, DAEMON-02, DAEMON-03, DAEMON-06, DAEMON-07, DAEMON-08]
 
 # Metrics
 duration: 4min
@@ -59,6 +64,7 @@ completed: 2026-03-20
 - **Files modified:** 3
 
 ## Accomplishments
+
 - Refactored monolithic single-file graph cache into per-repo architecture with three layers (global gate, per-repo disk, per-repo extraction)
 - Added exponential backoff (2s, 4s, 8s, 16s, 30s cap) with immediate reset when repo hash changes after failure
 - Exported `computeRepoHash` and `writePerRepoCache` for Plan 02 sync pre-caching integration
@@ -79,11 +85,13 @@ Each task was committed atomically:
 2. **Task 2: Update index.ts parameter naming** - `62fa6b1` (refactor)
 
 ## Files Created/Modified
+
 - `packages/op-nx-polyrepo/src/lib/graph/cache.ts` - Refactored to per-repo cache with three layers, backoff, actionable warnings
 - `packages/op-nx-polyrepo/src/lib/graph/cache.spec.ts` - 16 tests covering global gate, selective invalidation, disk cache, backoff, exports
 - `packages/op-nx-polyrepo/src/index.ts` - Renamed reposHash to reposConfigHash for consistency
 
 ## Decisions Made
+
 - Per-repo hash uses `hashArray([reposConfigHash, alias, headSha, dirtyFiles])` -- lockfile hash unnecessary since headSha + dirtyFiles already covers lockfile changes
 - Backoff formula: `min(2000 * 2^(attempt-1), 30000)ms` with immediate reset on hash change
 - Global gate checks both hash match AND all-repos-cached to ensure failed repos get retried
@@ -94,6 +102,7 @@ Each task was committed atomically:
 ### Auto-fixed Issues
 
 **1. [Rule 1 - Bug] Fixed lint issues in cache.spec.ts**
+
 - **Found during:** Task 1 (REFACTOR step)
 - **Issue:** `Unsafe return of a value of type 'any'` from loggerWarn mock calls map, and missing blank lines between `expectTypeOf`/`expect` assertions
 - **Fix:** Added `[string]` tuple type to map callback parameter, added blank lines between assertions
@@ -107,12 +116,15 @@ Each task was committed atomically:
 **Impact on plan:** Minimal -- lint compliance fix required for correctness. No scope creep.
 
 ## Issues Encountered
+
 - `npm exec nx -- test @op-nx/polyrepo` without `--exclude-task-dependencies` fails because cross-repo edges cascade into the synced nx repo's `devkit:build` target. Used `--exclude-task-dependencies` flag as documented workaround.
 
 ## User Setup Required
+
 None - no external service configuration required.
 
 ## Next Phase Readiness
+
 - `computeRepoHash` and `writePerRepoCache` are exported and ready for Plan 02 (sync pre-caching)
 - Per-repo cache architecture is complete and tested, ready for e2e verification in Plan 03
 - Old monolithic cache file will be cleaned up automatically on first invocation
@@ -122,5 +134,6 @@ None - no external service configuration required.
 All 3 files verified on disk. All 5 commits verified in git log.
 
 ---
-*Phase: 11-full-nx-daemon-support*
-*Completed: 2026-03-20*
+
+_Phase: 11-full-nx-daemon-support_
+_Completed: 2026-03-20_

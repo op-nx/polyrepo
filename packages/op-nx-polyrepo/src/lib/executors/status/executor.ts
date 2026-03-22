@@ -36,10 +36,7 @@ interface GraphCacheFile {
   report: PolyrepoGraphReport;
 }
 
-function getProjectCount(
-  workspaceRoot: string,
-  alias: string,
-): number | null {
+function getProjectCount(workspaceRoot: string, alias: string): number | null {
   try {
     const cachePath = join(workspaceRoot, '.repos', CACHE_FILENAME);
     const cache = readJsonFile<GraphCacheFile>(cachePath);
@@ -130,7 +127,8 @@ export default async function statusExecutor(
 
     if (result.status === 'rejected') {
       const reason: unknown = result.reason;
-      const reasonMessage = reason instanceof Error ? reason.message : String(reason);
+      const reasonMessage =
+        reason instanceof Error ? reason.message : String(reason);
       logger.warn(
         `Failed to fetch ${syncedEntry.entry.alias}: ${reasonMessage}`,
       );
@@ -175,7 +173,8 @@ export default async function statusExecutor(
 
       // Check for drift
       const configuredRef = entry.type === 'remote' ? entry.ref : undefined;
-      const hasDrift = configuredRef !== undefined && branchDisplay !== configuredRef;
+      const hasDrift =
+        configuredRef !== undefined && branchDisplay !== configuredRef;
 
       if (hasDrift) {
         branchDisplay = `${branchDisplay} (expected ${configuredRef})`;
@@ -208,9 +207,10 @@ export default async function statusExecutor(
       }
 
       // Build project count display
-      const projectCountDisplay = projectCount !== null
-        ? `${String(projectCount)} projects`
-        : '? projects';
+      const projectCountDisplay =
+        projectCount !== null
+          ? `${String(projectCount)} projects`
+          : '? projects';
 
       // Build warnings
       const warnings: string[] = [];

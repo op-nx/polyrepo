@@ -15,11 +15,13 @@ DETECT-07 (`nx affected` cross-repo) is explicitly deferred per user decision. T
 **Primary recommendation:** One plan with two waves -- Wave 1 wires `detectCrossRepoDependencies` into `createDependencies` and adds a minimal integration test in `index.spec.ts`; Wave 2 adds three e2e test scenarios (auto-detection, overrides, negation) to the existing e2e spec file.
 
 <user_constraints>
+
 ## User Constraints (from CONTEXT.md)
 
 ### Locked Decisions
 
 **E2e Fixture Topology**
+
 - Reuse the existing nx monorepo as the external repo for cross-repo dep testing -- no new fixture repo needed
 - The host workspace's root `package.json` already contains `@nx/*` dependencies/devDependencies -- these are the cross-repo dep targets. No manual dependency injection needed in test setup.
 - The root workspace project (e.g., `@workspace/source`) is the dependency source; namespaced nx projects (e.g., `nx/devkit`) are the targets
@@ -28,17 +30,20 @@ DETECT-07 (`nx affected` cross-repo) is explicitly deferred per user decision. T
 - Negation test: configure `implicitDependencies` with a `!` negation on an auto-detected edge, assert it is absent from the graph
 
 **Graph Verification Method**
+
 - Use `nx graph --print` to dump the full project graph as JSON to stdout inside the container
 - Parse the JSON and assert specific edge objects: check `dependencies[sourceProject]` contains an entry with the expected `target` project name AND the correct `type` (`static` for auto-detected, `implicit` for overrides)
 - Always pass `NX_DAEMON=false` when running graph commands in the container to avoid flaky daemon-not-ready failures on cold starts
 
 **DETECT-07 Scoping**
+
 - DETECT-07 (`nx affected` cross-repo) is deferred to a future milestone
 - Root cause: Nx's `calculateFileChanges()` filters files through `.gitignore` before any file-to-project mapping -- `.repos/` is gitignored, so both `--files` and `--base/--head` are blind to synced repo changes
 - What works: Cross-repo edge traversal is correct -- if Nx knows a project changed, it follows the edges. The gap is in the initial "which files changed" step.
 - Future solution: A `polyrepo-affected` executor that runs `git -C .repos/<alias> diff --name-only`, maps changed files to namespaced projects, and delegates to `nx run-many --projects=<list>`
 
 **Error Handling in createDependencies**
+
 - Separate error paths for extraction vs. detection:
   - `populateGraphReport` failures: caught, return empty array (existing silent degradation pattern)
   - `detectCrossRepoDependencies` errors: not caught -- let validation errors (OVRD-03: unknown projects in overrides) propagate to Nx so users see a clear error message
@@ -58,37 +63,42 @@ DETECT-07 (`nx affected` cross-repo) is explicitly deferred per user decision. T
 - Cross-repo `nx affected` support (DETECT-07) -- requires `polyrepo-affected` executor, deferred to future milestone
 - Consumer-side tsconfig path resolution for cross-repo detection -- deferred to v1.2+
 - Dependency edge type control on overrides -- default `implicit` for overrides, `static` for auto-detected
-</user_constraints>
+  </user_constraints>
 
 <phase_requirements>
+
 ## Phase Requirements
 
-| ID | Description | Research Support |
-|----|-------------|-----------------|
-| DETECT-06 | Cross-repo edges appear in `nx graph` visualization | Wire `detectCrossRepoDependencies` into `createDependencies`; verify via `nx graph --print` JSON output in e2e container |
+| ID        | Description                                                                        | Research Support                                                                                                                                                                                                          |
+| --------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| DETECT-06 | Cross-repo edges appear in `nx graph` visualization                                | Wire `detectCrossRepoDependencies` into `createDependencies`; verify via `nx graph --print` JSON output in e2e container                                                                                                  |
 | DETECT-07 | `nx affected` correctly traces changes across repo boundaries via cross-repo edges | **DEFERRED** to future milestone per CONTEXT.md. `.gitignore` filter in Nx core blocks `.repos/` paths. Graph edges are correct; gap is in initial touched-file detection. See `research-detect-07.md` for full analysis. |
+
 </phase_requirements>
 
 ## Standard Stack
 
 ### Core
-| Library | Version | Purpose | Why Standard |
-|---------|---------|---------|--------------|
-| `@nx/devkit` | >=20.0.0 | `CreateDependencies`, `DependencyType`, `RawProjectGraphDependency` types | Nx plugin API surface for dependency registration |
-| `vitest` | (workspace) | Unit + e2e test runner | Already in use for all project tests |
-| `testcontainers` | (workspace) | Docker container lifecycle for e2e tests | Already established e2e infrastructure |
+
+| Library          | Version     | Purpose                                                                   | Why Standard                                      |
+| ---------------- | ----------- | ------------------------------------------------------------------------- | ------------------------------------------------- |
+| `@nx/devkit`     | >=20.0.0    | `CreateDependencies`, `DependencyType`, `RawProjectGraphDependency` types | Nx plugin API surface for dependency registration |
+| `vitest`         | (workspace) | Unit + e2e test runner                                                    | Already in use for all project tests              |
+| `testcontainers` | (workspace) | Docker container lifecycle for e2e tests                                  | Already established e2e infrastructure            |
 
 ### Supporting
-| Library | Version | Purpose | When to Use |
-|---------|---------|---------|-------------|
+
+| Library     | Version | Purpose                             | When to Use                                          |
+| ----------- | ------- | ----------------------------------- | ---------------------------------------------------- |
 | `minimatch` | ^10.0.0 | Glob matching for override patterns | Already a production dependency of `@op-nx/polyrepo` |
-| `zod` | ^4.0.0 | Schema validation for JSON parsing | Already a production dependency |
+| `zod`       | ^4.0.0  | Schema validation for JSON parsing  | Already a production dependency                      |
 
 ### Alternatives Considered
-| Instead of | Could Use | Tradeoff |
-|------------|-----------|----------|
+
+| Instead of                 | Could Use                 | Tradeoff                                                                                            |
+| -------------------------- | ------------------------- | --------------------------------------------------------------------------------------------------- |
 | `nx graph --print` for e2e | `nx show projects --json` | `--print` gives full graph with edges; `show projects` only gives project list, no dependency edges |
-| Testcontainers snapshot | Fresh container per test | Snapshot avoids 2+ minute setup per test; already proven in v1.0 |
+| Testcontainers snapshot    | Fresh container per test  | Snapshot avoids 2+ minute setup per test; already proven in v1.0                                    |
 
 **Installation:**
 No new dependencies needed. All libraries already in the workspace.
@@ -98,11 +108,13 @@ No new dependencies needed. All libraries already in the workspace.
 ### Integration Wiring Point
 
 The `createDependencies` hook in `index.ts` (lines 97-134) is the sole integration point. Currently it:
+
 1. Validates config and populates graph report (lines 106-118)
 2. Iterates `repoReport.dependencies` for intra-repo edges (lines 120-131)
 3. Returns the collected dependencies array
 
 Phase 10 inserts a step between 2 and 3:
+
 ```typescript
 // After existing intra-repo edge collection...
 
@@ -114,6 +126,7 @@ return dependencies;
 ```
 
 Key design constraints:
+
 - `detectCrossRepoDependencies` is called **outside** the extraction try/catch, so OVRD-03 validation errors propagate
 - The function receives the already-validated `config` (from `validateConfig(options)`)
 - The `context` parameter provides `context.projects` (merged graph) and `context.workspaceRoot`
@@ -121,12 +134,14 @@ Key design constraints:
 ### E2e Test Architecture
 
 The existing e2e test in `op-nx-polyrepo.spec.ts` follows this pattern:
+
 1. `globalSetup` builds Docker image, publishes plugin to Verdaccio, creates snapshot image
 2. Each `describe` block starts a container from the snapshot image
 3. Tests configure `nx.json` inside the container using `container.exec(['sh', '-c', 'cat > ...'])`
 4. Tests run Nx commands via `container.exec(['npx', 'nx', ...])` and assert on stdout
 
 Phase 10 adds a new `describe` block (or nested describe blocks) that:
+
 1. Configures plugin with the `nx` repo (already prebaked as `/repos/nx` in Docker image)
 2. Runs `polyrepo-sync` to clone the repo into `.repos/nx/`
 3. Runs `npx nx graph --print` to get full graph JSON
@@ -135,48 +150,54 @@ Phase 10 adds a new `describe` block (or nested describe blocks) that:
 For override/negation scenarios, the test modifies `nx.json` between assertions using the established `container.exec` pattern.
 
 ### Anti-Patterns to Avoid
+
 - **Catching `detectCrossRepoDependencies` errors in `createDependencies`:** OVRD-03 errors must propagate. The extraction try/catch should NOT wrap detection.
 - **Running `nx graph` with daemon in container:** Always `NX_DAEMON=false` (already set as ENV in Dockerfile, but good to verify).
 - **Creating a new fixture repo for e2e:** The existing nrwl/nx repo prebaked in Docker provides all needed cross-repo targets.
 
 ## Don't Hand-Roll
 
-| Problem | Don't Build | Use Instead | Why |
-|---------|-------------|-------------|-----|
-| JSON output from `nx graph` | Custom graph serialization | `nx graph --print` | Standard Nx CLI output; tested and maintained by Nx team |
-| Container setup/teardown | Manual Docker commands | testcontainers API + global-setup.ts | Existing infrastructure handles lifecycle, port mapping, cleanup |
-| Edge type constants | String literals `"static"`, `"implicit"` | `DependencyType.static`, `DependencyType.implicit` | Type-safe enum from `@nx/devkit`; matches unit test expectations |
-| JSON parsing in e2e assertions | Manual string matching on stdout | `JSON.parse()` on sanitized stdout | Robust; follows existing pattern from `op-nx-polyrepo.spec.ts` line 98 |
+| Problem                        | Don't Build                              | Use Instead                                        | Why                                                                    |
+| ------------------------------ | ---------------------------------------- | -------------------------------------------------- | ---------------------------------------------------------------------- |
+| JSON output from `nx graph`    | Custom graph serialization               | `nx graph --print`                                 | Standard Nx CLI output; tested and maintained by Nx team               |
+| Container setup/teardown       | Manual Docker commands                   | testcontainers API + global-setup.ts               | Existing infrastructure handles lifecycle, port mapping, cleanup       |
+| Edge type constants            | String literals `"static"`, `"implicit"` | `DependencyType.static`, `DependencyType.implicit` | Type-safe enum from `@nx/devkit`; matches unit test expectations       |
+| JSON parsing in e2e assertions | Manual string matching on stdout         | `JSON.parse()` on sanitized stdout                 | Robust; follows existing pattern from `op-nx-polyrepo.spec.ts` line 98 |
 
 **Key insight:** The entire detection function is already built and tested. Phase 10 is pure integration glue and end-to-end validation -- no new algorithms or data structures needed.
 
 ## Common Pitfalls
 
 ### Pitfall 1: nx graph --print JSON extraction from stdout
+
 **What goes wrong:** Nx prints warnings, version banners, or debug messages before/after the JSON output. Naive `JSON.parse(stdout)` fails.
 **Why it happens:** Various Nx subsystems (daemon, plugin load, migration warnings) can write to stdout before the graph JSON.
 **How to avoid:** Use the established pattern from `extract.ts`: find the first `{` character and parse from there. In e2e, use `const jsonStart = stdout.indexOf('{')` then `JSON.parse(stdout.substring(jsonStart))`.
 **Warning signs:** `SyntaxError: Unexpected token` in JSON.parse during e2e tests.
 
 ### Pitfall 2: NX_DAEMON=false inside container
+
 **What goes wrong:** First `nx graph --print` call times out or returns stale data because daemon is starting up.
 **Why it happens:** Container may not have daemon disabled despite ENV setting; some Nx commands start daemon regardless.
 **How to avoid:** The Dockerfile already sets `ENV NX_DAEMON=false`. Verify in test that the env var is set. If needed, pass it explicitly: `['sh', '-c', 'NX_DAEMON=false npx nx graph --print']`.
 **Warning signs:** Flaky timeout failures on first graph command in a fresh container.
 
 ### Pitfall 3: Edge deduplication between intra-repo and cross-repo
+
 **What goes wrong:** The same edge appears twice in the returned array -- once from `repoReport.dependencies` (intra-repo) and once from `detectCrossRepoDependencies` (cross-repo).
 **Why it happens:** An edge between `nx/devkit` and `nx/jest` would appear in BOTH the intra-repo dependencies (from the nrwl/nx graph extraction) AND the cross-repo detection (if package.json deps match).
 **How to avoid:** This is NOT a problem. The cross-repo detection function has a cross-repo guard (`sourceRepo === targetRepo` check at line 367) that prevents it from emitting intra-repo edges. The intra-repo edges come from `repoReport.dependencies` only. The two sets are disjoint by construction.
 **Warning signs:** None -- this is handled by design.
 
 ### Pitfall 4: E2e test timeout on polyrepo-sync
+
 **What goes wrong:** `polyrepo-sync` takes too long because pnpm install in the container downloads packages.
 **Why it happens:** The Docker image prebakes `/repos/nx` with `pnpm install --frozen-lockfile`, warming the pnpm store. When sync clones to `/workspace/.repos/nx/`, `pnpm install` should resolve from cache. But if the store is not shared or the clone happens to a tmpfs mount, the store may not be accessible.
 **How to avoid:** The existing e2e test at line 22 uses `.withTmpFs({ '/workspace/.repos': 'rw,exec,size=4g' })`. The pnpm store at `/repos/nx/node_modules/.pnpm` is separate from `/workspace/.repos/nx/`. The warm store is at the pnpm content-addressable location (typically `~/.local/share/pnpm/store`). Verify this works by checking the existing sync test (line 106-126) which already succeeds in ~120s.
 **Warning signs:** pnpm install taking >60s in the container; `ENOENT` errors for packages.
 
 ### Pitfall 5: Asserting on specific namespaced project names
+
 **What goes wrong:** Test expects `nx/devkit` but the project is named `nx/packages/devkit` or `nx/@nrwl/devkit`.
 **Why it happens:** The namespacing uses `<alias>/<original-project-name>`. The original project name comes from the nrwl/nx workspace's project graph, which may not be `devkit` but rather the full package name.
 **How to avoid:** After sync, first dump all project names with `nx show projects` (or from `nx graph --print` nodes) and identify the correct namespaced names before writing assertions. The existing status test (line 106-126) shows the pattern: sync first, then query.
@@ -251,7 +272,11 @@ export const createDependencies: CreateDependencies<PolyrepoConfig> = async (
   try {
     config = validateConfig(options);
     const optionsHash = hashObject(options ?? {});
-    report = await populateGraphReport(config, context.workspaceRoot, optionsHash);
+    report = await populateGraphReport(
+      config,
+      context.workspaceRoot,
+      optionsHash,
+    );
   } catch {
     return dependencies;
   }
@@ -317,10 +342,9 @@ const { exitCode, output } = await container.exec(
 ### E2e Pattern: Running nx graph --print and parsing JSON
 
 ```typescript
-const graphResult = await container.exec(
-  ['npx', 'nx', 'graph', '--print'],
-  { workingDir: '/workspace' },
-);
+const graphResult = await container.exec(['npx', 'nx', 'graph', '--print'], {
+  workingDir: '/workspace',
+});
 
 expect(graphResult.exitCode).toBe(0);
 
@@ -363,12 +387,13 @@ expect(deps).toContainEqual(
 
 ## State of the Art
 
-| Old Approach | Current Approach | When Changed | Impact |
-|--------------|------------------|--------------|--------|
-| Intra-repo edges only | Intra-repo + cross-repo edges | Phase 10 (now) | `nx graph` shows full dependency picture across repo boundaries |
-| Manual override only | Auto-detection + overrides + negation | Phase 9 | Users get edges automatically from package.json/tsconfig |
+| Old Approach          | Current Approach                      | When Changed   | Impact                                                          |
+| --------------------- | ------------------------------------- | -------------- | --------------------------------------------------------------- |
+| Intra-repo edges only | Intra-repo + cross-repo edges         | Phase 10 (now) | `nx graph` shows full dependency picture across repo boundaries |
+| Manual override only  | Auto-detection + overrides + negation | Phase 9        | Users get edges automatically from package.json/tsconfig        |
 
 **Deprecated/outdated:**
+
 - None relevant. The Nx plugin API (`createDependencies`, `RawProjectGraphDependency`, `DependencyType`) is stable across Nx 20-22.
 
 ## Open Questions
@@ -391,27 +416,31 @@ expect(deps).toContainEqual(
 ## Validation Architecture
 
 ### Test Framework
-| Property | Value |
-|----------|-------|
-| Framework | Vitest (workspace version) |
-| Config file | `packages/op-nx-polyrepo-e2e/vitest.config.mts` (e2e) and `packages/op-nx-polyrepo/vitest.config.mts` (unit) |
-| Quick run command | `npm exec nx test @op-nx/polyrepo --output-style=static` |
-| Full suite command | `npm exec nx run-many -t test,e2e --output-style=static` |
+
+| Property           | Value                                                                                                        |
+| ------------------ | ------------------------------------------------------------------------------------------------------------ |
+| Framework          | Vitest (workspace version)                                                                                   |
+| Config file        | `packages/op-nx-polyrepo-e2e/vitest.config.mts` (e2e) and `packages/op-nx-polyrepo/vitest.config.mts` (unit) |
+| Quick run command  | `npm exec nx test @op-nx/polyrepo --output-style=static`                                                     |
+| Full suite command | `npm exec nx run-many -t test,e2e --output-style=static`                                                     |
 
 ### Phase Requirements -> Test Map
-| Req ID | Behavior | Test Type | Automated Command | File Exists? |
-|--------|----------|-----------|-------------------|-------------|
-| DETECT-06 | Cross-repo edges from `createDependencies` wiring | unit | `npm exec nx test @op-nx/polyrepo --output-style=static -- --run -t "createDependencies"` | Partial -- `index.spec.ts` exists, needs new tests for detect wiring |
-| DETECT-06 | Auto-detected cross-repo edges in `nx graph --print` | e2e | `npm exec nx e2e op-nx-polyrepo-e2e --output-style=static` | No -- new e2e tests needed |
-| DETECT-06 | Override edges in `nx graph --print` | e2e | `npm exec nx e2e op-nx-polyrepo-e2e --output-style=static` | No -- new e2e tests needed |
-| DETECT-06 | Negation suppression in `nx graph --print` | e2e | `npm exec nx e2e op-nx-polyrepo-e2e --output-style=static` | No -- new e2e tests needed |
+
+| Req ID    | Behavior                                             | Test Type | Automated Command                                                                         | File Exists?                                                         |
+| --------- | ---------------------------------------------------- | --------- | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| DETECT-06 | Cross-repo edges from `createDependencies` wiring    | unit      | `npm exec nx test @op-nx/polyrepo --output-style=static -- --run -t "createDependencies"` | Partial -- `index.spec.ts` exists, needs new tests for detect wiring |
+| DETECT-06 | Auto-detected cross-repo edges in `nx graph --print` | e2e       | `npm exec nx e2e op-nx-polyrepo-e2e --output-style=static`                                | No -- new e2e tests needed                                           |
+| DETECT-06 | Override edges in `nx graph --print`                 | e2e       | `npm exec nx e2e op-nx-polyrepo-e2e --output-style=static`                                | No -- new e2e tests needed                                           |
+| DETECT-06 | Negation suppression in `nx graph --print`           | e2e       | `npm exec nx e2e op-nx-polyrepo-e2e --output-style=static`                                | No -- new e2e tests needed                                           |
 
 ### Sampling Rate
+
 - **Per task commit:** `npm exec nx test @op-nx/polyrepo --output-style=static`
 - **Per wave merge:** `npm exec nx run-many -t test,lint --output-style=static`
 - **Phase gate:** `npm exec nx run-many -t test,lint,e2e --output-style=static` (full suite green before `/gsd:verify-work`)
 
 ### Wave 0 Gaps
+
 - [ ] Integration tests in `index.spec.ts` for `detectCrossRepoDependencies` wiring -- 3+ new tests covering: happy path (detect returns edges), detect error propagation (OVRD-03), empty report (no edges)
 - [ ] E2e tests in `op-nx-polyrepo.spec.ts` for cross-repo graph validation -- 3 new test scenarios for auto-detection, override, negation
 - No framework install needed -- all test infrastructure exists
@@ -419,6 +448,7 @@ expect(deps).toContainEqual(
 ## Sources
 
 ### Primary (HIGH confidence)
+
 - `packages/op-nx-polyrepo/src/index.ts` -- current `createDependencies` implementation (lines 97-134)
 - `packages/op-nx-polyrepo/src/lib/graph/detect.ts` -- full `detectCrossRepoDependencies` function (514 lines)
 - `packages/op-nx-polyrepo/src/index.spec.ts` -- existing `createDependencies` unit tests (490 lines)
@@ -428,15 +458,18 @@ expect(deps).toContainEqual(
 - `.planning/phases/10-integration-and-end-to-end-validation/research-detect-07.md` -- DETECT-07 analysis
 
 ### Secondary (MEDIUM confidence)
+
 - `nx graph --help` output -- verified `--print` flag for JSON stdout output
 - `@nx/devkit` type exports -- `RawProjectGraphDependency`, `DependencyType`, `CreateDependencies`
 
 ### Tertiary (LOW confidence)
+
 - None -- all findings verified against source code
 
 ## Metadata
 
 **Confidence breakdown:**
+
 - Standard stack: HIGH -- no new libraries, all existing infrastructure
 - Architecture: HIGH -- single function call insertion, established e2e patterns
 - Pitfalls: HIGH -- patterns verified against existing codebase and prior phase execution

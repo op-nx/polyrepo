@@ -16,13 +16,13 @@ validated: 2026-03-16
 
 ## Test Infrastructure
 
-| Property | Value |
-|----------|-------|
-| **Framework** | Vitest 4.0.18 |
-| **Config file** | `packages/op-nx-polyrepo/vitest.config.mts` |
-| **Quick run command** | `npm exec nx test @op-nx/polyrepo` |
+| Property               | Value                                                |
+| ---------------------- | ---------------------------------------------------- |
+| **Framework**          | Vitest 4.0.18                                        |
+| **Config file**        | `packages/op-nx-polyrepo/vitest.config.mts`          |
+| **Quick run command**  | `npm exec nx test @op-nx/polyrepo`                   |
 | **Full suite command** | `npm exec nx run-many --targets=test,lint,typecheck` |
-| **Estimated runtime** | ~15 seconds |
+| **Estimated runtime**  | ~15 seconds                                          |
 
 ---
 
@@ -37,18 +37,18 @@ validated: 2026-03-16
 
 ## Per-Task Verification Map
 
-| Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
-|---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 05-01-01 | 01 | 1 | ESLint strict presets | lint | `npm exec nx lint @op-nx/polyrepo` | N/A (config) | green |
-| 05-01-02 | 01 | 1 | TSConfig hardening | typecheck | `npm exec nx typecheck @op-nx/polyrepo` | N/A (config) | green |
-| 05-01-03 | 01 | 1 | Install @vitest/eslint-plugin | lint | `npm exec nx lint @op-nx/polyrepo` | N/A (dep) | green |
-| 05-02-01 | 02 | 2 | Mock cast elimination | unit | `npm exec nx test @op-nx/polyrepo` | Yes (14 files) | green |
-| 05-02-02 | 02 | 2 | Zod JSON.parse validation | unit | `npm exec nx test @op-nx/polyrepo` | Yes (extract.spec.ts) | green |
-| 05-02-03 | 02 | 2 | Zero eslint-disable comments | lint | `npm exec nx lint @op-nx/polyrepo` | N/A | green |
-| 05-03-01 | 03 | 3 | SIFERS test refactoring | unit | `npm exec nx test @op-nx/polyrepo` | Yes (14 files) | green |
-| 05-04-01 | 04 | 4 | Enforcement skills created | manual | Skill files exist in `.claude/skills/` | Yes (5 files) | green |
+| Task ID  | Plan | Wave | Requirement                   | Test Type | Automated Command                       | File Exists           | Status |
+| -------- | ---- | ---- | ----------------------------- | --------- | --------------------------------------- | --------------------- | ------ |
+| 05-01-01 | 01   | 1    | ESLint strict presets         | lint      | `npm exec nx lint @op-nx/polyrepo`      | N/A (config)          | green  |
+| 05-01-02 | 01   | 1    | TSConfig hardening            | typecheck | `npm exec nx typecheck @op-nx/polyrepo` | N/A (config)          | green  |
+| 05-01-03 | 01   | 1    | Install @vitest/eslint-plugin | lint      | `npm exec nx lint @op-nx/polyrepo`      | N/A (dep)             | green  |
+| 05-02-01 | 02   | 2    | Mock cast elimination         | unit      | `npm exec nx test @op-nx/polyrepo`      | Yes (14 files)        | green  |
+| 05-02-02 | 02   | 2    | Zod JSON.parse validation     | unit      | `npm exec nx test @op-nx/polyrepo`      | Yes (extract.spec.ts) | green  |
+| 05-02-03 | 02   | 2    | Zero eslint-disable comments  | lint      | `npm exec nx lint @op-nx/polyrepo`      | N/A                   | green  |
+| 05-03-01 | 03   | 3    | SIFERS test refactoring       | unit      | `npm exec nx test @op-nx/polyrepo`      | Yes (14 files)        | green  |
+| 05-04-01 | 04   | 4    | Enforcement skills created    | manual    | Skill files exist in `.claude/skills/`  | Yes (5 files)         | green  |
 
-*Status: pending / green / red / flaky*
+_Status: pending / green / red / flaky_
 
 ---
 
@@ -57,16 +57,16 @@ validated: 2026-03-16
 - [x] `@vitest/eslint-plugin` — install before ESLint config update
 - [x] `parserOptions.projectService: true` — configure before type-checked rules activate
 
-*All Wave 0 prerequisites satisfied.*
+_All Wave 0 prerequisites satisfied._
 
 ---
 
 ## Manual-Only Verifications
 
-| Behavior | Requirement | Why Manual | Test Instructions |
-|----------|-------------|------------|-------------------|
-| Skills teach resolution patterns | Enforcement skills | Skills are documentation artifacts | Review `.claude/skills/` files for completeness |
-| Zero eslint-disable comments | Full elimination | Grep check, not a test | `git grep 'eslint-disable' -- '*.ts'` returns empty |
+| Behavior                         | Requirement        | Why Manual                         | Test Instructions                                   |
+| -------------------------------- | ------------------ | ---------------------------------- | --------------------------------------------------- |
+| Skills teach resolution patterns | Enforcement skills | Skills are documentation artifacts | Review `.claude/skills/` files for completeness     |
+| Zero eslint-disable comments     | Full elimination   | Grep check, not a test             | `git grep 'eslint-disable' -- '*.ts'` returns empty |
 
 ---
 
@@ -85,10 +85,10 @@ validated: 2026-03-16
 
 ## Validation Audit 2026-03-16
 
-| Metric | Count |
-|--------|-------|
-| Gaps found | 1 |
-| Resolved | 1 |
-| Escalated | 0 |
+| Metric     | Count |
+| ---------- | ----- |
+| Gaps found | 1     |
+| Resolved   | 1     |
+| Escalated  | 0     |
 
 **Gap resolved:** Added Zod schema rejection test to `extract.spec.ts` — validates that structurally-invalid JSON (valid parse, failed safeParse) rejects with descriptive error. 272 tests now pass.

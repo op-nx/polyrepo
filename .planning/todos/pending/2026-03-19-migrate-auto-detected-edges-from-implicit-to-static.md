@@ -1,5 +1,5 @@
 ---
-created: "2026-03-19T11:40:31.322Z"
+created: '2026-03-19T11:40:31.322Z'
 title: Migrate auto-detected edges from implicit to static
 area: detection
 files:

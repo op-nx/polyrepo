@@ -2,7 +2,15 @@
 phase: 05-avoid-type-casting-and-prefer-satisfies
 plan: 01
 subsystem: tooling
-tags: [eslint, typescript-eslint, tsconfig, vitest, strict-type-checked, type-safety]
+tags:
+  [
+    eslint,
+    typescript-eslint,
+    tsconfig,
+    vitest,
+    strict-type-checked,
+    type-safety,
+  ]
 
 requires:
   - phase: 04-code-cleanup
@@ -15,22 +23,34 @@ provides:
 affects: [05-02, 05-03, 05-04, 05-05, 05-06]
 
 tech-stack:
-  added: ["@vitest/eslint-plugin"]
-  patterns: ["strictTypeCheckedOnly layered on Nx flat/typescript", "disableTypeChecked for JS files", "projectService for type-checked linting"]
+  added: ['@vitest/eslint-plugin']
+  patterns:
+    [
+      'strictTypeCheckedOnly layered on Nx flat/typescript',
+      'disableTypeChecked for JS files',
+      'projectService for type-checked linting',
+    ]
 
 key-files:
   created: []
-  modified: ["eslint.config.mjs", "tsconfig.base.json", "packages/op-nx-polyrepo/vitest.config.mts", "package.json", "package-lock.json"]
+  modified:
+    [
+      'eslint.config.mjs',
+      'tsconfig.base.json',
+      'packages/op-nx-polyrepo/vitest.config.mts',
+      'package.json',
+      'package-lock.json',
+    ]
 
 key-decisions:
-  - "Removed exactOptionalPropertyTypes: conflicts with @nx/devkit types (TargetConfiguration, ProjectConfiguration assign undefined to optional properties)"
+  - 'Removed exactOptionalPropertyTypes: conflicts with @nx/devkit types (TargetConfiguration, ProjectConfiguration assign undefined to optional properties)'
   - "Removed allowAsConst from consistent-type-assertions: assertionStyle 'never' schema does not support allowAsConst option"
   - "Kept assertionStyle 'never' without allowAsConst: as const usage already removed from vitest.config.mts, future needs use satisfies patterns"
 
 patterns-established:
-  - "ESLint config layering: Nx base -> Nx typescript -> Nx javascript -> strictTypeCheckedOnly -> stylisticTypeCheckedOnly -> eslintComments -> vitest (test files) -> disableTypeChecked (JS files) -> project overrides"
-  - "Type-checked linting: parserOptions.projectService: true for TS files, disableTypeChecked for JS/MJS/CJS"
-  - "Vitest test linting: vitest.configs.all scoped to *.spec.ts and *.test.ts with explicit-function-return-type off"
+  - 'ESLint config layering: Nx base -> Nx typescript -> Nx javascript -> strictTypeCheckedOnly -> stylisticTypeCheckedOnly -> eslintComments -> vitest (test files) -> disableTypeChecked (JS files) -> project overrides'
+  - 'Type-checked linting: parserOptions.projectService: true for TS files, disableTypeChecked for JS/MJS/CJS'
+  - 'Vitest test linting: vitest.configs.all scoped to *.spec.ts and *.test.ts with explicit-function-return-type off'
 
 requirements-completed: [SAFE-ESLINT, SAFE-TSCONFIG]
 
@@ -51,6 +71,7 @@ completed: 2026-03-12
 - **Files modified:** 5
 
 ## Accomplishments
+
 - Rewrote ESLint config with strictTypeCheckedOnly + stylisticTypeCheckedOnly layered on Nx presets
 - Installed @vitest/eslint-plugin with all preset + no-hooks rule for SIFER enforcement
 - Enabled parserOptions.projectService for type-checked linting on TS files
@@ -68,6 +89,7 @@ Each task was committed atomically:
 2. **Task 2: Harden TSConfig and fix vitest.config.mts** - `0eb71ae` (feat)
 
 ## Files Created/Modified
+
 - `eslint.config.mjs` - Rewritten with strict-type-checked preset, vitest plugin, SIFER enforcement
 - `tsconfig.base.json` - Added noUncheckedIndexedAccess, noPropertyAccessFromIndexSignature
 - `packages/op-nx-polyrepo/vitest.config.mts` - Removed redundant `as const` cast
@@ -75,6 +97,7 @@ Each task was committed atomically:
 - `package-lock.json` - Updated lockfile
 
 ## Decisions Made
+
 - Removed `exactOptionalPropertyTypes` from tsconfig: conflicts with @nx/devkit types (TargetConfiguration, ProjectConfiguration) that assign `undefined` to optional properties (Pitfall 4 from research)
 - Removed `allowAsConst` from consistent-type-assertions rule: the `assertionStyle: 'never'` schema variant does not support additional properties. Since `as const` usage was already removed from vitest.config.mts, this is not a functional loss -- future `as const` needs use `satisfies` patterns instead
 - Kept `assertionStyle: 'never'` as the strictest possible mode for type assertions
@@ -84,6 +107,7 @@ Each task was committed atomically:
 ### Auto-fixed Issues
 
 **1. [Rule 3 - Blocking] Removed invalid allowAsConst ESLint option**
+
 - **Found during:** Task 2 (typecheck revealed ESLint config parse error)
 - **Issue:** `consistent-type-assertions` with `assertionStyle: 'never'` does not accept `allowAsConst` property -- ESLint schema validation fails, blocking Nx project graph processing
 - **Fix:** Removed `allowAsConst: true` from the rule config
@@ -97,18 +121,22 @@ Each task was committed atomically:
 **Impact on plan:** Minimal -- `as const` was already removed from vitest.config.mts, and `assertionStyle: 'never'` is the strictest mode. No scope reduction.
 
 ## Issues Encountered
+
 - Typecheck reports 142 violations from the new strict flags (noUncheckedIndexedAccess, noPropertyAccessFromIndexSignature) and type-checked rules. This is expected and intentional -- subsequent plans 02-05 fix these violations.
 - `nx sync` attempted to add `.repos/` project references to `tsconfig.json` -- discarded as unrelated to this plan.
 
 ## User Setup Required
+
 None - no external service configuration required.
 
 ## Next Phase Readiness
+
 - ESLint strict-type-checked rules are active and detecting violations in all TS files
 - TSConfig hardening flags are enabled, revealing 142 typecheck violations for subsequent plans to fix
 - Vitest ESLint plugin is enforcing test quality rules including no-hooks for SIFER migration
 - Plans 02-06 can now detect and fix specific violation categories
 
 ---
-*Phase: 05-avoid-type-casting-and-prefer-satisfies*
-*Completed: 2026-03-12*
+
+_Phase: 05-avoid-type-casting-and-prefer-satisfies_
+_Completed: 2026-03-12_

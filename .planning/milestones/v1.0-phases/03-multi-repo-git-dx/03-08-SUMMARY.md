@@ -16,7 +16,7 @@ affects: [sync-executor, status-executor, git-detect]
 # Tech tracking
 tech-stack:
   added: []
-  patterns: ["git show-ref --verify refs/tags/<ref> for tag detection"]
+  patterns: ['git show-ref --verify refs/tags/<ref> for tag detection']
 
 key-files:
   created: []
@@ -29,11 +29,11 @@ key-files:
     - packages/op-nx-polyrepo/src/lib/executors/status/executor.spec.ts
 
 key-decisions:
-  - "Use git show-ref --verify refs/tags/<ref> for tag detection -- exits 0 if tag exists, non-zero otherwise, works for any tag name"
-  - "getDryRunAction converted from sync to async with repoPath parameter to support async isGitTag"
+  - 'Use git show-ref --verify refs/tags/<ref> for tag detection -- exits 0 if tag exists, non-zero otherwise, works for any tag name'
+  - 'getDryRunAction converted from sync to async with repoPath parameter to support async isGitTag'
 
 patterns-established:
-  - "Git-based detection: query git directly instead of regex pattern matching for ref classification"
+  - 'Git-based detection: query git directly instead of regex pattern matching for ref classification'
 
 requirements-completed: [GITX-01, GITX-02]
 
@@ -55,6 +55,7 @@ completed: 2026-03-11
 - **Files modified:** 6
 
 ## Accomplishments
+
 - Added `isGitTag` async function to `git/detect.ts` that queries git directly via `show-ref --verify`
 - Removed all regex-based `isTagRef` / `tagPattern` / `TAG_PATTERN` from both sync and status executors
 - Converted `getDryRunAction` from sync to async to support the new async tag detection
@@ -68,6 +69,7 @@ Each task was committed atomically (TDD flow):
 2. **Task 1 GREEN: Implement isGitTag and update executors** - `158c997` (feat)
 
 ## Files Created/Modified
+
 - `packages/op-nx-polyrepo/src/lib/git/detect.ts` - Added exported `isGitTag` function
 - `packages/op-nx-polyrepo/src/lib/git/detect.spec.ts` - Added 4 tests for `isGitTag`
 - `packages/op-nx-polyrepo/src/lib/executors/sync/executor.ts` - Removed isTagRef, imported/used isGitTag, made getDryRunAction async
@@ -76,6 +78,7 @@ Each task was committed atomically (TDD flow):
 - `packages/op-nx-polyrepo/src/lib/executors/status/executor.spec.ts` - Added isGitTag mock, updated tag-related tests
 
 ## Decisions Made
+
 - Used `git show-ref --verify refs/tags/<ref>` which exits 0 if tag exists and non-zero if not -- works for any tag name without assumptions about naming conventions
 - Converted `getDryRunAction` from sync to async and added `repoPath` parameter -- necessary to support the async `isGitTag` call
 - Hoisted `repoPath` computation in `executeDryRun` before the `getDryRunAction` call to share it between action and warning logic
@@ -85,12 +88,15 @@ Each task was committed atomically (TDD flow):
 None - plan executed exactly as written.
 
 ## Issues Encountered
+
 None
 
 ## User Setup Required
+
 None - no external service configuration required.
 
 ## Next Phase Readiness
+
 - Git-based tag detection ready, all executors updated
 - One remaining gap closure plan (03-09: conditional dep install)
 
@@ -101,5 +107,6 @@ None - no external service configuration required.
 - Commit 158c997 (GREEN) verified in git log
 
 ---
-*Phase: 03-multi-repo-git-dx*
-*Completed: 2026-03-11*
+
+_Phase: 03-multi-repo-git-dx_
+_Completed: 2026-03-11_

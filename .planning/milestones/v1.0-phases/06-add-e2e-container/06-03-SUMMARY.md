@@ -30,12 +30,12 @@ The plan specified replacing nrwl/nx with a synthetic test repo. After the execu
 
 ## Measured Results
 
-| Metric | Before | After |
-|--------|--------|-------|
-| pnpm install (overlay2) | 130s (timeout) | N/A |
-| pnpm install (tmpfs) | N/A | 37s |
-| Sync test total | >120s (timeout) | 53.7s |
-| All 4 e2e tests | 1 failing | All pass |
+| Metric                  | Before          | After    |
+| ----------------------- | --------------- | -------- |
+| pnpm install (overlay2) | 130s (timeout)  | N/A      |
+| pnpm install (tmpfs)    | N/A             | 37s      |
+| Sync test total         | >120s (timeout) | 53.7s    |
+| All 4 e2e tests         | 1 failing       | All pass |
 
 ## Files Changed
 

@@ -7,7 +7,10 @@ describe('polyrepo-status', () => {
   let container: StartedTestContainer;
 
   beforeAll(async () => {
-    container = await startContainer(inject('snapshotImage'), 'polyrepo-status');
+    container = await startContainer(
+      inject('snapshotImage'),
+      'polyrepo-status',
+    );
   });
 
   afterAll(async () => {
@@ -35,10 +38,9 @@ describe('polyrepo-status', () => {
   it('should show project counts when synced', async () => {
     expect.assertions(2);
 
-    const { stdout } = await container.exec(
-      ['npx', 'nx', 'polyrepo-status'],
-      { workingDir: '/workspace' },
-    );
+    const { stdout } = await container.exec(['npx', 'nx', 'polyrepo-status'], {
+      workingDir: '/workspace',
+    });
 
     expect(stdout).toContain('projects');
     expect(stdout).not.toContain('[not synced]');
@@ -56,10 +58,9 @@ describe('polyrepo-status', () => {
       },
     });
 
-    const { stdout } = await container.exec(
-      ['npx', 'nx', 'polyrepo-status'],
-      { workingDir: '/workspace' },
-    );
+    const { stdout } = await container.exec(['npx', 'nx', 'polyrepo-status'], {
+      workingDir: '/workspace',
+    });
 
     expect(stdout).toContain('[not synced]');
     expect(stdout).toContain('1 configured, 0 synced, 1 not synced');

@@ -62,20 +62,22 @@ describe(resolvePluginConfig, () => {
 
     mockedReadFileSync.mockReturnValue(JSON.stringify({}));
 
-    expect(() => resolvePluginConfig('/workspace')).toThrowError('Invalid @op-nx/polyrepo config');
+    expect(() => resolvePluginConfig('/workspace')).toThrowError(
+      'Invalid @op-nx/polyrepo config',
+    );
   });
 
   it('throws when @op-nx/polyrepo plugin entry is missing from plugins', () => {
     const { mockedReadFileSync } = setup();
 
     const nxJson = JSON.stringify({
-      plugins: [
-        { plugin: '@nx/some-other-plugin', options: {} },
-      ],
+      plugins: [{ plugin: '@nx/some-other-plugin', options: {} }],
     });
 
     mockedReadFileSync.mockReturnValue(nxJson);
 
-    expect(() => resolvePluginConfig('/workspace')).toThrowError('Invalid @op-nx/polyrepo config');
+    expect(() => resolvePluginConfig('/workspace')).toThrowError(
+      'Invalid @op-nx/polyrepo config',
+    );
   });
 });

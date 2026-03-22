@@ -14,6 +14,7 @@ Users can monitor and manage git state across all synced repos from a single com
 ## Implementation Decisions
 
 ### Status detail depth
+
 - **Working tree summary per repo**: one line per repo with branch, ahead/behind remote, and dirty file counts using `M` (modified), `A` (added/staged), `D` (deleted), `??` (untracked) labels. No individual file paths listed
 - **Auto-fetch before status**: `polyrepo-status` runs `git fetch` in each repo (parallelized) before computing ahead/behind counts. Always accurate, ~1-3s added. Making this configurable (skip-fetch flag) is deferred
 - **Tag-pinned repos omit ahead/behind**: repos pinned to a tag (static like `v2.1.0` or moving like `v2.x`) show tag name, drift detection, and dirty file counts but no ahead/behind columns — tags don't have tracking branches, so those numbers would be meaningless
@@ -21,11 +22,13 @@ Users can monitor and manage git state across all synced repos from a single com
 - **Project count per repo**: status reads the Phase 2 graph cache to show how many projects were extracted from each repo. If cache doesn't exist yet, shows `?` with footer explanation: "graph not yet extracted (run any nx command to trigger)". Any Nx command in the host workspace triggers extraction for all repos (via `createNodesV2`), not just commands targeting that specific repo
 
 ### Output presentation
+
 - **Aligned columns**: output padded so values line up vertically across repos (like `docker ps`, `kubectl get pods`). Easy to scan
 - **Sync gets aligned summary table**: sync keeps streaming progress lines during execution, then adds an aligned results table at the end showing per-repo outcome (`[OK]` / `[ERROR]` with message)
 - **Legend always shown**: printed at bottom of every status run, one symbol per line. Making it hideable via flag is deferred
 
 Output example:
+
 ```
 repo-a   main      +2 -0  3M 1??  12 projects  [WARN: dirty, sync may fail]
 repo-b   develop   +0 -1  clean    8 projects
@@ -47,6 +50,7 @@ Legend:
 ```
 
 Sync summary example:
+
 ```
 Cloning repo-a from git@github.com:org/a.git...
 Done: repo-a cloned.
@@ -64,11 +68,13 @@ repo-ccc   pull     [ERROR] auth denied
 ```
 
 ### Command surface design
+
 - **Enhance polyrepo-status**: the existing executor is upgraded with working tree info, auto-fetch, project counts, warnings, and aligned output. No new command needed. Current branch/drift output is replaced by the richer format
 - **Sync is already complete for GITX-02/GITX-03**: bulk pull/fetch with strategy options, parallel execution, and per-repo error reporting already exist. Phase 3 adds the aligned results table and `--dry-run`
 - **`--dry-run` for sync**: shows what sync would do without executing — which repos need cloning, which would be pulled, which are dirty and might fail. New executor option on `polyrepo-sync`
 
 ### Error handling & edge cases
+
 - **Proactive warnings in status**: status flags repos whose state would cause sync problems. Four warning triggers:
   1. `[WARN: dirty, sync may fail]` — uncommitted changes that could block pull
   2. `[WARN: detached HEAD]` — not on a branch
@@ -78,6 +84,7 @@ repo-ccc   pull     [ERROR] auth denied
 - **Status always exits 0**: warnings are informational. Exit 1 only if the executor itself fails (e.g., can't read config, git binary not found). Consistent with `git status`. Sync exit codes unchanged (0 = all ok, 1 = any failed)
 
 ### Claude's Discretion
+
 - Exact git commands for computing ahead/behind counts, detecting merge conflicts, and detecting detached HEAD
 - Column width calculation and padding implementation
 - How to read Phase 2 graph cache for project counts (file path, parsing)
@@ -97,9 +104,11 @@ repo-ccc   pull     [ERROR] auth denied
 </specifics>
 
 <code_context>
+
 ## Existing Code Insights
 
 ### Reusable Assets
+
 - `git/detect.ts`: `detectRepoState`, `getCurrentBranch`, `getHeadSha`, `getDirtyFiles`, `getCurrentRef` — extend with ahead/behind, staged/unstaged counts, merge conflict detection
 - `git/commands.ts`: `gitFetch` — reuse for auto-fetch in status. `execGit` (private) — may need to expose or duplicate for new git queries
 - `executors/status/executor.ts`: Current `reportRepo` function replaced by richer output. Config loading pattern (readFileSync nx.json, validateConfig, normalizeRepos) stays the same
@@ -107,12 +116,14 @@ repo-ccc   pull     [ERROR] auth denied
 - Graph cache from Phase 2: cached in `.repos/` — status reads this for project counts
 
 ### Established Patterns
+
 - Executor options: `SyncExecutorOptions` interface with optional fields, validated by Nx executor schema
 - Logger: `@nx/devkit` logger for all output (`logger.info`, `logger.warn`, `logger.error`)
 - Config loading: identical pattern in both status and sync executors (could be extracted but not required)
 - Error collection: `Promise.allSettled` + post-loop analysis for parallel operations
 
 ### Integration Points
+
 - `executors.json`: `polyrepo-sync` schema needs `--dry-run` boolean option added
 - `git/detect.ts`: new exported functions for enhanced git state queries
 - `.repos/*-graph-cache.json` (or similar): read by status for project counts
@@ -132,5 +143,5 @@ repo-ccc   pull     [ERROR] auth denied
 
 ---
 
-*Phase: 03-multi-repo-git-dx*
-*Context gathered: 2026-03-11*
+_Phase: 03-multi-repo-git-dx_
+_Context gathered: 2026-03-11_

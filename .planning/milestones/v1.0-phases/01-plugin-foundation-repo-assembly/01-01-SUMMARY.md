@@ -7,12 +7,12 @@ tags: [nx-plugin, zod, createNodesV2, config-validation, vitest]
 # Dependency graph
 requires: []
 provides:
-  - "nx-openpolyrepo plugin project with build, test, typecheck targets"
-  - "Zod config schema (polyrepoConfigSchema) with PolyrepoConfig type"
-  - "NormalizedRepoEntry type and normalizeRepos function"
-  - "Config validation (validateConfig, warnIfReposNotGitignored, warnUnsyncedRepos)"
-  - "Plugin entry (createNodesV2) registering polyrepo-sync and polyrepo-status targets"
-  - "executors.json with sync and status executor stubs"
+  - 'nx-openpolyrepo plugin project with build, test, typecheck targets'
+  - 'Zod config schema (polyrepoConfigSchema) with PolyrepoConfig type'
+  - 'NormalizedRepoEntry type and normalizeRepos function'
+  - 'Config validation (validateConfig, warnIfReposNotGitignored, warnUnsyncedRepos)'
+  - 'Plugin entry (createNodesV2) registering polyrepo-sync and polyrepo-status targets'
+  - 'executors.json with sync and status executor stubs'
 affects: [01-02, 01-03, 02-graph-discovery]
 
 # Tech tracking
@@ -37,14 +37,14 @@ key-files:
     - nx.json
 
 key-decisions:
-  - "Changed vitest environment from jsdom to node -- plugin is Node.js code, not browser"
-  - "Used .strict() on zod object schemas to reject objects with both url and path fields"
-  - "Used .refine() on repos record to require at least one entry"
+  - 'Changed vitest environment from jsdom to node -- plugin is Node.js code, not browser'
+  - 'Used .strict() on zod object schemas to reject objects with both url and path fields'
+  - 'Used .refine() on repos record to require at least one entry'
 
 patterns-established:
-  - "Zod schema validation pattern: safeParse + formatted error throw"
-  - "createNodesV2 tuple pattern: glob on nx.json, validate options, register targets on root project"
-  - "Test mocking pattern: vi.mock with importOriginal for node:fs and node:fs/promises"
+  - 'Zod schema validation pattern: safeParse + formatted error throw'
+  - 'createNodesV2 tuple pattern: glob on nx.json, validate options, register targets on root project'
+  - 'Test mocking pattern: vi.mock with importOriginal for node:fs and node:fs/promises'
 
 requirements-completed: [ASSM-01, ASSM-04]
 
@@ -66,6 +66,7 @@ completed: 2026-03-10
 - **Files modified:** 13
 
 ## Accomplishments
+
 - Plugin project scaffolded with @nx/plugin:plugin generator, vitest, tsc build
 - Zod config schema validates all forms from CONTEXT.md (string URL, string path, object with url/path/ref/depth)
 - normalizeRepos converts all entry forms to typed NormalizedRepoEntry (remote with depth default 1, local)
@@ -84,6 +85,7 @@ Each task was committed atomically:
 _Note: Task 2 used TDD with separate RED and GREEN commits._
 
 ## Files Created/Modified
+
 - `packages/nx-openpolyrepo/src/lib/config/schema.ts` - Zod schema, PolyrepoConfig type, NormalizedRepoEntry type, normalizeRepos function
 - `packages/nx-openpolyrepo/src/lib/config/validate.ts` - validateConfig, warnIfReposNotGitignored, warnUnsyncedRepos
 - `packages/nx-openpolyrepo/src/index.ts` - Plugin entry with createNodesV2 tuple
@@ -95,6 +97,7 @@ _Note: Task 2 used TDD with separate RED and GREEN commits._
 - `packages/nx-openpolyrepo/src/index.spec.ts` - 3 plugin entry tests
 
 ## Decisions Made
+
 - Changed vitest environment from jsdom (generator default) to node -- this is a Node.js Nx plugin, not browser code
 - Used `.strict()` on zod object schemas so objects with both `url` and `path` fields are correctly rejected as ambiguous
 - Used `.refine()` on repos record to require at least one entry (empty repos map rejected)
@@ -105,6 +108,7 @@ _Note: Task 2 used TDD with separate RED and GREEN commits._
 ### Auto-fixed Issues
 
 **1. [Rule 1 - Bug] Fixed vitest environment from jsdom to node**
+
 - **Found during:** Task 2 (config schema tests)
 - **Issue:** Generator scaffolded jsdom environment which cannot resolve node:fs/promises
 - **Fix:** Changed `environment: 'jsdom'` to `environment: 'node'` in vitest.config.mts
@@ -118,12 +122,15 @@ _Note: Task 2 used TDD with separate RED and GREEN commits._
 **Impact on plan:** Necessary for correctness. No scope creep.
 
 ## Issues Encountered
+
 None beyond the vitest environment fix documented above.
 
 ## User Setup Required
+
 None - no external service configuration required.
 
 ## Next Phase Readiness
+
 - Config schema and validation are complete, ready for Plan 02 (polyrepo-sync executor) and Plan 03 (polyrepo-status executor)
 - createNodesV2 plugin entry wired up, ready for integration testing after executors are implemented
 - executors.json has sync and status entries pointing to not-yet-created executor files
@@ -133,5 +140,6 @@ None - no external service configuration required.
 All 8 key files verified present. All 4 task commits verified in git log.
 
 ---
-*Phase: 01-plugin-foundation-repo-assembly*
-*Completed: 2026-03-10*
+
+_Phase: 01-plugin-foundation-repo-assembly_
+_Completed: 2026-03-10_

@@ -19,19 +19,19 @@ requirements: []
 
 must_haves:
   truths:
-    - "E2e tests run via Vitest and pass"
-    - "No Jest configuration, dependencies, or tooling remains in the workspace"
-    - "Local registry setup/teardown works with Vitest globalSetup"
+    - 'E2e tests run via Vitest and pass'
+    - 'No Jest configuration, dependencies, or tooling remains in the workspace'
+    - 'Local registry setup/teardown works with Vitest globalSetup'
   artifacts:
-    - path: "packages/nx-openpolyrepo-e2e/vitest.config.mts"
-      provides: "Vitest config for e2e with globalSetup/globalTeardown"
-    - path: "packages/nx-openpolyrepo-e2e/package.json"
-      provides: "e2e target using Vitest executor"
+    - path: 'packages/nx-openpolyrepo-e2e/vitest.config.mts'
+      provides: 'Vitest config for e2e with globalSetup/globalTeardown'
+    - path: 'packages/nx-openpolyrepo-e2e/package.json'
+      provides: 'e2e target using Vitest executor'
   key_links:
-    - from: "packages/nx-openpolyrepo-e2e/vitest.config.mts"
-      to: "tools/scripts/start-local-registry.ts"
-      via: "globalSetup"
-      pattern: "globalSetup.*start-local-registry"
+    - from: 'packages/nx-openpolyrepo-e2e/vitest.config.mts'
+      to: 'tools/scripts/start-local-registry.ts'
+      via: 'globalSetup'
+      pattern: 'globalSetup.*start-local-registry'
 ---
 
 <objective>
@@ -125,12 +125,12 @@ Output: E2e tests running on Vitest, all Jest artifacts deleted.
 7. Delete Jest-specific files from the e2e project:
    - Delete `packages/nx-openpolyrepo-e2e/jest.config.cts`
    - Delete `packages/nx-openpolyrepo-e2e/.spec.swcrc`
-  </action>
-  <verify>
-    <automated>npx nx run nx-openpolyrepo-e2e:e2e --verbose</automated>
-  </verify>
-  <done>E2e tests pass using Vitest. Jest config files deleted from e2e project. The e2e target uses @nx/vite:test executor.</done>
-</task>
+     </action>
+     <verify>
+     <automated>npx nx run nx-openpolyrepo-e2e:e2e --verbose</automated>
+     </verify>
+     <done>E2e tests pass using Vitest. Jest config files deleted from e2e project. The e2e target uses @nx/vite:test executor.</done>
+     </task>
 
 <task type="auto">
   <name>Task 2: Remove all Jest tooling from the workspace</name>
@@ -158,16 +158,16 @@ Output: E2e tests running on Vitest, all Jest artifacts deleted.
    - `jest-util`
    - `ts-jest`
    - `@nx/jest`
-   Also remove `ts-node` -- it was only needed for Jest's TypeScript config loading (jest.config.cts). Vitest handles TypeScript natively. Verify no other config references ts-node before removing.
+     Also remove `ts-node` -- it was only needed for Jest's TypeScript config loading (jest.config.cts). Vitest handles TypeScript natively. Verify no other config references ts-node before removing.
 
 4. Run `npm install` to update the lockfile after removing dependencies.
 
 NOTE: Keep `@swc-node/register`, `@swc/cli`, `@swc/core`, `@swc/helpers` -- these are used by the build toolchain (esbuild plugin or other non-Jest purposes), not exclusively by Jest. Verify by checking if they appear in non-Jest configs before removing. They are used by `@nx/js` for TypeScript registration.
-  </action>
-  <verify>
-    <automated>npx nx run nx-openpolyrepo-e2e:e2e --verbose && git grep -l "jest" -- "*.config.*" "*.preset.*" && echo "FAIL: Jest config files still exist" || echo "OK: No Jest config files remain"</automated>
-  </verify>
-  <done>No Jest dependencies in package.json. No Jest config files in workspace root. No @nx/jest/plugin in nx.json. E2e tests still pass after cleanup. npm install completes without errors.</done>
+</action>
+<verify>
+<automated>npx nx run nx-openpolyrepo-e2e:e2e --verbose && git grep -l "jest" -- "_.config._" "_.preset._" && echo "FAIL: Jest config files still exist" || echo "OK: No Jest config files remain"</automated>
+</verify>
+<done>No Jest dependencies in package.json. No Jest config files in workspace root. No @nx/jest/plugin in nx.json. E2e tests still pass after cleanup. npm install completes without errors.</done>
 </task>
 
 </tasks>
@@ -181,12 +181,13 @@ NOTE: Keep `@swc-node/register`, `@swc/cli`, `@swc/core`, `@swc/helpers` -- thes
 </verification>
 
 <success_criteria>
+
 - E2e tests run and pass using Vitest via `npx nx run nx-openpolyrepo-e2e:e2e`
 - Unit tests still pass via `npx nx run nx-openpolyrepo:test`
 - Zero Jest-related devDependencies remain in root package.json
 - Zero Jest configuration files remain anywhere in workspace
 - @nx/jest/plugin removed from nx.json plugins array
-</success_criteria>
+  </success_criteria>
 
 <output>
 After completion, create `.planning/quick/1-change-the-e2e-test-to-use-vitest-and-re/1-SUMMARY.md`

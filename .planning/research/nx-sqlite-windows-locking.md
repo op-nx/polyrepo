@@ -31,29 +31,29 @@ inheritance in Node.js child processes.
 
 ### Directly Relevant Issues
 
-| Issue | Title | Status | Platform | Key Detail |
-|-------|-------|--------|----------|------------|
-| [#28424](https://github.com/nrwl/nx/issues/28424) | Parallel tasks fail with "disk I/O error" | Closed | `win32-x64` | First Windows-specific SQLite report. Nx 19.8.4. |
-| [#28608](https://github.com/nrwl/nx/issues/28608) | Multiple Nx instances throw database locked | Closed | Multiple | `DatabaseBusy` (extended_code: 5) on concurrent runs |
-| [#28665](https://github.com/nrwl/nx/issues/28665) | SqliteFailure "DatabaseBusy" on `nx run-many` | Closed | Linux/Docker | After upgrade from 18.3.5 to 20.0.6 |
-| [#28640](https://github.com/nrwl/nx/issues/28640) | Unable to set journal_mode: CannotOpen | Closed | Linux CI | **High priority**. Self-hosted GitHub runners |
-| [#28772](https://github.com/nrwl/nx/issues/28772) | "database disk image is malformed" | Closed | Multiple | Parallel tasks + UNIQUE constraint failures |
-| [#30856](https://github.com/nrwl/nx/issues/30856) | Daemon crash: SQLite "locking protocol" | Closed | WSL1/WSL2 | `FileLockingProtocolFailed` (code 15). Workaround: `NX_DISABLE_DB=true` |
-| [#32894](https://github.com/nrwl/nx/issues/32894) | Nx 21.6.2: disk I/O error on journal_mode | Closed | Multiple | After migration, `SystemIoFailure` (code 522) |
-| [#32981](https://github.com/nrwl/nx/issues/32981) | taskDetails logging should be opt-out | **OPEN** | Linux | Requests `NX_DISABLE_DB` replacement for parallel runs |
-| [#34442](https://github.com/nrwl/nx/issues/34442) | Plugin worker not connected within 5 seconds | Open | `win32-x64` | Worker shutdown race on Windows |
+| Issue                                             | Title                                         | Status   | Platform     | Key Detail                                                              |
+| ------------------------------------------------- | --------------------------------------------- | -------- | ------------ | ----------------------------------------------------------------------- |
+| [#28424](https://github.com/nrwl/nx/issues/28424) | Parallel tasks fail with "disk I/O error"     | Closed   | `win32-x64`  | First Windows-specific SQLite report. Nx 19.8.4.                        |
+| [#28608](https://github.com/nrwl/nx/issues/28608) | Multiple Nx instances throw database locked   | Closed   | Multiple     | `DatabaseBusy` (extended_code: 5) on concurrent runs                    |
+| [#28665](https://github.com/nrwl/nx/issues/28665) | SqliteFailure "DatabaseBusy" on `nx run-many` | Closed   | Linux/Docker | After upgrade from 18.3.5 to 20.0.6                                     |
+| [#28640](https://github.com/nrwl/nx/issues/28640) | Unable to set journal_mode: CannotOpen        | Closed   | Linux CI     | **High priority**. Self-hosted GitHub runners                           |
+| [#28772](https://github.com/nrwl/nx/issues/28772) | "database disk image is malformed"            | Closed   | Multiple     | Parallel tasks + UNIQUE constraint failures                             |
+| [#30856](https://github.com/nrwl/nx/issues/30856) | Daemon crash: SQLite "locking protocol"       | Closed   | WSL1/WSL2    | `FileLockingProtocolFailed` (code 15). Workaround: `NX_DISABLE_DB=true` |
+| [#32894](https://github.com/nrwl/nx/issues/32894) | Nx 21.6.2: disk I/O error on journal_mode     | Closed   | Multiple     | After migration, `SystemIoFailure` (code 522)                           |
+| [#32981](https://github.com/nrwl/nx/issues/32981) | taskDetails logging should be opt-out         | **OPEN** | Linux        | Requests `NX_DISABLE_DB` replacement for parallel runs                  |
+| [#34442](https://github.com/nrwl/nx/issues/34442) | Plugin worker not connected within 5 seconds  | Open     | `win32-x64`  | Worker shutdown race on Windows                                         |
 
 ### Key Fix PRs
 
-| PR | Title | Merged | What it does |
-|----|-------|--------|-------------|
-| [#28390](https://github.com/nrwl/nx/pull/28390) | Add busy handler for sqlite | 2024-10-15 | Added `busy_handler` callback to retry on SQLite busy signal |
-| [#28667](https://github.com/nrwl/nx/pull/28667) | Retry more db operations | 2024-10-30 | Transaction and pragma_update retry logic, `FULL_MUTEX` mode on CI |
-| [#28747](https://github.com/nrwl/nx/pull/28747) | Disable the db by default | ~2024-11 | Temporarily disabled DB. Later reversed. |
-| [#33054](https://github.com/nrwl/nx/pull/33054) | Improve db connection init and error messages | 2025-10-16 | **Major overhaul**: iterative retry, stale WAL cleanup, WSL1 detection, DELETE fallback |
-| [#33143](https://github.com/nrwl/nx/pull/33143) | Do not remove wal files manually for existing databases | 2025-10-21 | Simplified initialization, prevents race with manual WAL deletion |
-| [#34533](https://github.com/nrwl/nx/pull/34533) | Retry entire SQLite transaction on DatabaseBusy | ~2025+ | Retries the whole transaction, not just individual statements |
-| [#32887](https://github.com/nrwl/nx/pull/32887) | Remove NX_DISABLE_DB | Nx 22.0.0 | **Breaking change**: removed the escape hatch |
+| PR                                              | Title                                                   | Merged     | What it does                                                                            |
+| ----------------------------------------------- | ------------------------------------------------------- | ---------- | --------------------------------------------------------------------------------------- |
+| [#28390](https://github.com/nrwl/nx/pull/28390) | Add busy handler for sqlite                             | 2024-10-15 | Added `busy_handler` callback to retry on SQLite busy signal                            |
+| [#28667](https://github.com/nrwl/nx/pull/28667) | Retry more db operations                                | 2024-10-30 | Transaction and pragma_update retry logic, `FULL_MUTEX` mode on CI                      |
+| [#28747](https://github.com/nrwl/nx/pull/28747) | Disable the db by default                               | ~2024-11   | Temporarily disabled DB. Later reversed.                                                |
+| [#33054](https://github.com/nrwl/nx/pull/33054) | Improve db connection init and error messages           | 2025-10-16 | **Major overhaul**: iterative retry, stale WAL cleanup, WSL1 detection, DELETE fallback |
+| [#33143](https://github.com/nrwl/nx/pull/33143) | Do not remove wal files manually for existing databases | 2025-10-21 | Simplified initialization, prevents race with manual WAL deletion                       |
+| [#34533](https://github.com/nrwl/nx/pull/34533) | Retry entire SQLite transaction on DatabaseBusy         | ~2025+     | Retries the whole transaction, not just individual statements                           |
+| [#32887](https://github.com/nrwl/nx/pull/32887) | Remove NX_DISABLE_DB                                    | Nx 22.0.0  | **Breaking change**: removed the escape hatch                                           |
 
 ### Assessment
 
@@ -68,23 +68,23 @@ exiting processes causing lock contention on Windows**.
 
 ### Database-Related
 
-| Variable | Status (Nx 22) | Description |
-|----------|---------------|-------------|
-| `NX_DISABLE_DB` | **REMOVED** in 22.0.0 | Was the primary escape hatch. No replacement. |
-| `NX_WORKSPACE_DATA_DIRECTORY` | Active | Redirects `.nx/workspace-data` to a custom path. **Our current workaround.** |
-| `NX_PROJECT_GRAPH_CACHE_DIRECTORY` | Legacy fallback | Older name for `NX_WORKSPACE_DATA_DIRECTORY` |
-| `NX_CACHE_DIRECTORY` | Active | Redirects `.nx/cache` for task outputs. Separate from workspace data. |
-| `NX_SKIP_NX_CACHE` | Active | Skips cache reads/writes but **does NOT skip DB metadata writes** (per issue #32981) |
+| Variable                           | Status (Nx 22)        | Description                                                                          |
+| ---------------------------------- | --------------------- | ------------------------------------------------------------------------------------ |
+| `NX_DISABLE_DB`                    | **REMOVED** in 22.0.0 | Was the primary escape hatch. No replacement.                                        |
+| `NX_WORKSPACE_DATA_DIRECTORY`      | Active                | Redirects `.nx/workspace-data` to a custom path. **Our current workaround.**         |
+| `NX_PROJECT_GRAPH_CACHE_DIRECTORY` | Legacy fallback       | Older name for `NX_WORKSPACE_DATA_DIRECTORY`                                         |
+| `NX_CACHE_DIRECTORY`               | Active                | Redirects `.nx/cache` for task outputs. Separate from workspace data.                |
+| `NX_SKIP_NX_CACHE`                 | Active                | Skips cache reads/writes but **does NOT skip DB metadata writes** (per issue #32981) |
 
 ### Debugging / Logging
 
-| Variable | Description |
-|----------|-------------|
-| `NX_NATIVE_LOGGING` | Controls Rust-side logging to stdout. Example: `NX_NATIVE_LOGGING=nx::native::db=trace` |
-| `NX_NATIVE_FILE_LOGGING` | Same filter syntax but writes to `.nx/workspace-data/nx.log` instead of stdout |
-| `NX_VERBOSE_LOGGING` | TypeScript-side verbose logging |
-| `NX_DAEMON` | Set to `false` to disable the daemon (useful for debugging) |
-| `NX_PERF_LOGGING` | Profiling data for executors and Nx internals |
+| Variable                 | Description                                                                             |
+| ------------------------ | --------------------------------------------------------------------------------------- |
+| `NX_NATIVE_LOGGING`      | Controls Rust-side logging to stdout. Example: `NX_NATIVE_LOGGING=nx::native::db=trace` |
+| `NX_NATIVE_FILE_LOGGING` | Same filter syntax but writes to `.nx/workspace-data/nx.log` instead of stdout          |
+| `NX_VERBOSE_LOGGING`     | TypeScript-side verbose logging                                                         |
+| `NX_DAEMON`              | Set to `false` to disable the daemon (useful for debugging)                             |
+| `NX_PERF_LOGGING`        | Profiling data for executors and Nx internals                                           |
 
 ### Important Notes
 
@@ -207,6 +207,7 @@ NX_DAEMON=false NX_NATIVE_LOGGING=nx::native::db=trace npm exec nx -- build devk
 ### What the Logs Will Show
 
 With `nx::native::db=trace`, you will see:
+
 - `Creating connection to "<path>"` -- which DB file is being opened
 - `Creating lock file at "<path>"` -- the `.lock` file acquisition
 - `Got lock on db lock file` -- successful lock acquisition
@@ -235,10 +236,12 @@ NX_WORKSPACE_DATA_DIRECTORY=$(mktemp -d) npm exec nx -- build devkit
 ```
 
 **Pros:**
+
 - Works reliably. Each run gets its own SQLite DB, no contention.
 - No Nx version dependency.
 
 **Cons:**
+
 - Loses cross-run caching (task history, estimated timings).
 - Creates temp directories that need cleanup.
 - Doesn't address the root cause.
@@ -254,16 +257,19 @@ NX_DAEMON=false npm exec nx -- build devkit
 **Rationale:** When running Nx in a child repo (`.repos/nx/`) from our plugin, the daemon is
 unnecessary overhead. The daemon is the process that keeps SQLite connections open across runs.
 Disabling it means:
+
 - No persistent SQLite connections that could be inherited by plugin workers.
 - Each `nx` invocation opens and closes its own DB connection cleanly.
 - Plugin workers still run but without a daemon holding the DB open in the background.
 
 **Pros:**
+
 - Addresses the root cause (persistent connections across process boundaries).
 - Simple, single env var.
 - Cross-run caching still works (the DB is opened/closed per invocation, not held open).
 
 **Cons:**
+
 - Slightly slower startup (no daemon to keep warm project graph in memory).
 - For large repos like `nrwl/nx` (~21 plugins), cold graph computation adds ~2-5s.
 
@@ -272,7 +278,8 @@ Disabling it means:
 ### Solution C: Upgrade to Nx 22.5+ and Let Retry Logic Handle It -- PARTIAL
 
 Nx 22.x includes all the fixes from PRs #33054, #33143, and #34533:
-- Iterative retry with exponential backoff (25ms * 2^n, max 12s, 20 retries)
+
+- Iterative retry with exponential backoff (25ms \* 2^n, max 12s, 20 retries)
 - Stale WAL file cleanup
 - Full-transaction retry on DatabaseBusy
 - Lock file (`fs4` crate) serialization of `initialize_db`
@@ -303,6 +310,7 @@ npm exec nx -- build devkit
 ```
 
 This is our most robust option:
+
 - Daemon disabled: no persistent connections.
 - Workspace data in the child repo's own directory: isolates from the host project's DB.
 - The DB path is deterministic (not a temp dir), so cross-run caching works.
@@ -351,6 +359,7 @@ handle.exe <db-filename>
 ## Sources
 
 ### Nx GitHub Issues
+
 - [#28424 - Parallel tasks fail with disk I/O error](https://github.com/nrwl/nx/issues/28424) (win32-x64)
 - [#28608 - Multiple Nx instances: database locked](https://github.com/nrwl/nx/issues/28608)
 - [#28640 - Unable to set journal_mode: CannotOpen](https://github.com/nrwl/nx/issues/28640) (high priority)
@@ -363,23 +372,28 @@ handle.exe <db-filename>
 - [#23224 - nx reset fails on Windows (file locked)](https://github.com/nrwl/nx/issues/23224)
 
 ### Nx Fix PRs
+
 - [#28390 - Add busy handler for sqlite](https://github.com/nrwl/nx/pull/28390)
 - [#28667 - Retry more db operations](https://github.com/nrwl/nx/pull/28667)
 - [#33054 - Improve db connection init and error messages](https://github.com/nrwl/nx/pull/33054)
 - [#33143 - Do not remove wal files manually](https://github.com/nrwl/nx/pull/33143)
 
 ### Nx Release Notes
+
 - [Nx 22.0.0 release](https://newreleases.io/project/github/nrwl/nx/release/22.0.0) (NX_DISABLE_DB removed)
 
 ### Nx Documentation
+
 - [Environment Variables](https://nx.dev/docs/reference/environment-variables)
 
 ### SQLite Documentation
+
 - [File Locking And Concurrency in SQLite Version 3](https://sqlite.org/lockingv3.html)
 - [Write-Ahead Logging](https://sqlite.org/wal.html)
 - [How To Corrupt An SQLite Database File](https://sqlite.org/howtocorrupt.html)
 
 ### Windows / Handle Inheritance
+
 - [CodiLime: Debugging faultily inherited file handles on Windows](https://codilime.com/blog/debugging-faultily-inherited-file-handles-on-microsoft-windows/)
 - [Microsoft Learn: Handle Inheritance](https://learn.microsoft.com/en-us/windows/win32/sysinfo/handle-inheritance)
 - [dotnet/runtime#19569 - Process should not inherit handles by default](https://github.com/dotnet/runtime/issues/19569)
@@ -387,10 +401,12 @@ handle.exe <db-filename>
 - [rust-lang/rustup#4181 - os error 32 file in use on Windows](https://github.com/rust-lang/rustup/issues/4181)
 
 ### ReFS / Dev Drive
+
 - [Windows Dev Drive / ReFS overview](https://windowsforum.com/threads/refs-on-windows-11-dev-drive-access-integrity-and-when-to-use.395360/)
 - [WSL#12220 - Cannot access Dev Drive after 24H2 upgrade](https://github.com/microsoft/WSL/issues/12220)
 
 ### Nx Source Code (Verified)
+
 - `packages/nx/src/utils/db-connection.ts` -- TypeScript DB connection wrapper
 - `packages/nx/src/utils/cache-directory.ts` -- `NX_WORKSPACE_DATA_DIRECTORY` handling
 - `packages/nx/src/native/db/mod.rs` -- `connect_to_nx_db` NAPI binding, lock file creation

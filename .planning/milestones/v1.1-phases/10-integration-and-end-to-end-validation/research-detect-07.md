@@ -25,13 +25,13 @@ After filtering, surviving files are passed to `getTouchedProjects()` in `affect
 
 The `NxPluginV2` API (verified in `node_modules/nx/src/project-graph/plugins/public-api.d.ts`) exposes exactly five hooks:
 
-| Hook | Purpose |
-|------|---------|
-| `createNodesV2` | Register projects |
-| `createDependencies` | Add dependency edges |
-| `createMetadata` | Add project metadata |
-| `preTasksExecution` | Run before task execution |
-| `postTasksExecution` | Run after task execution |
+| Hook                 | Purpose                   |
+| -------------------- | ------------------------- |
+| `createNodesV2`      | Register projects         |
+| `createDependencies` | Add dependency edges      |
+| `createMetadata`     | Add project metadata      |
+| `preTasksExecution`  | Run before task execution |
+| `postTasksExecution` | Run after task execution  |
 
 There is **no `createAffectedProjects`, no `createTouchedFiles`, and no `injectChangedFiles` hook**. Affected computation is hardcoded inside `nx/src/command-line/affected/` and is not extensible via the plugin API. The `NxAffectedConfig` type exported from `nx/src/config/nx-json` only covers default base/head ref configuration — it does not add a plugin extension point.
 
@@ -70,6 +70,7 @@ DETECT-07 ("nx affected correctly traces changes across repo boundaries via cros
 **Option A — Shallow DETECT-07 (graph edges only):** Assert that the cross-repo edges ARE in the project graph (verified via `nx graph --print-affected` or programmatic graph inspection). Affected propagation will work correctly if Nx ever receives a touched project from a synced repo — for example, if the user provides `--projects` on `nx run-many` manually. The plugin's job (emitting edges) is done; the limitation is in how Nx receives the initial touched set, not in edge traversal.
 
 **Option B — Wrapper script:** Provide a `polyrepo-affected` executor (or document a shell alias) that:
+
 1. For each synced repo, runs `git -C .repos/<alias> diff --name-only <base>..<head>`
 2. Maps each changed file to its project name (already known from the graph report)
 3. Calls `nx run-many --projects=<list> --target=<target>` with the combined host-affected + cross-repo-propagated project list
@@ -110,6 +111,6 @@ In practice, until a `polyrepo-affected` executor exists, the recommended user w
 pnpm nx run-many --projects=host-app,another-host-lib --target=build --output-style=static
 ```
 
-The cross-repo edges registered by `createDependencies` ensure that `nx run-many` respects task ordering and dependency chains (e.g., if `host-app` depends on `nx/devkit`, Nx will run `nx/devkit:build` before `host-app:build` if both have build targets). The gap is only in the *initial* detection of which projects changed — not in the propagation or task ordering once the set is known.
+The cross-repo edges registered by `createDependencies` ensure that `nx run-many` respects task ordering and dependency chains (e.g., if `host-app` depends on `nx/devkit`, Nx will run `nx/devkit:build` before `host-app:build` if both have build targets). The gap is only in the _initial_ detection of which projects changed — not in the propagation or task ordering once the set is known.
 
 **Summary for the planner:** DETECT-07 in its current form ("nx affected correctly traces changes") is not achievable end-to-end in v1.1 due to the `.gitignore` filter in Nx core that cannot be bypassed by plugin API. Phase 10 should verify the graph edge half (cross-repo edges exist and reverse-dep traversal is correct) and document the manual workflow. The full `polyrepo-affected` automation should be a separate tracked requirement (DETECT-08 or similar) deferred to v1.2.

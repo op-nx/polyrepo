@@ -7,18 +7,23 @@ tags: [git-commands, executor, parallel-sync, vitest, tdd]
 # Dependency graph
 requires:
   - phase: 01-plugin-foundation-repo-assembly
-    provides: "Zod config schema, normalizeRepos, validateConfig"
+    provides: 'Zod config schema, normalizeRepos, validateConfig'
 provides:
-  - "Git command wrappers: gitClone, gitPull, gitFetch, gitPullRebase, gitPullFfOnly, gitFetchTag"
-  - "Repo state detection: isGitUrl, detectRepoState, getCurrentBranch, getCurrentRef"
-  - "polyrepo-sync executor with strategy support (pull/fetch/rebase/ff-only)"
-  - "Executor schema.json for sync"
+  - 'Git command wrappers: gitClone, gitPull, gitFetch, gitPullRebase, gitPullFfOnly, gitFetchTag'
+  - 'Repo state detection: isGitUrl, detectRepoState, getCurrentBranch, getCurrentRef'
+  - 'polyrepo-sync executor with strategy support (pull/fetch/rebase/ff-only)'
+  - 'Executor schema.json for sync'
 affects: [01-03, 02-graph-discovery]
 
 # Tech tracking
 tech-stack:
   added: []
-  patterns: [Promise.allSettled parallel execution, execFile wrapper with path normalization, tag-vs-branch ref detection]
+  patterns:
+    [
+      Promise.allSettled parallel execution,
+      execFile wrapper with path normalization,
+      tag-vs-branch ref detection,
+    ]
 
 key-files:
   created:
@@ -32,13 +37,13 @@ key-files:
   modified: []
 
 key-decisions:
-  - "Used readFileSync to read nx.json directly instead of readNxJson (which requires a Tree, unavailable in executors)"
+  - 'Used readFileSync to read nx.json directly instead of readNxJson (which requires a Tree, unavailable in executors)'
   - "Tag detection uses /^v?\\d+\\.\\d+/ pattern to distinguish tags from branch refs"
 
 patterns-established:
-  - "execFile wrapper pattern: promisified with cwd normalization for Windows path separators"
-  - "Executor config reading: parse nx.json from disk, find plugin entry, validate with validateConfig"
-  - "Parallel repo processing with Promise.allSettled and per-repo error logging"
+  - 'execFile wrapper pattern: promisified with cwd normalization for Windows path separators'
+  - 'Executor config reading: parse nx.json from disk, find plugin entry, validate with validateConfig'
+  - 'Parallel repo processing with Promise.allSettled and per-repo error logging'
 
 requirements-completed: [ASSM-02, ASSM-03]
 
@@ -60,6 +65,7 @@ completed: 2026-03-10
 - **Files modified:** 7
 
 ## Accomplishments
+
 - Git command wrappers construct correct argument arrays for all git operations with Windows path normalization
 - Detection utilities identify repo state (cloned/referenced/not-synced) and current branch/ref
 - Sync executor clones missing remote repos, pulls existing repos, re-fetches tags, handles local paths
@@ -78,6 +84,7 @@ Each task was committed atomically:
 _Note: Both tasks used TDD with separate RED and GREEN commits._
 
 ## Files Created/Modified
+
 - `packages/nx-openpolyrepo/src/lib/git/commands.ts` - Git command wrappers (clone, pull, fetch, rebase, ff-only, fetchTag) with path normalization
 - `packages/nx-openpolyrepo/src/lib/git/detect.ts` - Repo state detection (isGitUrl, detectRepoState, getCurrentBranch, getCurrentRef)
 - `packages/nx-openpolyrepo/src/lib/git/commands.spec.ts` - 10 tests for git command arg construction
@@ -87,6 +94,7 @@ _Note: Both tasks used TDD with separate RED and GREEN commits._
 - `packages/nx-openpolyrepo/src/lib/executors/sync/executor.spec.ts` - 16 tests for executor behavior
 
 ## Decisions Made
+
 - Used `readFileSync` to read `nx.json` directly from disk instead of `readNxJson` from `@nx/devkit` -- `readNxJson` requires a `Tree` object which is not available in executor context
 - Tag detection heuristic uses `/^v?\d+\.\d+/` pattern -- matches common semver tags like `v1.0.0`, `1.2.3` while treating branch names like `main`, `develop` as branches
 
@@ -95,6 +103,7 @@ _Note: Both tasks used TDD with separate RED and GREEN commits._
 ### Auto-fixed Issues
 
 **1. [Rule 1 - Bug] Fixed readNxJson usage in executor**
+
 - **Found during:** Task 2 (sync executor build)
 - **Issue:** `readNxJson` from `@nx/devkit` requires a `Tree` parameter, not a string path. TypeScript build error TS2345.
 - **Fix:** Replaced with `readFileSync` + `JSON.parse` to read nx.json from disk. Updated test to mock `node:fs` instead of `readNxJson`.
@@ -103,6 +112,7 @@ _Note: Both tasks used TDD with separate RED and GREEN commits._
 - **Committed in:** `661023c` (Task 2 GREEN commit)
 
 **2. [Rule 1 - Bug] Fixed entry.ref type narrowing for gitFetchTag**
+
 - **Found during:** Task 2 (sync executor build)
 - **Issue:** `entry.ref` is `string | undefined` but `gitFetchTag` requires `string`. TypeScript error TS2345.
 - **Fix:** Added explicit `entry.ref &&` guard before `isTagRef(entry.ref)` check, which narrows type to `string`.
@@ -116,12 +126,15 @@ _Note: Both tasks used TDD with separate RED and GREEN commits._
 **Impact on plan:** Both fixes necessary for TypeScript compilation. No scope creep.
 
 ## Issues Encountered
+
 None beyond the build fixes documented above.
 
 ## User Setup Required
+
 None - no external service configuration required.
 
 ## Next Phase Readiness
+
 - Git command wrappers and sync executor are complete, ready for Plan 03 (polyrepo-status executor)
 - Detection utilities (detectRepoState, getCurrentBranch, getCurrentRef) available for status executor
 - All executor stubs from executors.json now have real implementation for sync
@@ -131,5 +144,6 @@ None - no external service configuration required.
 All 7 key files verified present. All 4 task commits verified in git log.
 
 ---
-*Phase: 01-plugin-foundation-repo-assembly*
-*Completed: 2026-03-10*
+
+_Phase: 01-plugin-foundation-repo-assembly_
+_Completed: 2026-03-10_

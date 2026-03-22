@@ -13,9 +13,11 @@ The research covers seven interconnected domains: (1) eliminating overloaded fun
 **Primary recommendation:** Split into 4-5 sub-phases: ESLint/tsconfig hardening first (enables detection), then type-casting elimination (mocks + JSON.parse), then test SIFER refactoring, then skill creation. All changes land in one pass -- no eslint-disable comments remain.
 
 <user_constraints>
+
 ## User Constraints (from CONTEXT.md)
 
 ### Locked Decisions
+
 - Ban all `as` type assertions (already enforced by `consistent-type-assertions: never`)
 - Eliminate ALL existing `eslint-disable` comments for type casting rules -- find proper solutions, not suppressions
 - Research how to mock overloaded functions (e.g., `execFile`) in Vitest without `as` casts -- do NOT add dependency injection through function parameters just for testing
@@ -73,6 +75,7 @@ The research covers seven interconnected domains: (1) eliminating overloaded fun
 - All at once: enable all strict rules and fix ALL violations -- zero eslint-disable comments remaining
 
 ### Claude's Discretion
+
 - Exact sub-phase boundaries after research
 - Which Vitest mock API best eliminates each casting pattern
 - Whether totality plugins add value beyond TSConfig options
@@ -80,35 +83,40 @@ The research covers seven interconnected domains: (1) eliminating overloaded fun
 - Skill content structure and trigger design
 
 ### Deferred Ideas (OUT OF SCOPE)
+
 - **Biome/oxlint migration** -- faster linters as future option when codebase grows; current performance is acceptable
 - **Best practices guide for human contributors** -- written documentation beyond AI skills; evaluate after skills are created
 - **Promote skills to global plugin** -- start project-local, promote once proven via evals
-</user_constraints>
+  </user_constraints>
 
 ## Standard Stack
 
 ### Core (already installed)
-| Library | Version | Purpose | Why Standard |
-|---------|---------|---------|--------------|
-| typescript | 5.9.3 | Compiler | Current stable; supports `satisfies`, `as const satisfies`, `noUncheckedIndexedAccess` |
-| typescript-eslint | 8.57.0 | ESLint parser/plugin | Provides `strictTypeChecked` preset with 40+ rules |
-| eslint | 9.39.4 | Linter | Flat config native support |
-| zod | 4.3.6 | Schema validation | Already in prod deps; `safeParse` as type guard |
-| vitest | 4.0.18 | Test runner | Overloaded function mock fix (v2.0.4+) included |
-| @nx/eslint-plugin | 22.5.4 | Nx ESLint integration | `flat/typescript` uses `recommended`; we layer on top |
+
+| Library           | Version | Purpose               | Why Standard                                                                           |
+| ----------------- | ------- | --------------------- | -------------------------------------------------------------------------------------- |
+| typescript        | 5.9.3   | Compiler              | Current stable; supports `satisfies`, `as const satisfies`, `noUncheckedIndexedAccess` |
+| typescript-eslint | 8.57.0  | ESLint parser/plugin  | Provides `strictTypeChecked` preset with 40+ rules                                     |
+| eslint            | 9.39.4  | Linter                | Flat config native support                                                             |
+| zod               | 4.3.6   | Schema validation     | Already in prod deps; `safeParse` as type guard                                        |
+| vitest            | 4.0.18  | Test runner           | Overloaded function mock fix (v2.0.4+) included                                        |
+| @nx/eslint-plugin | 22.5.4  | Nx ESLint integration | `flat/typescript` uses `recommended`; we layer on top                                  |
 
 ### To Install
-| Library | Version | Purpose | When to Use |
-|---------|---------|---------|-------------|
-| @vitest/eslint-plugin | latest | Vitest lint rules | `all` preset + promote to `error` + `no-hooks` for SIFERs |
+
+| Library               | Version | Purpose           | When to Use                                               |
+| --------------------- | ------- | ----------------- | --------------------------------------------------------- |
+| @vitest/eslint-plugin | latest  | Vitest lint rules | `all` preset + promote to `error` + `no-hooks` for SIFERs |
 
 ### Not Needed
-| Instead of | Don't Use | Reason |
-|------------|-----------|--------|
+
+| Instead of                 | Don't Use                     | Reason                                                                                              |
+| -------------------------- | ----------------------------- | --------------------------------------------------------------------------------------------------- |
 | `noUncheckedIndexedAccess` | eslint-plugin-total-functions | TSConfig flag covers the same ground; plugin adds 3K weekly downloads dependency for marginal value |
-| `noUncheckedIndexedAccess` | eslint-plugin-functional | Too opinionated (bans mutation entirely); overkill for an Nx plugin project |
+| `noUncheckedIndexedAccess` | eslint-plugin-functional      | Too opinionated (bans mutation entirely); overkill for an Nx plugin project                         |
 
 **Installation:**
+
 ```bash
 npm install --save-dev @vitest/eslint-plugin
 ```
@@ -122,6 +130,7 @@ The current `eslint.config.mjs` uses `@nx/eslint-plugin`'s `flat/typescript` whi
 **Key insight:** Nx's `flat/typescript` sets `no-explicit-any: 'warn'`, `no-non-null-assertion: 'warn'`, and `no-unused-vars: 'warn'`. The `strictTypeChecked` preset sets these to `error`. Our config must override all `warn` rules to `error` last.
 
 **Config layering order:**
+
 1. `nx.configs['flat/base']` -- registers @nx plugin
 2. `nx.configs['flat/typescript']` -- recommended + Nx overrides
 3. `nx.configs['flat/javascript']` -- JS-specific
@@ -137,6 +146,7 @@ The current `eslint.config.mjs` uses `@nx/eslint-plugin`'s `flat/typescript` whi
 ### TSConfig Hardening
 
 Current `tsconfig.base.json` already has `strict: true` which enables:
+
 - `strictNullChecks`, `strictFunctionTypes`, `strictBindCallApply`, `strictPropertyInitialization`
 - `noImplicitThis`, `noImplicitAny`, `alwaysStrict`, `useUnknownInCatchVariables`
 
@@ -169,12 +179,15 @@ Three `JSON.parse` sites need Zod schemas:
    - Use `safeParse` with fallback
 
 **Pattern:**
+
 ```typescript
 // Source: Zod v4 docs - https://zod.dev/basics
 const result = ExternalGraphJsonSchema.safeParse(JSON.parse(jsonPayload));
 
 if (!result.success) {
-  throw new Error(`Invalid graph JSON from ${repoPath}: ${result.error.message}`);
+  throw new Error(
+    `Invalid graph JSON from ${repoPath}: ${result.error.message}`,
+  );
 }
 
 // result.data is fully typed as ExternalGraphJson
@@ -188,30 +201,42 @@ resolve(result.data);
 **For `execFile` and `exec` overloaded function mocks**, there are two strategies:
 
 #### Strategy A: Test if fix is sufficient (HIGH confidence)
+
 With Vitest 4.0.18, `vi.mocked(execFile).mockImplementation(fn)` may work without casting if the implementation matches the last overload signature. The overloaded `exec`/`execFile` functions have the callback variant as the last overload, which is exactly what our tests use.
 
 **Action:** Try removing `as typeof execFile` casts and run `npm exec nx typecheck @op-nx/polyrepo`. If it compiles, the fix resolves the issue.
 
 #### Strategy B: Wrapper function approach (fallback)
+
 If Strategy A fails, create a typed mock helper:
+
 ```typescript
 function mockExecFileCallback(
   impl: (
     file: string,
     args: readonly string[],
     options: unknown,
-    callback?: (error: ExecFileException | null, stdout: string, stderr: string) => void,
+    callback?: (
+      error: ExecFileException | null,
+      stdout: string,
+      stderr: string,
+    ) => void,
   ) => void,
 ): void {
   mockExecFile.mockImplementation(impl);
 }
 ```
+
 This avoids the cast by typing the parameter explicitly and letting TypeScript infer assignability.
 
 #### For partial `ExecutorContext` objects
+
 Use factory function with full defaults:
+
 ```typescript
-function createTestContext(overrides: Partial<ExecutorContext> = {}): ExecutorContext {
+function createTestContext(
+  overrides: Partial<ExecutorContext> = {},
+): ExecutorContext {
   return {
     root: '/workspace',
     cwd: '/workspace',
@@ -225,7 +250,9 @@ function createTestContext(overrides: Partial<ExecutorContext> = {}): ExecutorCo
 ```
 
 #### For stub objects (`{} as never`)
+
 Replace with minimal valid objects. For graph node stubs not inspected by SUT, create a factory:
+
 ```typescript
 function createStubNode(name: string): TransformedNode {
   return {
@@ -238,7 +265,9 @@ function createStubNode(name: string): TransformedNode {
 ```
 
 #### For `EventEmitter as ChildProcess` pattern
+
 This is the hardest cast to eliminate. The `spawn` return type (`ChildProcess`) has many required properties. Options:
+
 1. **`Object.create(EventEmitter.prototype)`** with `Object.defineProperties` for required fields (already partially done)
 2. **Vitest's `vi.fn()` returning a mock ChildProcess** -- define the full shape upfront
 3. **Accept a scoped override in ESLint config for test files** for this specific pattern -- the `ChildProcess` type has 20+ required properties and creating all of them is pure busywork
@@ -275,6 +304,7 @@ it('calls exec with correct args', () => {
 ```
 
 **Key principles:**
+
 - Each test calls `setup()` explicitly -- no hidden state
 - Setup function returns all mutable state the test needs
 - Injectable parameters allow per-test customization
@@ -301,6 +331,7 @@ Intermediate value passed to typed function?
 ```
 
 ### Anti-Patterns to Avoid
+
 - **`as` type assertions anywhere** -- already banned, but ensure zero eslint-disable overrides
 - **`any` type anywhere** -- use `unknown` and narrow; `no-explicit-any` + `no-unsafe-*` family
 - **`!` non-null assertions** -- use narrowing or optional chaining
@@ -309,50 +340,56 @@ Intermediate value passed to typed function?
 
 ## Don't Hand-Roll
 
-| Problem | Don't Build | Use Instead | Why |
-|---------|-------------|-------------|-----|
-| JSON.parse type safety | Type annotation after parse | Zod `safeParse()` | Runtime validation + type inference in one call |
-| Config validation | Custom type guards | Zod schemas (already exist in `schema.ts`) | Zod handles nested objects, unions, defaults |
-| Overloaded mock typing | Manual `as` cast workarounds | `vi.mocked()` + Vitest 4.x type system | Fix landed in v2.0.4; mock types handle overloads |
-| Test data factories | Inline object construction with casts | Shared factory functions per type | Single source of truth for required fields |
-| ESLint rule enforcement | AGENTS.md instructions | ESLint config + lint CI check | "Never send an LLM to do a linter's job" |
-| Type-safe catch clauses | Manual `instanceof` checks | `useUnknownInCatchVariables` (already enabled via `strict`) + Zod for structured errors | Compiler catches unsafe access automatically |
+| Problem                 | Don't Build                           | Use Instead                                                                             | Why                                               |
+| ----------------------- | ------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| JSON.parse type safety  | Type annotation after parse           | Zod `safeParse()`                                                                       | Runtime validation + type inference in one call   |
+| Config validation       | Custom type guards                    | Zod schemas (already exist in `schema.ts`)                                              | Zod handles nested objects, unions, defaults      |
+| Overloaded mock typing  | Manual `as` cast workarounds          | `vi.mocked()` + Vitest 4.x type system                                                  | Fix landed in v2.0.4; mock types handle overloads |
+| Test data factories     | Inline object construction with casts | Shared factory functions per type                                                       | Single source of truth for required fields        |
+| ESLint rule enforcement | AGENTS.md instructions                | ESLint config + lint CI check                                                           | "Never send an LLM to do a linter's job"          |
+| Type-safe catch clauses | Manual `instanceof` checks            | `useUnknownInCatchVariables` (already enabled via `strict`) + Zod for structured errors | Compiler catches unsafe access automatically      |
 
 **Key insight:** The codebase already has Zod as a production dependency with schemas in `schema.ts`. Extend this pattern to all `JSON.parse` boundaries rather than hand-writing type guards.
 
 ## Common Pitfalls
 
 ### Pitfall 1: Nx flat/typescript and strictTypeChecked conflict
+
 **What goes wrong:** Using `tseslint.configs.strictTypeChecked` (not `...Only`) re-declares parser and plugin settings that Nx's `flat/typescript` already set, causing duplicate rule applications or config conflicts.
 **Why it happens:** `strictTypeChecked` includes base recommended rules. Nx's preset also includes recommended.
 **How to avoid:** Use `strictTypeCheckedOnly` and `stylisticTypeCheckedOnly` -- these add ONLY the additional rules, not the base recommended set.
 **Warning signs:** Rules firing twice, unexpected severity levels, parser configuration warnings.
 
 ### Pitfall 2: Missing parserOptions.projectService
+
 **What goes wrong:** Type-checked rules silently fall back to non-type-checked behavior or error with "you must configure parser options".
 **Why it happens:** Nx's `flat/typescript` sets `tsconfigRootDir` but does NOT enable `projectService`.
 **How to avoid:** Add `languageOptions: { parserOptions: { projectService: true } }` in the config.
 **Warning signs:** Type-checked rules not catching obvious violations.
 
 ### Pitfall 3: Type-checked linting on JS files
+
 **What goes wrong:** ESLint errors on `.js`/`.mjs` files: "no program found for file".
 **Why it happens:** Type-checked rules require TypeScript programs; JS files are not included in tsconfig.
 **How to avoid:** Add `tseslint.configs.disableTypeChecked` scoped to `['**/*.js', '**/*.mjs', '**/*.cjs']`.
 **Warning signs:** Lint failures on `eslint.config.mjs` or other config files.
 
 ### Pitfall 4: `exactOptionalPropertyTypes` with Nx types
+
 **What goes wrong:** Third-party types (e.g., `ExecutorContext`, `CreateNodesContextV2`) may use `property?: Type` where code assigns `undefined` explicitly.
 **Why it happens:** `exactOptionalPropertyTypes` distinguishes "missing" from "undefined".
 **How to avoid:** Test the flag incrementally. If third-party type conflicts arise, may need to omit this flag or use `Omit`/`Pick` utility types.
 **Warning signs:** Type errors in code that interfaces with `@nx/devkit` types.
 
 ### Pitfall 5: `noUncheckedIndexedAccess` with Record iteration
+
 **What goes wrong:** Every `Record<string, T>` access now returns `T | undefined`, requiring null checks even in `for...of Object.entries()` loops where the value is guaranteed.
 **Why it happens:** TypeScript cannot narrow Record index access even after Object.entries().
 **How to avoid:** Use destructuring in for-of loops: `for (const [key, value] of Object.entries(record))` -- the destructured `value` is `T`, not `T | undefined`. If this doesn't suffice, use a null assertion ONLY if the value existence is guaranteed by the iteration pattern, but prefer an `if` guard.
 **Warning signs:** Excessive `!` assertions or unnecessary null checks.
 
 ### Pitfall 6: `vi.mocked()` + overloads resolves to LAST overload only
+
 **What goes wrong:** `vi.mocked(execFile).mockImplementation(...)` resolves to the last overload signature of `execFile`, which may not match the overload your test actually uses.
 **Why it happens:** TypeScript's `Parameters<T>` and `ReturnType<T>` only resolve the last overload.
 **How to avoid:** Verify the callback-style overload is the last one for `exec`/`execFile`. If not, the wrapper function approach (Strategy B) is needed.
@@ -361,6 +398,7 @@ Intermediate value passed to typed function?
 ## Code Examples
 
 ### ESLint Config Upgrade (Verified Pattern)
+
 ```typescript
 // Source: typescript-eslint docs - https://typescript-eslint.io/users/configs/
 // Source: Nx docs - https://nx.dev/docs/technologies/eslint/guides/eslint
@@ -448,6 +486,7 @@ export default [
 ```
 
 ### TSConfig Hardening
+
 ```jsonc
 // tsconfig.base.json additions
 {
@@ -455,12 +494,13 @@ export default [
     // ... existing strict: true and other flags ...
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
-    "noPropertyAccessFromIndexSignature": true
-  }
+    "noPropertyAccessFromIndexSignature": true,
+  },
 }
 ```
 
 ### Zod Schema for JSON.parse Validation
+
 ```typescript
 // Source: Zod v4 docs - https://zod.dev/basics
 import { z } from 'zod';
@@ -509,6 +549,7 @@ resolve(result.data);
 ```
 
 ### SIFER Test Refactoring
+
 ```typescript
 // Source: https://medium.com/@kolodny/testing-with-sifers-c9d6bb5b362
 
@@ -547,6 +588,7 @@ it('returns success when all repos sync', async () => {
 ```
 
 ### `as const` with `allowAsConst` Option
+
 ```typescript
 // The consistent-type-assertions rule with assertionStyle: 'never' bans ALL as assertions,
 // including `as const`. To allow `as const` specifically:
@@ -562,16 +604,17 @@ it('returns success when all repos sync', async () => {
 
 ## State of the Art
 
-| Old Approach | Current Approach | When Changed | Impact |
-|--------------|------------------|--------------|--------|
-| `typescript-eslint recommended` | `strict-type-checked` | typescript-eslint v6 (2023) | 40+ additional rules including no-unsafe-* family |
-| `parserOptions.project` | `parserOptions.projectService` | typescript-eslint v8 | Faster type resolution, better monorepo support |
-| `eslint-plugin-vitest` | `@vitest/eslint-plugin` | 2024 | Package renamed; old package redirects to new |
-| `tseslint.config()` | `defineConfig()` from eslint/config | typescript-eslint v8+ | Deprecated in favor of ESLint core utility |
-| Vitest `MockInstance` breaks on overloads | Fixed `MockInstance` | Vitest 2.0.4 (Jul 2024) | Overloaded function mocks work without casts |
-| `strict: true` is enough | TS 5.9 `tsc --init` adds `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes` | TS 5.9 (2025) | Official recognition these flags should be on by default |
+| Old Approach                              | Current Approach                                                                   | When Changed                | Impact                                                   |
+| ----------------------------------------- | ---------------------------------------------------------------------------------- | --------------------------- | -------------------------------------------------------- |
+| `typescript-eslint recommended`           | `strict-type-checked`                                                              | typescript-eslint v6 (2023) | 40+ additional rules including no-unsafe-\* family       |
+| `parserOptions.project`                   | `parserOptions.projectService`                                                     | typescript-eslint v8        | Faster type resolution, better monorepo support          |
+| `eslint-plugin-vitest`                    | `@vitest/eslint-plugin`                                                            | 2024                        | Package renamed; old package redirects to new            |
+| `tseslint.config()`                       | `defineConfig()` from eslint/config                                                | typescript-eslint v8+       | Deprecated in favor of ESLint core utility               |
+| Vitest `MockInstance` breaks on overloads | Fixed `MockInstance`                                                               | Vitest 2.0.4 (Jul 2024)     | Overloaded function mocks work without casts             |
+| `strict: true` is enough                  | TS 5.9 `tsc --init` adds `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes` | TS 5.9 (2025)               | Official recognition these flags should be on by default |
 
 **Deprecated/outdated:**
+
 - `eslint-plugin-vitest` npm package -- renamed to `@vitest/eslint-plugin`
 - `tseslint.config()` utility -- use `defineConfig()` from `eslint/config`
 
@@ -595,31 +638,34 @@ it('returns success when all repos sync', async () => {
 ## Validation Architecture
 
 ### Test Framework
-| Property | Value |
-|----------|-------|
-| Framework | Vitest 4.0.18 |
-| Config file | `packages/op-nx-polyrepo/vitest.config.mts` |
-| Quick run command | `npm exec nx test @op-nx/polyrepo` |
+
+| Property           | Value                                                |
+| ------------------ | ---------------------------------------------------- |
+| Framework          | Vitest 4.0.18                                        |
+| Config file        | `packages/op-nx-polyrepo/vitest.config.mts`          |
+| Quick run command  | `npm exec nx test @op-nx/polyrepo`                   |
 | Full suite command | `npm exec nx run-many --targets=test,lint,typecheck` |
 
 ### Phase Requirements -> Test Map
 
 This phase is a refactoring/hardening phase with no new functional requirements. Validation is through existing tests passing after changes + lint/typecheck passing with stricter rules.
 
-| Area | Behavior | Test Type | Automated Command | File Exists? |
-|------|----------|-----------|-------------------|-------------|
-| ESLint config | Strict rules enabled, zero violations | lint | `npm exec nx lint @op-nx/polyrepo` | N/A (config) |
-| TSConfig flags | Codebase compiles with strict flags | typecheck | `npm exec nx typecheck @op-nx/polyrepo` | N/A (config) |
-| Mock refactoring | All existing tests still pass | unit | `npm exec nx test @op-nx/polyrepo` | Yes (8 files) |
-| Zod validation | JSON.parse sites validated | unit | `npm exec nx test @op-nx/polyrepo` | Yes (existing + new) |
-| Zero eslint-disable | No suppression comments remain | lint | `npm exec nx lint @op-nx/polyrepo` | N/A |
+| Area                | Behavior                              | Test Type | Automated Command                       | File Exists?         |
+| ------------------- | ------------------------------------- | --------- | --------------------------------------- | -------------------- |
+| ESLint config       | Strict rules enabled, zero violations | lint      | `npm exec nx lint @op-nx/polyrepo`      | N/A (config)         |
+| TSConfig flags      | Codebase compiles with strict flags   | typecheck | `npm exec nx typecheck @op-nx/polyrepo` | N/A (config)         |
+| Mock refactoring    | All existing tests still pass         | unit      | `npm exec nx test @op-nx/polyrepo`      | Yes (8 files)        |
+| Zod validation      | JSON.parse sites validated            | unit      | `npm exec nx test @op-nx/polyrepo`      | Yes (existing + new) |
+| Zero eslint-disable | No suppression comments remain        | lint      | `npm exec nx lint @op-nx/polyrepo`      | N/A                  |
 
 ### Sampling Rate
+
 - **Per task commit:** `npm exec nx test @op-nx/polyrepo && npm exec nx lint @op-nx/polyrepo && npm exec nx typecheck @op-nx/polyrepo`
 - **Per wave merge:** `npm exec nx run-many --targets=test,lint,typecheck`
 - **Phase gate:** Full suite green + zero `eslint-disable` comments verified via `git grep`
 
 ### Wave 0 Gaps
+
 - [ ] `@vitest/eslint-plugin` must be installed before ESLint config update
 - [ ] `parserOptions.projectService: true` must be configured before type-checked rules activate
 - None for test infrastructure -- existing test files cover all source modules
@@ -627,6 +673,7 @@ This phase is a refactoring/hardening phase with no new functional requirements.
 ## Sources
 
 ### Primary (HIGH confidence)
+
 - [typescript-eslint shared configs](https://typescript-eslint.io/users/configs/) -- strictTypeChecked preset, config layering
 - [typescript-eslint typed linting](https://typescript-eslint.io/getting-started/typed-linting/) -- projectService setup
 - [TypeScript TSConfig reference](https://www.typescriptlang.org/tsconfig/) -- noUncheckedIndexedAccess, exactOptionalPropertyTypes
@@ -637,6 +684,7 @@ This phase is a refactoring/hardening phase with no new functional requirements.
 - Nx `flat/typescript` source (local `node_modules/@nx/eslint-plugin/src/flat-configs/typescript.js`) -- uses `recommended`, not type-checked
 
 ### Secondary (MEDIUM confidence)
+
 - [@vitest/eslint-plugin npm](https://www.npmjs.com/package/@vitest/eslint-plugin) -- configs.all preset, ~70 rules
 - [Nx ESLint guide](https://nx.dev/docs/technologies/eslint/guides/eslint) -- Nx + typescript-eslint integration
 - [The Strictest TypeScript Config](https://whatislove.dev/articles/the-strictest-typescript-config/) -- flags beyond strict
@@ -647,11 +695,13 @@ This phase is a refactoring/hardening phase with no new functional requirements.
 - [Claude Code Hooks](https://code.claude.com/docs/en/hooks) -- PreToolUse hook for lint enforcement
 
 ### Tertiary (LOW confidence)
+
 - [eslint-plugin-vitest GitHub](https://github.com/vitest-dev/eslint-plugin-vitest) -- no-hooks rule docs (need to verify exact rule names after install)
 
 ## Metadata
 
 **Confidence breakdown:**
+
 - Standard stack: HIGH -- all tools verified via installed versions and official docs
 - Architecture: HIGH -- ESLint config layering verified against Nx source code + typescript-eslint docs
 - Pitfalls: HIGH -- identified from real config analysis and known issues

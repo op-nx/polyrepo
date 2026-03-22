@@ -30,12 +30,12 @@ Nx executes the command, hashes stdout, and uses it as part of the cache key. Wh
 
 Synced repos are full git working copies with their own `.git/` folder. Users can and do edit files directly — this is a synthetic monorepo over a polyrepo, not a vendor cache. The input must capture uncommitted changes.
 
-| Approach | What it tracks | When it invalidates | Cost |
-|----------|---------------|--------------------|----- |
-| `git rev-parse HEAD` | Commit SHA only | On sync (new tag/commit) | ~2ms |
-| `git write-tree` | Full working tree state | On ANY tracked file change | ~50ms for 150-project repo |
-| `git diff HEAD --stat` | Uncommitted changes | On edits, staged or unstaged | ~10ms |
-| Compound: `HEAD` + `diff` hash | Commit + working tree delta | Both sync and local edits | ~12ms |
+| Approach                       | What it tracks              | When it invalidates          | Cost                       |
+| ------------------------------ | --------------------------- | ---------------------------- | -------------------------- |
+| `git rev-parse HEAD`           | Commit SHA only             | On sync (new tag/commit)     | ~2ms                       |
+| `git write-tree`               | Full working tree state     | On ANY tracked file change   | ~50ms for 150-project repo |
+| `git diff HEAD --stat`         | Uncommitted changes         | On edits, staged or unstaged | ~10ms                      |
+| Compound: `HEAD` + `diff` hash | Commit + working tree delta | Both sync and local edits    | ~12ms                      |
 
 **Recommendation: Compound.** Use `git -C .repos/${repoAlias} rev-parse HEAD && git -C .repos/${repoAlias} diff HEAD` piped through a hash. HEAD catches sync changes, diff catches user edits. `write-tree` is more expensive and captures untracked files which may not affect builds.
 
@@ -52,6 +52,7 @@ No `outputs` declaration needed.
 After `rm -rf .repos/nx/dist .repos/nx/.nx`, git HEAD is unchanged but the child's build outputs are gone. The host cache says "success" but post-build scripts fail on missing files.
 
 **Mitigations (choose one):**
+
 1. **Accept sync as prerequisite** -- scorched earth already requires `polyrepo-sync` for recovery. Sync clears stale child cache and rebuilds. After sync, HEAD may or may not change (same tag = same HEAD), but the child cache is rebuilt. The host cache hit is valid because the child cache was restored.
 2. **Compound input** -- add a second runtime input checking output existence: `git -C .repos/nx rev-parse HEAD && test -d .repos/nx/dist/packages/devkit`. If dist/ is missing, the command fails or produces different output, invalidating the cache. More defensive but more complex.
 3. **Sync clears host cache** -- the sync executor could clear host `.nx/cache/` entries for the affected repo when it reinstalls. This ensures the first post-sync run always rebuilds.
@@ -63,7 +64,9 @@ After `rm -rf .repos/nx/dist .repos/nx/.nx`, git HEAD is unchanged but the child
 Instead of git HEAD, use the `.polyrepo-graph-cache.json` file's hash or modification time:
 
 ```typescript
-inputs: [{ runtime: `git hash-object .repos/${repoAlias}/.polyrepo-graph-cache.json` }]
+inputs: [
+  { runtime: `git hash-object .repos/${repoAlias}/.polyrepo-graph-cache.json` },
+];
 ```
 
 This changes whenever the graph extraction runs (after sync). It's slightly more conservative than HEAD (re-extractions without HEAD change would invalidate). But it couples the proxy cache to the graph extraction cache, which is a different concern. It also wouldn't catch user edits to source files that don't trigger re-extraction.

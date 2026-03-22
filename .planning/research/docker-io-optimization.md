@@ -24,23 +24,23 @@ overlay2 uses a layered filesystem with read-only lower layers and a writable up
 
 ### Hardlinks Within Same Layer vs Cross-Layer (HIGH confidence)
 
-| Scenario | Behavior | Performance |
-|----------|----------|-------------|
-| Hardlink within same RUN/layer | True hardlink (shared inode) | Fast, no copy |
+| Scenario                                 | Behavior                         | Performance                          |
+| ---------------------------------------- | -------------------------------- | ------------------------------------ |
+| Hardlink within same RUN/layer           | True hardlink (shared inode)     | Fast, no copy                        |
 | Hardlink from lower layer to upper layer | Full file copy-up, then hardlink | Slow, equivalent to copying the file |
-| Hardlink within container writable layer | True hardlink (shared inode) | Fast, no copy |
+| Hardlink within container writable layer | True hardlink (shared inode)     | Fast, no copy                        |
 
 **Source:** [moby/moby#48140](https://github.com/moby/moby/issues/48140) -- confirmed regression where cross-layer hardlinks inflate image size, proving that copy-up occurs.
 
 ### Would Switching Storage Drivers Help?
 
-| Driver | Hardlink Performance | Availability on Docker Desktop WSL2 | Verdict |
-|--------|---------------------|--------------------------------------|---------|
-| overlay2 (default) | File-level CoW, slow for cross-layer hardlinks | Default | Current driver |
-| overlayfs snapshotter (containerd) | Same underlying mechanism as overlay2 | Docker Engine 29.0+ default | No improvement |
-| btrfs | Block-level CoW, reflinks supported | Not available on Docker Desktop WSL2 | Not an option |
-| zfs | Block-level CoW | Not available on Docker Desktop WSL2 | Not an option |
-| vfs | No CoW (full copies always) | Available but very slow | Worse |
+| Driver                             | Hardlink Performance                           | Availability on Docker Desktop WSL2  | Verdict        |
+| ---------------------------------- | ---------------------------------------------- | ------------------------------------ | -------------- |
+| overlay2 (default)                 | File-level CoW, slow for cross-layer hardlinks | Default                              | Current driver |
+| overlayfs snapshotter (containerd) | Same underlying mechanism as overlay2          | Docker Engine 29.0+ default          | No improvement |
+| btrfs                              | Block-level CoW, reflinks supported            | Not available on Docker Desktop WSL2 | Not an option  |
+| zfs                                | Block-level CoW                                | Not available on Docker Desktop WSL2 | Not an option  |
+| vfs                                | No CoW (full copies always)                    | Available but very slow              | Worse          |
 
 **Verdict:** Switching storage drivers is not a viable path on Docker Desktop for Windows. The WSL2 backend uses ext4 inside a VHD, and overlay2/overlayfs snapshotter is the only practical option. Block-level CoW drivers (btrfs, zfs) are not available in this environment.
 
@@ -53,6 +53,7 @@ overlay2 uses a layered filesystem with read-only lower layers and a writable up
 A Docker named volume bypasses the overlay2 filesystem entirely -- it mounts directly on the backing ext4 filesystem inside the WSL2 VM. If the pnpm store were on a named volume AND node_modules were on the same volume, hardlinks would work as true hardlinks without copy-up overhead.
 
 **Problem:** The pnpm store is populated during `docker build` (in an image layer), but a named volume is only available at `docker run` time. To use a named volume for the store, you would need to:
+
 1. Create the named volume
 2. Start a container, run `pnpm install` to populate the store on the volume
 3. Commit that container (but volumes are NOT included in commits)
@@ -65,20 +66,23 @@ This is incompatible with the testcontainers snapshot pattern already in use (`c
 Mount the entire clone target directory as tmpfs. Since pnpm's store and node_modules would both be in-memory on the same tmpfs filesystem, hardlinks work as true hardlinks with zero disk I/O.
 
 **Performance characteristics:**
+
 - tmpfs throughput: ~10,000 MB/s (RAM speed)
 - SSD-backed overlay2: ~500 MB/s
 - Improvement factor: ~20x for raw I/O
 
 **Testcontainers API:**
+
 ```typescript
 const container = await workspaceImage
-  .withTmpFs({ "/workspace/.repos": "rw,exec,size=4g" })
+  .withTmpFs({ '/workspace/.repos': 'rw,exec,size=4g' })
   .withNetwork(network)
   .withCommand(['sleep', 'infinity'])
   .start();
 ```
 
 **Important considerations:**
+
 - `exec` flag required (not `noexec`) -- pnpm needs to execute binaries
 - `size=4g` -- nrwl/nx with node_modules is ~3GB; adjust based on fixture size
 - Data is lost when container stops -- fine for tests
@@ -86,6 +90,7 @@ const container = await workspaceImage
 - tmpfs does NOT survive `container.commit()` -- the snapshot image will NOT contain the tmpfs contents
 
 **The tmpfs-doesn't-survive-commit issue is critical.** If the test flow is:
+
 1. Start container
 2. Clone + pnpm install (on tmpfs -- fast)
 3. Run test assertions
@@ -100,10 +105,17 @@ An alternative to tmpfs: mount a Docker volume for the pnpm store, pre-populated
 ```typescript
 // In global setup, before test containers
 const storeContainer = await workspaceImage
-  .withBindMounts([{ source: 'pnpm-store-vol', target: '/root/.local/share/pnpm/store' }])
+  .withBindMounts([
+    { source: 'pnpm-store-vol', target: '/root/.local/share/pnpm/store' },
+  ])
   .start();
 // Store is populated from the image layer into the volume
-await storeContainer.exec(['cp', '-a', '/root/.local/share/pnpm/store/.', '/mnt/store/']);
+await storeContainer.exec([
+  'cp',
+  '-a',
+  '/root/.local/share/pnpm/store/.',
+  '/mnt/store/',
+]);
 ```
 
 **Verdict:** Overly complex for the benefit. tmpfs is simpler and faster.
@@ -187,7 +199,7 @@ The ~13% overhead from WSL2 virtualization is unavoidable without switching to n
 
 ```typescript
 const container = await workspaceImage
-  .withTmpFs({ "/workspace/.repos/nx": "rw,exec,size=4g" })
+  .withTmpFs({ '/workspace/.repos/nx': 'rw,exec,size=4g' })
   .withNetwork(network)
   .withCommand(['sleep', 'infinity'])
   .start();
@@ -196,6 +208,7 @@ const container = await workspaceImage
 ### Why It Helps for pnpm Linking
 
 When the sync executor clones into `/workspace/.repos/nx/` and runs `pnpm install`:
+
 1. The clone writes to tmpfs (fast)
 2. pnpm's store is on the container's overlay2 layer (lower layer)
 3. pnpm tries to hardlink from store to `node_modules/` on tmpfs
@@ -209,16 +222,17 @@ Mount a single tmpfs that contains both the pnpm store and the working directory
 ```typescript
 const container = await workspaceImage
   .withTmpFs({
-    "/workspace/.repos": "rw,exec,size=4g",
-    "/root/.local/share/pnpm/store": "rw,exec,size=2g"
+    '/workspace/.repos': 'rw,exec,size=4g',
+    '/root/.local/share/pnpm/store': 'rw,exec,size=2g',
   })
   .start();
 
 // Pre-populate the store on tmpfs by copying from the image layer
 await container.exec([
-  'cp', '-a',
+  'cp',
+  '-a',
   '/prebaked-pnpm-store/.',
-  '/root/.local/share/pnpm/store/'
+  '/root/.local/share/pnpm/store/',
 ]);
 ```
 
@@ -262,17 +276,22 @@ The snapshot could include the synced repo state, eliminating the need for tests
 ```typescript
 // In global setup, after plugin install:
 await workspace.exec(['npx', 'nx', 'run', '@op-nx/source:polyrepo-sync'], {
-  workingDir: '/workspace'
+  workingDir: '/workspace',
 });
 // Commit now includes synced repo with node_modules
-const snapshotImage = await workspace.commit({ repo: 'op-nx-e2e-snapshot', tag: 'latest' });
+const snapshotImage = await workspace.commit({
+  repo: 'op-nx-e2e-snapshot',
+  tag: 'latest',
+});
 ```
 
 **Pros:**
+
 - Each test starts with a fully synced workspace
 - No per-test sync overhead
 
 **Cons:**
+
 - The sync itself still takes 130s+ during global setup
 - Tests that verify the sync flow itself cannot use this shortcut
 - The snapshot image grows significantly (~3GB larger with nrwl/nx node_modules)
@@ -308,6 +327,7 @@ cp -a /repos/nx/node_modules /workspace/.repos/nx/node_modules
 ```
 
 For ~3GB of node_modules, this takes approximately:
+
 - On overlay2 (SSD-backed): 30-60s (source read from lower layer + write to upper layer)
 - On overlay2 to tmpfs: 10-20s (source read from cache + write to RAM)
 
@@ -323,15 +343,15 @@ This means we are testing a different code path than production -- the install s
 
 ## Recommendation Matrix
 
-| Strategy | Speed Improvement | Complexity | E2E Coverage Impact | Recommended? |
-|----------|------------------|------------|---------------------|-------------|
-| **Use synthetic fixture** (from docker-e2e-monorepo-fixtures.md) | 130s -> 5-15s | Low | None (still tests full flow) | **YES -- primary** |
-| **tmpfs for .repos** | 130s -> 20-40s (est.) | Low | None | **YES -- complementary** |
-| **Pre-copy node_modules** (`cp -a`) | 130s -> 30-60s | Medium | Weakens install test | Maybe |
-| **Extended snapshot** (commit after sync) | Per-test savings | Low | Skips sync test | Situational |
-| **Named volume for pnpm store** | Unknown, complex | High | None | No |
-| **Switch storage driver** | Not possible | N/A | N/A | No |
-| **BuildKit cache mounts** | Build time only | Low | N/A | Build optimization only |
+| Strategy                                                         | Speed Improvement     | Complexity | E2E Coverage Impact          | Recommended?             |
+| ---------------------------------------------------------------- | --------------------- | ---------- | ---------------------------- | ------------------------ |
+| **Use synthetic fixture** (from docker-e2e-monorepo-fixtures.md) | 130s -> 5-15s         | Low        | None (still tests full flow) | **YES -- primary**       |
+| **tmpfs for .repos**                                             | 130s -> 20-40s (est.) | Low        | None                         | **YES -- complementary** |
+| **Pre-copy node_modules** (`cp -a`)                              | 130s -> 30-60s        | Medium     | Weakens install test         | Maybe                    |
+| **Extended snapshot** (commit after sync)                        | Per-test savings      | Low        | Skips sync test              | Situational              |
+| **Named volume for pnpm store**                                  | Unknown, complex      | High       | None                         | No                       |
+| **Switch storage driver**                                        | Not possible          | N/A        | N/A                          | No                       |
+| **BuildKit cache mounts**                                        | Build time only       | Low        | N/A                          | Build optimization only  |
 
 ---
 
@@ -347,7 +367,7 @@ Even with a synthetic fixture, tmpfs provides a speed boost for the clone + inst
 
 ```typescript
 const container = await snapshotImage
-  .withTmpFs({ "/workspace/.repos": "rw,exec,size=512m" })
+  .withTmpFs({ '/workspace/.repos': 'rw,exec,size=512m' })
   .withNetwork(network)
   .withCommand(['sleep', 'infinity'])
   .start();
@@ -372,6 +392,7 @@ If replacing the fixture is not an option, the best Docker-level optimization is
 ### pnpm's `package-import-method` Setting
 
 pnpm's `auto` mode (default) tries: clone (reflink) -> hardlink -> copy. In Docker overlay2:
+
 - **Clone/reflink:** Not supported on ext4 (overlay2's backing FS)
 - **Hardlink:** Works only if store and target are on the same filesystem/mount
 - **Copy:** Always works, slowest option
@@ -381,9 +402,10 @@ When the pnpm store is on overlay2 (lower layer) and node_modules is on tmpfs, p
 ### overlay2 Copy-Up Cost
 
 Each cross-layer hardlink triggers a copy-up. For 4649 packages:
+
 - Average file size in pnpm store: ~10-50KB (most JS packages are small)
 - Copy-up overhead per file: ~0.5-2ms (metadata + data copy)
-- Total copy-up time: 4649 * ~1ms = ~4.6s
+- Total copy-up time: 4649 \* ~1ms = ~4.6s
 
 This suggests the 130s is NOT primarily copy-up overhead. The majority of time is likely pnpm's JavaScript execution: dependency resolution, lockfile parsing, virtual store construction, and symlink/hardlink creation logic. The overlay2 filesystem overhead is a contributing factor but not the dominant one.
 
@@ -396,6 +418,7 @@ Even with perfect filesystem performance (tmpfs), `pnpm install` for 4649 packag
 ## Sources
 
 ### Primary (HIGH confidence)
+
 - [Docker overlay2 storage driver docs](https://docs.docker.com/engine/storage/drivers/overlayfs-driver/) -- Copy-on-write behavior, hardlink handling
 - [moby/moby#48140](https://github.com/moby/moby/issues/48140) -- Cross-layer hardlink regression, confirmed copy-up behavior
 - [moby/moby#5632](https://github.com/moby/moby/issues/5632) -- Original hardlink-across-layers issue
@@ -406,6 +429,7 @@ Even with perfect filesystem performance (tmpfs), `pnpm install` for 4649 packag
 - [Docker tmpfs mounts](https://docs.docker.com/engine/storage/tmpfs/) -- tmpfs configuration options
 
 ### Secondary (MEDIUM confidence)
+
 - [pnpm/pnpm#2479](https://github.com/pnpm/pnpm/issues/2479) -- pnpm install slow on Docker/macOS
 - [pnpm Discussion #3651](https://github.com/orgs/pnpm/discussions/3651) -- Working around no hardlinks in dev containers
 - [pnpm/pnpm#1515](https://github.com/pnpm/pnpm/issues/1515) -- pnpm does not support multiple file-systems
@@ -414,6 +438,7 @@ Even with perfect filesystem performance (tmpfs), `pnpm install` for 4649 packag
 - [Docker tmpfs for faster I/O](https://oneuptime.com/blog/post/2026-01-16-docker-tmpfs-mounts/view) -- tmpfs ~20x faster than SSD
 
 ### Tertiary (LOW confidence)
+
 - [Docker storage driver benchmarks (2017)](https://github.com/chriskuehl/docker-storage-benchmark) -- Historical benchmarks, may be outdated
 - [WSL2 Phoronix benchmarks Sep 2025](https://www.thetributary.ai/blog/optimizing-wsl2-claude-code-performance-guide/) -- ~87% bare-metal performance claim
 
@@ -422,6 +447,7 @@ Even with perfect filesystem performance (tmpfs), `pnpm install` for 4649 packag
 ## Metadata
 
 **Confidence breakdown:**
+
 - overlay2 hardlink behavior: HIGH -- verified from Docker docs + confirmed bug reports
 - pnpm cross-filesystem fallback: HIGH -- verified from pnpm docs + issue tracker
 - tmpfs performance improvement: MEDIUM -- extrapolated from general benchmarks, not measured for this specific workload

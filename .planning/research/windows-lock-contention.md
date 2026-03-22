@@ -40,25 +40,25 @@ Even after a child process exits, Windows may not immediately release inherited 
 
 ### Where Tools Create Lock Files
 
-| Toolchain | Lock File Location | Uses %TEMP%? | Uses Home Dir? | Uses Project-Local? | Env Var to Override |
-|-----------|-------------------|:---:|:---:|:---:|---------------------|
-| **Nx Daemon** | `.nx/workspace-data/*.db` (SQLite WAL) | No | No | Yes | `NX_WORKSPACE_DATA_DIRECTORY`, `NX_DAEMON=false` |
-| **Nx Cloud** | `%TEMP%/client-instance-id.lock` | **Yes** | No | No | `NX_NO_CLOUD=true`, or override `TEMP` |
-| **npm** | `%LOCALAPPDATA%/npm-cache/_locks/` | No | **Yes** | No | `npm_config_cache`, or `NPM_CONFIG_CACHE` |
-| **npm (temp)** | `%TEMP%/npm-*` (staging dirs) | **Yes** | No | No | `npm_config_tmp` |
-| **pnpm** | `%LOCALAPPDATA%/pnpm/store/` | No | **Yes** | No | `PNPM_HOME`, `pnpm_config_store_dir` |
-| **pnpm** (virtual store) | `node_modules/.pnpm/lock.yaml` | No | No | Yes | N/A (project-local, not contended across repos) |
-| **NuGet** | `%TEMP%/NuGetScratch/` | **Yes** | No | No | `NUGET_SCRATCH`, or override `TEMP` |
-| **NuGet (global)** | `%USERPROFILE%/.nuget/packages/` | No | **Yes** | No | `NUGET_PACKAGES` |
-| **Gradle** | `%USERPROFILE%/.gradle/caches/*.lock` | No | **Yes** | No | `GRADLE_USER_HOME` |
-| **Gradle (temp)** | `%TEMP%/gradle-*` | **Yes** | No | No | `GRADLE_TMPDIR`, or override `TEMP` |
-| **Cargo/Rust** | `%USERPROFILE%/.cargo/` | No | **Yes** | No | `CARGO_HOME` |
-| **Cargo (target)** | `target/` (project-local) | No | No | Yes | `CARGO_TARGET_DIR` |
-| **.NET SDK** | `%TEMP%/dotnet-*`, `%TEMP%/NuGetScratch/` | **Yes** | No | No | Override `TEMP` |
-| **ESLint** | `.eslintcache` (project-local) | No | No | Yes | `--cache-location` flag |
-| **TypeScript** | `tsconfig.tsbuildinfo` (project-local) | No | No | Yes | N/A |
-| **Jest/Vitest** | In-memory or project-local | No | No | Yes | N/A |
-| **Node.js** | `os.tmpdir()` for various ops | **Yes** | No | No | Override `TEMP`/`TMP` |
+| Toolchain                | Lock File Location                        | Uses %TEMP%? | Uses Home Dir? | Uses Project-Local? | Env Var to Override                              |
+| ------------------------ | ----------------------------------------- | :----------: | :------------: | :-----------------: | ------------------------------------------------ |
+| **Nx Daemon**            | `.nx/workspace-data/*.db` (SQLite WAL)    |      No      |       No       |         Yes         | `NX_WORKSPACE_DATA_DIRECTORY`, `NX_DAEMON=false` |
+| **Nx Cloud**             | `%TEMP%/client-instance-id.lock`          |   **Yes**    |       No       |         No          | `NX_NO_CLOUD=true`, or override `TEMP`           |
+| **npm**                  | `%LOCALAPPDATA%/npm-cache/_locks/`        |      No      |    **Yes**     |         No          | `npm_config_cache`, or `NPM_CONFIG_CACHE`        |
+| **npm (temp)**           | `%TEMP%/npm-*` (staging dirs)             |   **Yes**    |       No       |         No          | `npm_config_tmp`                                 |
+| **pnpm**                 | `%LOCALAPPDATA%/pnpm/store/`              |      No      |    **Yes**     |         No          | `PNPM_HOME`, `pnpm_config_store_dir`             |
+| **pnpm** (virtual store) | `node_modules/.pnpm/lock.yaml`            |      No      |       No       |         Yes         | N/A (project-local, not contended across repos)  |
+| **NuGet**                | `%TEMP%/NuGetScratch/`                    |   **Yes**    |       No       |         No          | `NUGET_SCRATCH`, or override `TEMP`              |
+| **NuGet (global)**       | `%USERPROFILE%/.nuget/packages/`          |      No      |    **Yes**     |         No          | `NUGET_PACKAGES`                                 |
+| **Gradle**               | `%USERPROFILE%/.gradle/caches/*.lock`     |      No      |    **Yes**     |         No          | `GRADLE_USER_HOME`                               |
+| **Gradle (temp)**        | `%TEMP%/gradle-*`                         |   **Yes**    |       No       |         No          | `GRADLE_TMPDIR`, or override `TEMP`              |
+| **Cargo/Rust**           | `%USERPROFILE%/.cargo/`                   |      No      |    **Yes**     |         No          | `CARGO_HOME`                                     |
+| **Cargo (target)**       | `target/` (project-local)                 |      No      |       No       |         Yes         | `CARGO_TARGET_DIR`                               |
+| **.NET SDK**             | `%TEMP%/dotnet-*`, `%TEMP%/NuGetScratch/` |   **Yes**    |       No       |         No          | Override `TEMP`                                  |
+| **ESLint**               | `.eslintcache` (project-local)            |      No      |       No       |         Yes         | `--cache-location` flag                          |
+| **TypeScript**           | `tsconfig.tsbuildinfo` (project-local)    |      No      |       No       |         Yes         | N/A                                              |
+| **Jest/Vitest**          | In-memory or project-local                |      No      |       No       |         Yes         | N/A                                              |
+| **Node.js**              | `os.tmpdir()` for various ops             |   **Yes**    |       No       |         No          | Override `TEMP`/`TMP`                            |
 
 ### Analysis: Three Lock Domains
 
@@ -105,6 +105,7 @@ This means our `TEMP`/`TMP` values from `envOptionFromExecutor` **will override*
 **Verification:** Since Node.js `os.tmpdir()` reads from `process.env.TEMP` (on Windows, TEMP takes precedence over TMP), all Node.js tools that use `os.tmpdir()` will automatically use our isolated directory. The Windows `GetTempPath()` API checks TMP first, then TEMP -- by setting both to the same value, we cover both resolution orders.
 
 **What this catches:**
+
 - Nx Cloud `client-instance-id.lock` (uses `%TEMP%`)
 - npm staging directories (uses `%TEMP%`)
 - NuGet scratch directory (uses `%TEMP%`)
@@ -114,6 +115,7 @@ This means our `TEMP`/`TMP` values from `envOptionFromExecutor` **will override*
 - Any native tool using `GetTempPath()`
 
 **What this does NOT catch:**
+
 - Nx SQLite in `.nx/workspace-data/` (uses explicit path, not `%TEMP%`) -- already handled by `NX_WORKSPACE_DATA_DIRECTORY`
 - npm cache locks in `%LOCALAPPDATA%/npm-cache/` (uses `LOCALAPPDATA`, not `TEMP`)
 - Gradle caches in `%USERPROFILE%/.gradle/` (uses `USERPROFILE`, not `TEMP`)
@@ -140,6 +142,7 @@ env: {
 **What this catches:** npm cache, pnpm store, Gradle caches, Cargo home, NuGet global packages -- everything that uses `%LOCALAPPDATA%` or `%USERPROFILE%`.
 
 **Why NOT recommended:**
+
 - **Breaks Git authentication:** Git reads `%USERPROFILE%/.gitconfig` and credential helpers from the home directory. Overriding USERPROFILE would prevent Git operations inside child repos.
 - **Breaks SSH keys:** SSH reads `%USERPROFILE%/.ssh/` for keys. Build tools that fetch from private Git repos would fail.
 - **Breaks npm auth:** npm reads `%USERPROFILE%/.npmrc` for registry credentials.
@@ -183,6 +186,7 @@ Setting `"parallelism": false` on a target tells Nx's task scheduler that this t
 Job Objects are a Windows kernel primitive for grouping processes and controlling their resources. They can limit CPU, memory, and I/O usage, and they allow killing an entire process tree. However, Job Objects do **not** provide file handle isolation or filesystem namespacing.
 
 **Why NOT recommended:**
+
 - Job Objects cannot prevent file handle inheritance -- they only manage process lifetime and resource limits.
 - Implementing Job Objects requires native Windows API calls (`CreateJobObject`, `AssignProcessToJobObject`), which means a native addon or FFI.
 - Node.js does not expose Job Object APIs, and the existing npm packages for this (`job-object-win32`) are unmaintained.
@@ -197,6 +201,7 @@ Job Objects are a Windows kernel primitive for grouping processes and controllin
 **Mechanism:** Run each child Nx process inside a lightweight container or WSL instance for full filesystem isolation.
 
 **Why NOT recommended:**
+
 - Docker on Windows arm64 (Qualcomm Snapdragon X Elite) runs x86_64 containers via QEMU emulation, which is ~5x slower than native.
 - arm64 native containers are available but require arm64 images, which most npm packages do not provide.
 - WSL2 with Ubuntu is available but adds significant startup overhead per invocation.
@@ -212,6 +217,7 @@ Job Objects are a Windows kernel primitive for grouping processes and controllin
 **Mechanism:** Use Sandboxie-Plus or Windows Sandbox for filesystem namespace isolation.
 
 **Why NOT recommended:**
+
 - Sandboxie requires installation and admin privileges for its kernel driver.
 - Windows Sandbox is Hyper-V based, requires Pro/Enterprise, and has multi-second startup time.
 - Neither can be invoked programmatically from Node.js in a clean way.
@@ -238,12 +244,16 @@ export default async function runExecutor(
   options: RunExecutorOptions,
   context: ExecutorContext,
 ): Promise<{ success: boolean }> {
-  const repoPath = normalizePath(join(context.root, '.repos', options.repoAlias));
+  const repoPath = normalizePath(
+    join(context.root, '.repos', options.repoAlias),
+  );
   const nxBin = normalizePath(join(repoPath, 'node_modules', '.bin', 'nx'));
   const repoTempDir = normalizePath(join(repoPath, '.tmp'));
 
   // Ensure the temp directory exists
-  mkdirSync(join(context.root, '.repos', options.repoAlias, '.tmp'), { recursive: true });
+  mkdirSync(join(context.root, '.repos', options.repoAlias, '.tmp'), {
+    recursive: true,
+  });
 
   const command = `"${nxBin}" run ${options.originalProject}:${options.targetName}`;
 
@@ -273,6 +283,7 @@ export default async function runExecutor(
 ```
 
 **Key design choices:**
+
 - **Per-repo, not per-invocation:** Use `.repos/<alias>/.tmp/` rather than `.repos/<alias>/.tmp/<target>-<pid>/`. Per-invocation would prevent tools like NuGet from coordinating across concurrent processes (NuGet requires a shared NuGetScratch for inter-process locking). Per-repo means concurrent targets for the same repo share a temp dir -- but since they already share the repo filesystem, this is correct.
 - **Ensure directory exists before spawn:** `mkdirSync` with `recursive: true` is safe for concurrent calls.
 - **Include TMPDIR:** Some tools (Git Bash utilities, Python) check TMPDIR on non-Windows platforms. Since Git Bash is in use, setting TMPDIR avoids edge cases.
@@ -290,6 +301,7 @@ The current `createProxyTarget()` already passes through the child repo's `paral
 ### What About Home Directory Locks?
 
 For the common tools (npm, pnpm, Gradle, Cargo):
+
 - **npm cache:** Set `npm_config_cache` to `.repos/<alias>/.npm-cache/` if npm contention is observed. Not needed by default because npm install runs during sync, not during target execution.
 - **pnpm store:** Same -- pnpm install runs during sync, and the store uses per-disk hard links that are safe for concurrent reads.
 - **Gradle/Cargo:** If a child repo uses Gradle or Cargo, set `GRADLE_USER_HOME` or `CARGO_HOME` on a case-by-case basis. Not needed generically.
@@ -300,40 +312,40 @@ For the common tools (npm, pnpm, Gradle, Cargo):
 
 ### Low Risks
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|-----------|--------|------------|
-| Temp dir not created before spawn | Low | Child process crashes on first temp file write | `mkdirSync({recursive: true})` before spawn |
-| Temp dir accumulates stale files | Medium | Disk space growth | Add cleanup in sync executor or as periodic maintenance |
-| Tool reads parent's TEMP, ignores env | Very Low | That specific tool's lock contention | Tool-specific env var override |
+| Risk                                  | Likelihood | Impact                                         | Mitigation                                              |
+| ------------------------------------- | ---------- | ---------------------------------------------- | ------------------------------------------------------- |
+| Temp dir not created before spawn     | Low        | Child process crashes on first temp file write | `mkdirSync({recursive: true})` before spawn             |
+| Temp dir accumulates stale files      | Medium     | Disk space growth                              | Add cleanup in sync executor or as periodic maintenance |
+| Tool reads parent's TEMP, ignores env | Very Low   | That specific tool's lock contention           | Tool-specific env var override                          |
 
 ### Medium Risks
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|-----------|--------|------------|
-| TEMP override breaks a specific tool | Low | One tool in one child repo fails | Tool-specific env var to restore its expected path |
-| NuGet needs shared NuGetScratch for inter-process coordination | Medium | Concurrent restores fail | Per-repo TEMP means same-repo processes share scratch; cross-repo is safe because they have different global-packages dirs |
-| Long path names on Windows | Low | Paths like `.repos/my-long-alias/.tmp/NuGetScratch/...` exceed MAX_PATH | Use short alias names; enable long path support in Windows manifest |
+| Risk                                                           | Likelihood | Impact                                                                  | Mitigation                                                                                                                 |
+| -------------------------------------------------------------- | ---------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| TEMP override breaks a specific tool                           | Low        | One tool in one child repo fails                                        | Tool-specific env var to restore its expected path                                                                         |
+| NuGet needs shared NuGetScratch for inter-process coordination | Medium     | Concurrent restores fail                                                | Per-repo TEMP means same-repo processes share scratch; cross-repo is safe because they have different global-packages dirs |
+| Long path names on Windows                                     | Low        | Paths like `.repos/my-long-alias/.tmp/NuGetScratch/...` exceed MAX_PATH | Use short alias names; enable long path support in Windows manifest                                                        |
 
 ### Non-Risks (Verified Safe)
 
-| Concern | Why It's Safe |
-|---------|---------------|
-| Git operations in child repos | Git uses `%USERPROFILE%/.gitconfig`, not `%TEMP%` -- TEMP override does not affect Git |
-| SSH key access | SSH uses `%USERPROFILE%/.ssh/`, not `%TEMP%` -- TEMP override does not affect SSH |
-| npm registry auth | npm reads `%USERPROFILE%/.npmrc`, not `%TEMP%` -- TEMP override does not affect npm auth |
-| Nx cache reads/writes | Nx cache uses `.nx/cache/` (project-local) or `NX_CACHE_DIRECTORY` -- neither depends on `%TEMP%` |
+| Concern                       | Why It's Safe                                                                                     |
+| ----------------------------- | ------------------------------------------------------------------------------------------------- |
+| Git operations in child repos | Git uses `%USERPROFILE%/.gitconfig`, not `%TEMP%` -- TEMP override does not affect Git            |
+| SSH key access                | SSH uses `%USERPROFILE%/.ssh/`, not `%TEMP%` -- TEMP override does not affect SSH                 |
+| npm registry auth             | npm reads `%USERPROFILE%/.npmrc`, not `%TEMP%` -- TEMP override does not affect npm auth          |
+| Nx cache reads/writes         | Nx cache uses `.nx/cache/` (project-local) or `NX_CACHE_DIRECTORY` -- neither depends on `%TEMP%` |
 
 ## 6. Comparison Matrix
 
-| Approach | Coverage | Performance | Implementation Cost | Risk | Recommended? |
-|----------|----------|-------------|---------------------|------|:---:|
-| **A: TEMP/TMP isolation** | ~80% of lock sources | Zero overhead | LOW (3 env vars) | LOW | **Yes** |
-| **B: HOME isolation** | ~95% of lock sources | Zero overhead | LOW (3 env vars) | **HIGH** (breaks Git, SSH, npm auth) | **No** |
-| **C: Serialization** | 100% of lock sources | **HIGH** (3-10x slower) | LOW (1 line change) | LOW | Only per-target |
-| **D: Job Objects** | 0% (wrong problem) | N/A | HIGH (native addon) | N/A | **No** |
-| **E: Docker/WSL** | 100% | **HIGH** (5x overhead) | HIGH (infra change) | MEDIUM | **No** |
-| **F: Sandbox** | 100% | **HIGH** (multi-second startup) | HIGH (admin required) | HIGH | **No** |
-| **Layers 1+2 combined** | ~95% of lock sources | Zero overhead | LOW | LOW | **Yes** |
+| Approach                  | Coverage             | Performance                     | Implementation Cost   | Risk                                 |  Recommended?   |
+| ------------------------- | -------------------- | ------------------------------- | --------------------- | ------------------------------------ | :-------------: |
+| **A: TEMP/TMP isolation** | ~80% of lock sources | Zero overhead                   | LOW (3 env vars)      | LOW                                  |     **Yes**     |
+| **B: HOME isolation**     | ~95% of lock sources | Zero overhead                   | LOW (3 env vars)      | **HIGH** (breaks Git, SSH, npm auth) |     **No**      |
+| **C: Serialization**      | 100% of lock sources | **HIGH** (3-10x slower)         | LOW (1 line change)   | LOW                                  | Only per-target |
+| **D: Job Objects**        | 0% (wrong problem)   | N/A                             | HIGH (native addon)   | N/A                                  |     **No**      |
+| **E: Docker/WSL**         | 100%                 | **HIGH** (5x overhead)          | HIGH (infra change)   | MEDIUM                               |     **No**      |
+| **F: Sandbox**            | 100%                 | **HIGH** (multi-second startup) | HIGH (admin required) | HIGH                                 |     **No**      |
+| **Layers 1+2 combined**   | ~95% of lock sources | Zero overhead                   | LOW                   | LOW                                  |     **Yes**     |
 
 ## 7. Implementation Sketch
 
@@ -342,6 +354,7 @@ For the common tools (npm, pnpm, Gradle, Cargo):
 **File: `packages/op-nx-polyrepo/src/lib/executors/run/executor.ts`**
 
 Add three lines to the env block:
+
 ```typescript
 env: {
   // Generic TEMP/TMP isolation -- catches all tools using system temp
@@ -356,8 +369,11 @@ env: {
 ```
 
 Add `mkdirSync` before the `runCommandsImpl` call:
+
 ```typescript
-mkdirSync(join(context.root, '.repos', options.repoAlias, '.tmp'), { recursive: true });
+mkdirSync(join(context.root, '.repos', options.repoAlias, '.tmp'), {
+  recursive: true,
+});
 ```
 
 **File: `.gitignore`**
@@ -367,6 +383,7 @@ Already covered -- `.repos/` is gitignored, so `.repos/<alias>/.tmp/` is automat
 ### Test Changes
 
 Add tests for:
+
 1. `TEMP`, `TMP`, and `TMPDIR` env vars are set to the repo's `.tmp/` directory
 2. TEMP/TMP paths use forward slashes (Windows compat)
 3. TEMP/TMP paths are consistent (both point to same directory)
@@ -383,11 +400,11 @@ Recommendation: Option A -- clean during sync as a side effect, since sync alrea
 
 For the TEMP/TMP override to work, all Node.js tools in the child process must respect the environment variable. Here is how resolution works:
 
-| Platform | Resolution Order | Source |
-|----------|-----------------|--------|
-| Node.js on Windows | `process.env.TEMP` then `process.env.TMP` then `%SystemRoot%\temp` | [Node.js docs](https://nodejs.org/api/os.html#ostmpdir) |
-| Windows `GetTempPath()` | `TMP` then `TEMP` then `USERPROFILE` then `Windows dir` | [Raymond Chen / The Old New Thing](https://devblogs.microsoft.com/oldnewthing/20150417-00/?p=44213) |
-| Git Bash / MSYS2 | `$TMPDIR` then `$TEMP` then `$TMP` then `/tmp` | POSIX convention |
+| Platform                | Resolution Order                                                   | Source                                                                                              |
+| ----------------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------- |
+| Node.js on Windows      | `process.env.TEMP` then `process.env.TMP` then `%SystemRoot%\temp` | [Node.js docs](https://nodejs.org/api/os.html#ostmpdir)                                             |
+| Windows `GetTempPath()` | `TMP` then `TEMP` then `USERPROFILE` then `Windows dir`            | [Raymond Chen / The Old New Thing](https://devblogs.microsoft.com/oldnewthing/20150417-00/?p=44213) |
+| Git Bash / MSYS2        | `$TMPDIR` then `$TEMP` then `$TMP` then `/tmp`                     | POSIX convention                                                                                    |
 
 By setting all three (`TEMP`, `TMP`, `TMPDIR`) to the same value, all resolution orders converge to the same directory.
 
@@ -454,16 +471,19 @@ Keep the pass-through behavior. If a specific child repo target needs serializat
 ## Sources
 
 ### Windows File Locking
+
 - [Microsoft Learn: Handle Inheritance](https://learn.microsoft.com/en-us/windows/win32/sysinfo/handle-inheritance) -- `bInheritHandles` in `CreateProcess`
 - [Microsoft Learn: Job Objects](https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects) -- process grouping, resource limits
 - [Raymond Chen: Why are there both TMP and TEMP?](https://devblogs.microsoft.com/oldnewthing/20150417-00/?p=44213) -- `GetTempPath()` resolution order
 
 ### Node.js
+
 - [Node.js os.tmpdir() Documentation](https://nodejs.org/api/os.html#ostmpdir) -- TEMP/TMP resolution on Windows
 - [Node.js child_process Documentation](https://nodejs.org/api/child_process.html) -- `env` option behavior
 - [Node.js PR #42300: Reorder temp env variable on Windows](https://github.com/nodejs/node/pull/42300) -- discussion of TEMP vs TMP precedence
 
 ### Nx
+
 - [Nx: Run Tasks in Parallel](https://nx.dev/docs/guides/tasks--caching/run-tasks-in-parallel) -- `parallelism` flag
 - [Nx: Environment Variables](https://nx.dev/docs/reference/environment-variables) -- NX_DAEMON, NX_WORKSPACE_DATA_DIRECTORY, etc.
 - [Nx Issue #22047: Per-executor parallelism](https://github.com/nrwl/nx/issues/22047) -- feature request for per-target parallel limits
@@ -471,6 +491,7 @@ Keep the pass-through behavior. If a specific child repo target needs serializat
 - [Nx Issue #28930: Nx Cloud client-instance-id.lock](https://github.com/nrwl/nx/issues/28930) -- Nx Cloud lock file in %TEMP%
 
 ### Toolchain Lock Files
+
 - [npm Docs: Folders](https://docs.npmjs.com/cli/v11/configuring-npm/folders/) -- npm cache and temp locations
 - [pnpm: Settings](https://pnpm.io/settings) -- store directory, virtual store
 - [Gradle Issue #22661: processIsolation temp files](https://github.com/gradle/gradle/issues/22661) -- Gradle temp dir issues on Windows
@@ -481,9 +502,11 @@ Keep the pass-through behavior. If a specific child repo target needs serializat
 - [.NET SDK Issue #9585: Concurrent build lock failures](https://github.com/dotnet/sdk/issues/9585)
 
 ### Existing Project Research
+
 - [nx-sqlite-windows-locking.md](./nx-sqlite-windows-locking.md) -- Nx SQLite locking deep dive
 - [ARCHITECTURE.md](./ARCHITECTURE.md) -- v1.1 cross-repo architecture
 
 ---
-*Research for: General solution for Windows file locking contention in proxy executor child processes*
-*Researched: 2026-03-21*
+
+_Research for: General solution for Windows file locking contention in proxy executor child processes_
+_Researched: 2026-03-21_

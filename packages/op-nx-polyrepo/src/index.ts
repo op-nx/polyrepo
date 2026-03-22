@@ -70,7 +70,7 @@ function ensureTargetDefaultsShield(
   } catch {
     logger.warn(
       `Could not add '${PROXY_EXECUTOR}' to targetDefaults in nx.json. ` +
-      `Add it manually to prevent host targetDefaults from overriding external project targets.`,
+        `Add it manually to prevent host targetDefaults from overriding external project targets.`,
     );
   }
 }

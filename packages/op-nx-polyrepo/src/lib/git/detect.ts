@@ -21,29 +21,39 @@ export function detectRepoState(
 
 function execGitOutput(args: string[], cwd: string): Promise<string> {
   return new Promise((resolve, reject) => {
-    execFile('git', args, { cwd, windowsHide: true }, (error, stdout, stderr) => {
-      if (error) {
-        reject(new Error(stderr || error.message));
+    execFile(
+      'git',
+      args,
+      { cwd, windowsHide: true },
+      (error, stdout, stderr) => {
+        if (error) {
+          reject(new Error(stderr || error.message));
 
-        return;
-      }
+          return;
+        }
 
-      resolve(stdout.trim());
-    });
+        resolve(stdout.trim());
+      },
+    );
   });
 }
 
 function execGitRawOutput(args: string[], cwd: string): Promise<string> {
   return new Promise((resolve, reject) => {
-    execFile('git', args, { cwd, windowsHide: true }, (error, stdout, stderr) => {
-      if (error) {
-        reject(new Error(stderr || error.message));
+    execFile(
+      'git',
+      args,
+      { cwd, windowsHide: true },
+      (error, stdout, stderr) => {
+        if (error) {
+          reject(new Error(stderr || error.message));
 
-        return;
-      }
+          return;
+        }
 
-      resolve(stdout);
-    });
+        resolve(stdout);
+      },
+    );
   });
 }
 
@@ -122,9 +132,7 @@ export interface AheadBehind {
   behind: number;
 }
 
-const CONFLICT_PATTERNS = new Set([
-  'UU', 'AA', 'DD', 'AU', 'UA', 'DU', 'UD',
-]);
+const CONFLICT_PATTERNS = new Set(['UU', 'AA', 'DD', 'AU', 'UA', 'DU', 'UD']);
 
 const STAGED_CHARS = new Set(['M', 'A', 'D', 'R', 'C']);
 
@@ -186,9 +194,7 @@ export async function getWorkingTreeState(
   return state;
 }
 
-export async function getAheadBehind(
-  cwd: string,
-): Promise<AheadBehind | null> {
+export async function getAheadBehind(cwd: string): Promise<AheadBehind | null> {
   try {
     const output = await execGitOutput(
       ['rev-list', '--left-right', '--count', 'HEAD...@{u}'],

@@ -21,12 +21,14 @@ Use `--reporter=ndjson` for pnpm instead of `--reporter=silent` (when not `--ver
    `"resolved 3272 packages, reused 2794 packages, downloaded 459 packages, and added 694 packages in 9s"`
 
 Key ndjson fields observed:
+
 - `{"name":"pnpm:progress","status":{"done":3272,"total":3917}}` — progress ticks
 - `{"name":"pnpm:stage","stage":"resolution_started|importing_started|..."}` — phase changes
 - `{"name":"pnpm:stats","added":694,"removed":0}` — final stats
 - `{"level":"error",...}` — errors to forward to stderr
 
 Considerations:
+
 - Only applies to pnpm; npm and yarn keep their current quiet flags
 - Must handle partial JSON lines (chunks may split across `data` events)
 - Timer for duration display (`in Xs`)

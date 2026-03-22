@@ -30,15 +30,15 @@ This is a **root workspace script**, not a dependency lifecycle script. This dis
 
 **Side effects of `CI=true`:**
 
-| Tool | Behavior Change | Impact |
-|------|----------------|--------|
-| pnpm | Implies `--frozen-lockfile` (fails if lockfile needs update) | **None** -- we already pass `--frozen-lockfile` |
-| pnpm | Suppresses TTY prompts / `approve-builds` interactive mode | **Positive** -- we want non-interactive |
-| pnpm | Auto-detects CI, adjusts output formatting | **Neutral** |
-| npm | No significant install behavior change | **None** |
-| react-scripts | `build` treats warnings as errors | **N/A** -- not building React apps |
-| Jest / Vitest | May change watch mode behavior | **N/A** -- not running nx's tests |
-| Husky | `prepare` script uses `is-ci` to skip hook install | **Positive** -- avoids unnecessary husky setup |
+| Tool          | Behavior Change                                              | Impact                                          |
+| ------------- | ------------------------------------------------------------ | ----------------------------------------------- |
+| pnpm          | Implies `--frozen-lockfile` (fails if lockfile needs update) | **None** -- we already pass `--frozen-lockfile` |
+| pnpm          | Suppresses TTY prompts / `approve-builds` interactive mode   | **Positive** -- we want non-interactive         |
+| pnpm          | Auto-detects CI, adjusts output formatting                   | **Neutral**                                     |
+| npm           | No significant install behavior change                       | **None**                                        |
+| react-scripts | `build` treats warnings as errors                            | **N/A** -- not building React apps              |
+| Jest / Vitest | May change watch mode behavior                               | **N/A** -- not running nx's tests               |
+| Husky         | `prepare` script uses `is-ci` to skip hook install           | **Positive** -- avoids unnecessary husky setup  |
 
 **Verdict:** `CI=true` is safe and idiomatic for a container that exclusively runs automated tests. The side effects are either positive or irrelevant.
 
@@ -56,10 +56,12 @@ ENV CI=true
 **Why it works:** pnpm reads `.npmrc` and will skip ALL lifecycle scripts, including the root `preinstall`.
 
 **Where to place it:**
+
 - `/repos/nx/.npmrc` (project-level, highest file precedence) -- survives clone if committed to the prebaked repo
 - `~/.npmrc` (user-level) -- applies to all pnpm installs in the container
 
 **Config precedence (high to low):**
+
 1. CLI flags (`--ignore-scripts`)
 2. Environment variables (`pnpm_config_ignore_scripts=true`)
 3. `pnpm-workspace.yaml` (`ignoreScripts: true`)
@@ -101,6 +103,7 @@ RUN cd /repos/nx \
 ### 5. Environment Variable `pnpm_config_ignore_scripts=true`
 
 **How:** Set in Dockerfile:
+
 ```dockerfile
 ENV pnpm_config_ignore_scripts=true
 ```
@@ -116,12 +119,15 @@ ENV pnpm_config_ignore_scripts=true
 ## Solutions That Do NOT Work
 
 ### `onlyBuiltDependencies` / `neverBuiltDependencies`
+
 These only control **dependency** lifecycle scripts (packages in `node_modules`). The nx `preinstall` is a **root workspace** script -- it runs as part of the workspace's own package.json, not as a dependency. These settings have no effect.
 
 ### `.pnpmfile.cjs` `readPackage` Hook
+
 The `readPackage` hook mutates dependency manifests during resolution. It does NOT affect the root workspace's own `package.json` scripts. Even for dependencies, pnpm reads the package.json from the archive for build purposes, not the hooked version. So removing `scripts.preinstall` via `readPackage` does not prevent the script from running.
 
 ### `enable-pre-post-scripts=false`
+
 This controls whether `pre*` and `post*` variants of user-defined scripts run (e.g., `prebuild` when you run `pnpm build`). It does NOT affect the built-in `preinstall` lifecycle hook, which is triggered by `pnpm install` regardless of this setting.
 
 ---

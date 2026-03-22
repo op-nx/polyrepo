@@ -2,61 +2,69 @@
 phase: 02-unified-project-graph
 plan: 03
 subsystem: plugin-integration
-tags: [nx-plugin, typescript, executor, createNodesV2, createDependencies, proxy-targets]
+tags:
+  [
+    nx-plugin,
+    typescript,
+    executor,
+    createNodesV2,
+    createDependencies,
+    proxy-targets,
+  ]
 
 # Dependency graph
 requires:
   - phase: 02-unified-project-graph
     plan: 01
-    provides: "Graph types, git utilities, config schema"
+    provides: 'Graph types, git utilities, config schema'
   - phase: 02-unified-project-graph
     plan: 02
-    provides: "extractGraphFromRepo, populateGraphReport, getCurrentGraphReport, transformGraphForRepo"
+    provides: 'extractGraphFromRepo, populateGraphReport, getCurrentGraphReport, transformGraphForRepo'
 provides:
-  - "Run executor: proxy target execution to child repos via runCommandsImpl"
-  - "createNodesV2 extension: registers external projects from graph report"
-  - "createDependencies: exports intra-repo edges as implicit dependencies"
-  - "Batched unsynced repo warning"
+  - 'Run executor: proxy target execution to child repos via runCommandsImpl'
+  - 'createNodesV2 extension: registers external projects from graph report'
+  - 'createDependencies: exports intra-repo edges as implicit dependencies'
+  - 'Batched unsynced repo warning'
 affects: [phase-03]
 
 # Tech tracking
 tech-stack:
   added: []
   patterns:
-    - "Proxy executor pattern: @op-nx/polyrepo:run delegates to child repo nx CLI via runCommandsImpl"
-    - "createNodesV2 projects keyed by host root path (.repos/<alias>/<root>) with name override"
-    - "createDependencies guard: only emit edges where both source and target exist in context.projects"
-    - "Proxy targets: inputs:[], cache:false, no dependsOn -- child repo handles all internally"
-    - "Cache stored in .repos/ (not .nx/) to survive nx reset"
+    - 'Proxy executor pattern: @op-nx/polyrepo:run delegates to child repo nx CLI via runCommandsImpl'
+    - 'createNodesV2 projects keyed by host root path (.repos/<alias>/<root>) with name override'
+    - 'createDependencies guard: only emit edges where both source and target exist in context.projects'
+    - 'Proxy targets: inputs:[], cache:false, no dependsOn -- child repo handles all internally'
+    - 'Cache stored in .repos/ (not .nx/) to survive nx reset'
 
 key-files:
   created:
-    - "packages/op-nx-polyrepo/src/lib/executors/run/executor.ts"
-    - "packages/op-nx-polyrepo/src/lib/executors/run/executor.spec.ts"
-    - "packages/op-nx-polyrepo/src/lib/executors/run/schema.json"
+    - 'packages/op-nx-polyrepo/src/lib/executors/run/executor.ts'
+    - 'packages/op-nx-polyrepo/src/lib/executors/run/executor.spec.ts'
+    - 'packages/op-nx-polyrepo/src/lib/executors/run/schema.json'
   modified:
-    - "packages/op-nx-polyrepo/executors.json"
-    - "packages/op-nx-polyrepo/src/index.ts"
-    - "packages/op-nx-polyrepo/src/index.spec.ts"
-    - "packages/op-nx-polyrepo/src/lib/config/validate.ts"
-    - "packages/op-nx-polyrepo/src/lib/config/validate.spec.ts"
-    - "packages/op-nx-polyrepo/src/lib/graph/transform.ts"
-    - "packages/op-nx-polyrepo/src/lib/graph/transform.spec.ts"
-    - "packages/op-nx-polyrepo/src/lib/graph/cache.ts"
-    - "packages/op-nx-polyrepo/src/lib/graph/cache.spec.ts"
+    - 'packages/op-nx-polyrepo/executors.json'
+    - 'packages/op-nx-polyrepo/src/index.ts'
+    - 'packages/op-nx-polyrepo/src/index.spec.ts'
+    - 'packages/op-nx-polyrepo/src/lib/config/validate.ts'
+    - 'packages/op-nx-polyrepo/src/lib/config/validate.spec.ts'
+    - 'packages/op-nx-polyrepo/src/lib/graph/transform.ts'
+    - 'packages/op-nx-polyrepo/src/lib/graph/transform.spec.ts'
+    - 'packages/op-nx-polyrepo/src/lib/graph/cache.ts'
+    - 'packages/op-nx-polyrepo/src/lib/graph/cache.spec.ts'
 
 key-decisions:
-  - "Strip dependsOn from proxy targets -- host Nx builds cascading task graph across all external projects, triggering native Rust hasher on projects without projectFileMap entries"
-  - "Set inputs:[] on proxy targets -- undefined inputs causes native hasher to fall back to default inputs requiring file resolution; empty array means nothing to hash"
-  - "Move graph cache from .nx/workspace-data/ to .repos/ -- nx reset wipes .nx/ which forces re-extraction exceeding daemon plugin worker timeout"
-  - "Use exec() not execFile() for all child processes -- .bin/* are .cmd shims on Windows that execFile cannot execute"
-  - "Corepack support via packageManager field detection -- corepack <pm> install instead of direct PM invocation"
+  - 'Strip dependsOn from proxy targets -- host Nx builds cascading task graph across all external projects, triggering native Rust hasher on projects without projectFileMap entries'
+  - 'Set inputs:[] on proxy targets -- undefined inputs causes native hasher to fall back to default inputs requiring file resolution; empty array means nothing to hash'
+  - 'Move graph cache from .nx/workspace-data/ to .repos/ -- nx reset wipes .nx/ which forces re-extraction exceeding daemon plugin worker timeout'
+  - 'Use exec() not execFile() for all child processes -- .bin/* are .cmd shims on Windows that execFile cannot execute'
+  - 'Corepack support via packageManager field detection -- corepack <pm> install instead of direct PM invocation'
   - "Proxy targets omit inputs/outputs -- external repos define named inputs (e.g. 'native') in their own nx.json that the host can't resolve"
 
 patterns-established:
-  - "Proxy execution: construct command string with quoted nxBin path, delegate via runCommandsImpl"
+  - 'Proxy execution: construct command string with quoted nxBin path, delegate via runCommandsImpl'
   - "Degraded mode: extraction failure logs warning but doesn't crash Nx -- root project targets still available"
-  - "windowsHide: true on all child_process calls to prevent console window flashes"
+  - 'windowsHide: true on all child_process calls to prevent console window flashes'
 
 requirements-completed: [GRPH-01, GRPH-02, GRPH-03, GRPH-04]
 
@@ -134,6 +142,7 @@ completed: 2026-03-11
 ### Auto-fixed Issues
 
 **1. Native task hasher crash ("project X not found")**
+
 - **Found during:** Task 3 human verification
 - **Issue:** Rust hasher fails resolving dynamically registered external projects in projectFileMap
 - **Root cause:** `dependsOn` caused cascading task graph; undefined `inputs` triggered default file resolution
@@ -141,6 +150,7 @@ completed: 2026-03-11
 - **Commits:** `4d6d0d6`
 
 **2. External projects missing after nx reset**
+
 - **Found during:** Task 3 human verification
 - **Issue:** `nx reset` wipes `.nx/workspace-data/` including disk cache; re-extraction exceeds daemon timeout
 - **Fix:** Move cache to `.repos/.polyrepo-graph-cache.json`
@@ -171,5 +181,6 @@ None beyond Phase 1 setup (repos configured in nx.json, synced via `nx polyrepo-
 All 13 files verified present/modified. All 13 commits verified in git log.
 
 ---
-*Phase: 02-unified-project-graph*
-*Completed: 2026-03-11*
+
+_Phase: 02-unified-project-graph_
+_Completed: 2026-03-11_

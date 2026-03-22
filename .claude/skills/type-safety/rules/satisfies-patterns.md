@@ -39,12 +39,15 @@ const config: PolyrepoConfig = { ... };
 ## When to Use Type Annotations
 
 Use type annotations on:
+
 - **Exported function return types** (required by `explicit-function-return-type` rule)
 - **Variable declarations** where the wide type is what consumers need
 
 ```typescript
 // GOOD: return type annotation on exported function
-export function resolvePluginConfig(workspaceRoot: string): ResolvedPluginConfig {
+export function resolvePluginConfig(
+  workspaceRoot: string,
+): ResolvedPluginConfig {
   // ...
 }
 
@@ -71,7 +74,9 @@ const DEFAULTS = {
 `satisfies` catches excess properties that type annotations miss in some contexts:
 
 ```typescript
-interface Options { timeout: number }
+interface Options {
+  timeout: number;
+}
 
 // satisfies catches the typo
 const opts = { timeout: 100, timout: 200 } satisfies Options;
@@ -90,7 +95,13 @@ function createChildProcessStub(): ChildProcess {
     stdin: null,
     stdout: null,
     stderr: null,
-    stdio: [null, null, null, undefined, undefined] satisfies ChildProcess['stdio'],
+    stdio: [
+      null,
+      null,
+      null,
+      undefined,
+      undefined,
+    ] satisfies ChildProcess['stdio'],
     // ... remaining properties
   }) satisfies Partial<ChildProcess> as ChildProcess;
 }

@@ -64,7 +64,9 @@ describe(validateConfig, () => {
   it('throws with zod error details for invalid input', () => {
     setup();
 
-    expect(() => validateConfig({})).toThrowError('Invalid @op-nx/polyrepo config');
+    expect(() => validateConfig({})).toThrowError(
+      'Invalid @op-nx/polyrepo config',
+    );
   });
 });
 

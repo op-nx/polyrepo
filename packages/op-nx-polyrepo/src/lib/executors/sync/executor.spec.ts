@@ -68,11 +68,15 @@ vi.mock('../../format/table', () => ({
 }));
 
 vi.mock('nx/src/devkit-internals', () => ({
-  hashObject: vi.fn<typeof NxDevkitInternals.hashObject>(() => 'mock-repos-config-hash'),
+  hashObject: vi.fn<typeof NxDevkitInternals.hashObject>(
+    () => 'mock-repos-config-hash',
+  ),
 }));
 
 vi.mock('../../graph/cache', () => ({
-  computeRepoHash: vi.fn<typeof GraphCache.computeRepoHash>(() => Promise.resolve('mock-repo-hash')),
+  computeRepoHash: vi.fn<typeof GraphCache.computeRepoHash>(() =>
+    Promise.resolve('mock-repo-hash'),
+  ),
   writePerRepoCache: vi.fn<typeof GraphCache.writePerRepoCache>(),
 }));
 
@@ -84,7 +88,12 @@ vi.mock('../../graph/extract', () => ({
           'proj-a': {
             name: 'proj-a',
             type: 'library',
-            data: { root: 'packages/proj-a', targets: {}, tags: [], metadata: {} },
+            data: {
+              root: 'packages/proj-a',
+              targets: {},
+              tags: [],
+              metadata: {},
+            },
           },
         },
         dependencies: {},
@@ -94,18 +103,20 @@ vi.mock('../../graph/extract', () => ({
 }));
 
 vi.mock('../../graph/transform', () => ({
-  transformGraphForRepo: vi.fn<typeof GraphTransform.transformGraphForRepo>(() => ({
-    nodes: {
-      'repo-a/proj-a': {
-        name: 'repo-a/proj-a',
-        root: '.repos/repo-a/packages/proj-a',
-        projectType: 'library',
-        targets: {},
-        tags: ['polyrepo:external', 'polyrepo:repo-a'],
+  transformGraphForRepo: vi.fn<typeof GraphTransform.transformGraphForRepo>(
+    () => ({
+      nodes: {
+        'repo-a/proj-a': {
+          name: 'repo-a/proj-a',
+          root: '.repos/repo-a/packages/proj-a',
+          projectType: 'library',
+          targets: {},
+          tags: ['polyrepo:external', 'polyrepo:repo-a'],
+        },
       },
-    },
-    dependencies: [],
-  })),
+      dependencies: [],
+    }),
+  ),
 }));
 
 import { readFileSync, existsSync, rmSync, writeFileSync } from 'node:fs';
@@ -2011,9 +2022,7 @@ describe(syncExecutor, () => {
 
       await syncExecutor({}, createTestContext());
 
-      expect(mockHashObject).toHaveBeenCalledWith(
-        fakeConfig.repos,
-      );
+      expect(mockHashObject).toHaveBeenCalledWith(fakeConfig.repos);
     });
   });
 

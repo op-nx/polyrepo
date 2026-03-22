@@ -1,5 +1,5 @@
 ---
-description: "Windows-compatible Description Optimization loop for /skill-creator"
+description: 'Windows-compatible Description Optimization loop for /skill-creator'
 argument-hint: <skill-name> [--model <id>] [--max-turns <n>]
 allowed-tools: Bash, Read, Write, Edit, Glob
 ---
@@ -19,6 +19,7 @@ evals pass — description optimization is the last step before packaging.
 Check that `.claude/skills/$1-workspace/eval_set.json` exists.
 
 If it does NOT exist, create one by:
+
 1. Reading `.claude/skills/$1/SKILL.md` to understand what the skill does
 2. Generating 8-10 should-trigger queries (realistic user prompts that need this skill)
 3. Generating 8-10 should-not-trigger queries (near-miss prompts that share keywords but need something different — avoid obviously irrelevant queries)
@@ -39,17 +40,18 @@ Monitor progress by checking the background task output periodically.
 
 After the run completes, read `.claude/skills/$1-workspace/trigger-results.json` and report:
 
-| Metric | Score |
-|--------|-------|
-| True positives | N/M (should-trigger that triggered) |
+| Metric         | Score                                         |
+| -------------- | --------------------------------------------- |
+| True positives | N/M (should-trigger that triggered)           |
 | True negatives | N/M (should-not-trigger that did not trigger) |
-| **Total** | **N/M** |
+| **Total**      | **N/M**                                       |
 
 For each failure, show the query and explain whether it was a false positive (triggered when it shouldn't) or false negative (didn't trigger when it should).
 
 ## Step 4: Suggest improvements
 
 If there are failures:
+
 - **False negatives** (undertriggering): suggest adding symptom-oriented phrases to the description that match the missed queries
 - **False positives** (overtriggering): suggest narrowing the description or removing ambiguous keywords
 

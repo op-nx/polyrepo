@@ -10,9 +10,7 @@ describe(formatAlignedTable, () => {
   });
 
   it('returns single row without padding', () => {
-    const rows: ColumnDef[][] = [
-      [{ value: 'hello' }, { value: 'world' }],
-    ];
+    const rows: ColumnDef[][] = [[{ value: 'hello' }, { value: 'world' }]];
 
     const result = formatAlignedTable(rows);
 
@@ -27,10 +25,7 @@ describe(formatAlignedTable, () => {
 
     const result = formatAlignedTable(rows);
 
-    expect(result).toStrictEqual([
-      'a       short',
-      'longer  b    ',
-    ]);
+    expect(result).toStrictEqual(['a       short', 'longer  b    ']);
   });
 
   it('pads right-aligned columns with padStart', () => {

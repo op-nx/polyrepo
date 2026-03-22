@@ -3,7 +3,9 @@ import type { ChildProcess, ExecException } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 
 vi.mock('node:child_process', () => ({
-  exec: vi.fn<(command: string, options: unknown, callback: unknown) => ChildProcess>(),
+  exec: vi.fn<
+    (command: string, options: unknown, callback: unknown) => ChildProcess
+  >(),
 }));
 
 import { exec } from 'node:child_process';
@@ -20,7 +22,13 @@ function createChildProcessStub(): ChildProcess {
     stdin: null,
     stdout: null,
     stderr: null,
-    stdio: [null, null, null, undefined, undefined] satisfies ChildProcess['stdio'],
+    stdio: [
+      null,
+      null,
+      null,
+      undefined,
+      undefined,
+    ] satisfies ChildProcess['stdio'],
     pid: undefined,
     connected: false,
     exitCode: null,
@@ -42,21 +50,23 @@ function setupExecSuccess(stdout: string) {
 
   const mockExec = vi.mocked(exec);
 
-  mockExec.mockImplementation((
-    _command: string,
-    _options: unknown,
-    callback?: (
-      error: ExecException | null,
-      stdout: string,
-      stderr: string,
-    ) => void,
-  ) => {
-    if (callback) {
-      callback(null, stdout, '');
-    }
+  mockExec.mockImplementation(
+    (
+      _command: string,
+      _options: unknown,
+      callback?: (
+        error: ExecException | null,
+        stdout: string,
+        stderr: string,
+      ) => void,
+    ) => {
+      if (callback) {
+        callback(null, stdout, '');
+      }
 
-    return createChildProcessStub();
-  });
+      return createChildProcessStub();
+    },
+  );
 
   return { mockExec };
 }
@@ -66,22 +76,24 @@ function setupExecFailure(errorMessage: string, stderr = '') {
 
   const mockExec = vi.mocked(exec);
 
-  mockExec.mockImplementation((
-    _command: string,
-    _options: unknown,
-    callback?: (
-      error: ExecException | null,
-      stdout: string,
-      stderr: string,
-    ) => void,
-  ) => {
-    if (callback) {
-      const err: ExecException = new Error(errorMessage);
-      callback(err, '', stderr);
-    }
+  mockExec.mockImplementation(
+    (
+      _command: string,
+      _options: unknown,
+      callback?: (
+        error: ExecException | null,
+        stdout: string,
+        stderr: string,
+      ) => void,
+    ) => {
+      if (callback) {
+        const err: ExecException = new Error(errorMessage);
+        callback(err, '', stderr);
+      }
 
-    return createChildProcessStub();
-  });
+      return createChildProcessStub();
+    },
+  );
 
   return { mockExec };
 }

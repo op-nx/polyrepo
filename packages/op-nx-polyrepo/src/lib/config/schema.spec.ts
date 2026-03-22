@@ -12,9 +12,9 @@ interface ZodFailureResult {
   error: ZodError;
 }
 
-function expectZodFailure(
-  result: { success: boolean },
-): asserts result is ZodFailureResult {
+function expectZodFailure(result: {
+  success: boolean;
+}): asserts result is ZodFailureResult {
   expect(result.success).toBe(false);
 }
 

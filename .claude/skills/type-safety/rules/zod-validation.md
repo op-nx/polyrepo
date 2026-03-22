@@ -3,6 +3,7 @@
 ## When to Use
 
 Apply Zod `safeParse` at every **system boundary** where external data enters:
+
 - `JSON.parse()` results
 - File reads (`readFileSync`, `readJsonFile`)
 - API responses
@@ -24,7 +25,9 @@ const externalProjectNodeDataSchema = z.object({
   tags: z.array(z.string()).optional(),
 });
 
-export type ExternalProjectNodeData = z.infer<typeof externalProjectNodeDataSchema>;
+export type ExternalProjectNodeData = z.infer<
+  typeof externalProjectNodeDataSchema
+>;
 ```
 
 **Reference:** `src/lib/graph/types.ts` -- all graph types derived from Zod schemas.
@@ -59,12 +62,16 @@ or `package.json`), use `.loose()` (Zod's passthrough) to allow extra fields.
 // GOOD: only validate the fields we need, allow everything else
 const nxJsonPluginSubsetSchema = z
   .object({
-    plugins: z.array(
-      z.union([
-        z.string(),
-        z.object({ plugin: z.string(), options: z.unknown().optional() }).loose(),
-      ]),
-    ).optional(),
+    plugins: z
+      .array(
+        z.union([
+          z.string(),
+          z
+            .object({ plugin: z.string(), options: z.unknown().optional() })
+            .loose(),
+        ]),
+      )
+      .optional(),
   })
   .loose();
 ```

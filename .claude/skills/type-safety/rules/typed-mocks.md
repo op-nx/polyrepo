@@ -25,7 +25,7 @@ mockExec.mockImplementation((cmd, opts, callback) => { ... });
 
 **Reference:** `src/lib/graph/cache.spec.ts` -- all mocks use `vi.mocked()`.
 
-## Pattern: import type * as Mod for Factory Generics
+## Pattern: import type \* as Mod for Factory Generics
 
 When `vi.mock()` needs a factory with typed return, use `import type * as Mod`.
 
@@ -79,7 +79,7 @@ export function createMockChildProcess(exitCode = 0): ChildProcess {
     stderr: { value: new EventEmitter(), writable: true, configurable: true },
     // ... all ChildProcess properties
   });
-  Object.assign(child, { kill: vi.fn(), send: vi.fn(), /* ... */ });
+  Object.assign(child, { kill: vi.fn(), send: vi.fn() /* ... */ });
   process.nextTick(() => child.emit('close', exitCode));
   // eslint-disable-next-line -- sole bridging assertion, encapsulated
   return child as unknown as ChildProcess;

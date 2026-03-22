@@ -3,7 +3,10 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import { minimatch } from 'minimatch';
 import { DependencyType } from '@nx/devkit';
-import type { RawProjectGraphDependency, CreateDependenciesContext } from '@nx/devkit';
+import type {
+  RawProjectGraphDependency,
+  CreateDependenciesContext,
+} from '@nx/devkit';
 import type { PolyrepoConfig } from '../config/schema';
 import type { PolyrepoGraphReport } from './types';
 
@@ -58,7 +61,9 @@ const tsConfigPathsSchema = z
  * Returns undefined on any read/parse/validation failure (silent-skip behavior).
  * The filePath is normalized to forward slashes before reading.
  */
-function readTsconfigPaths(filePath: string): Record<string, string[]> | undefined {
+function readTsconfigPaths(
+  filePath: string,
+): Record<string, string[]> | undefined {
   try {
     const normalizedPath = normalizePath(filePath);
     const raw = readFileSync(normalizedPath, 'utf-8');
@@ -79,7 +84,9 @@ function readTsconfigPaths(filePath: string): Record<string, string[]> | undefin
  * Try tsconfig.base.json, then fall back to tsconfig.json.
  * Returns the paths map from whichever file is found first, or undefined.
  */
-function readTsconfigPathsWithFallback(dirPath: string): Record<string, string[]> | undefined {
+function readTsconfigPathsWithFallback(
+  dirPath: string,
+): Record<string, string[]> | undefined {
   const base = readTsconfigPaths(join(dirPath, 'tsconfig.base.json'));
 
   if (base !== undefined) {
@@ -123,7 +130,8 @@ function expandTsconfigPathsIntoMap(
       const normalized = value.replace(/\\/g, '/');
       // Strip the filename component
       const lastSlash = normalized.lastIndexOf('/');
-      let dirPath = lastSlash >= 0 ? normalized.slice(0, lastSlash) : normalized;
+      let dirPath =
+        lastSlash >= 0 ? normalized.slice(0, lastSlash) : normalized;
 
       // Walk up path segments looking for a matching project root
       while (dirPath.length > 0) {
@@ -191,7 +199,6 @@ export function detectCrossRepoDependencies(
 ): RawProjectGraphDependency[] {
   const { workspaceRoot } = context;
 
-
   // -------------------------------------------------------------------------
   // Step 1: Build the packageName → projectName lookup map
   // -------------------------------------------------------------------------
@@ -203,7 +210,10 @@ export function detectCrossRepoDependencies(
     for (const node of Object.values(repoData.nodes)) {
       const { packageName } = node;
 
-      if (typeof packageName === 'string' && !pkgNameToProject.has(packageName)) {
+      if (
+        typeof packageName === 'string' &&
+        !pkgNameToProject.has(packageName)
+      ) {
         pkgNameToProject.set(packageName, node.name);
       }
     }
@@ -266,7 +276,9 @@ export function detectCrossRepoDependencies(
     // Build map from project root → project name for host projects
     const hostRoots = new Map<string, string>();
 
-    for (const [projectName, projectConfig] of Object.entries(context.projects)) {
+    for (const [projectName, projectConfig] of Object.entries(
+      context.projects,
+    )) {
       const normalizedRoot = normalizePath(projectConfig.root);
       hostRoots.set(normalizedRoot, projectName);
     }
@@ -319,8 +331,12 @@ export function detectCrossRepoDependencies(
   if (config.implicitDependencies !== undefined) {
     const unknowns: string[] = [];
 
-    for (const [keyPattern, targets] of Object.entries(config.implicitDependencies)) {
-      const keyMatches = allProjectNames.some((name) => minimatch(name, keyPattern));
+    for (const [keyPattern, targets] of Object.entries(
+      config.implicitDependencies,
+    )) {
+      const keyMatches = allProjectNames.some((name) =>
+        minimatch(name, keyPattern),
+      );
 
       if (!keyMatches) {
         unknowns.push(keyPattern);
@@ -328,7 +344,9 @@ export function detectCrossRepoDependencies(
 
       for (const target of targets) {
         const stripped = target.startsWith('!') ? target.slice(1) : target;
-        const targetMatches = allProjectNames.some((name) => minimatch(name, stripped));
+        const targetMatches = allProjectNames.some((name) =>
+          minimatch(name, stripped),
+        );
 
         if (!targetMatches) {
           unknowns.push(stripped);
@@ -337,7 +355,9 @@ export function detectCrossRepoDependencies(
     }
 
     if (unknowns.length > 0) {
-      throw new Error(`Unknown projects in implicitDependencies: ${unknowns.join(', ')}`);
+      throw new Error(
+        `Unknown projects in implicitDependencies: ${unknowns.join(', ')}`,
+      );
     }
   }
 
@@ -348,10 +368,7 @@ export function detectCrossRepoDependencies(
   const emitted = new Set<string>();
   const edges: RawProjectGraphDependency[] = [];
 
-  function maybeEmitEdge(
-    sourceName: string,
-    depName: string,
-  ): void {
+  function maybeEmitEdge(sourceName: string, depName: string): void {
     const targetName = pkgNameToProject.get(depName);
 
     if (targetName === undefined) {
@@ -407,11 +424,7 @@ export function detectCrossRepoDependencies(
 
   // 3b. Scan host projects — read package.json from disk (silent skip on error)
   for (const [projectName, projectConfig] of Object.entries(context.projects)) {
-    const pkgJsonPath = join(
-      workspaceRoot,
-      projectConfig.root,
-      'package.json',
-    );
+    const pkgJsonPath = join(workspaceRoot, projectConfig.root, 'package.json');
     let pkgJson: Record<string, unknown>;
 
     try {
@@ -448,8 +461,12 @@ export function detectCrossRepoDependencies(
   // Step 4a: Build negation set — "source::target" pairs to suppress
   const negationSet = new Set<string>();
 
-  for (const [keyPattern, targets] of Object.entries(config.implicitDependencies)) {
-    const matchedSources = allProjectNames.filter((name) => minimatch(name, keyPattern));
+  for (const [keyPattern, targets] of Object.entries(
+    config.implicitDependencies,
+  )) {
+    const matchedSources = allProjectNames.filter((name) =>
+      minimatch(name, keyPattern),
+    );
 
     for (const target of targets) {
       if (!target.startsWith('!')) {
@@ -457,7 +474,9 @@ export function detectCrossRepoDependencies(
       }
 
       const stripped = target.slice(1);
-      const matchedTargets = allProjectNames.filter((name) => minimatch(name, stripped));
+      const matchedTargets = allProjectNames.filter((name) =>
+        minimatch(name, stripped),
+      );
 
       for (const source of matchedSources) {
         for (const tgt of matchedTargets) {
@@ -483,15 +502,21 @@ export function detectCrossRepoDependencies(
 
   const overrideEdges: RawProjectGraphDependency[] = [];
 
-  for (const [keyPattern, targets] of Object.entries(config.implicitDependencies)) {
-    const matchedSources = allProjectNames.filter((name) => minimatch(name, keyPattern));
+  for (const [keyPattern, targets] of Object.entries(
+    config.implicitDependencies,
+  )) {
+    const matchedSources = allProjectNames.filter((name) =>
+      minimatch(name, keyPattern),
+    );
 
     for (const target of targets) {
       if (target.startsWith('!')) {
         continue;
       }
 
-      const matchedTargets = allProjectNames.filter((name) => minimatch(name, target));
+      const matchedTargets = allProjectNames.filter((name) =>
+        minimatch(name, target),
+      );
 
       for (const source of matchedSources) {
         for (const tgt of matchedTargets) {

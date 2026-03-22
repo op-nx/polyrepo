@@ -13,7 +13,10 @@ describe('cross-repo dependencies', () => {
   const hostProject = '@workspace/source';
 
   beforeAll(async () => {
-    container = await startContainer(inject('snapshotImage'), 'cross-repo-deps');
+    container = await startContainer(
+      inject('snapshotImage'),
+      'cross-repo-deps',
+    );
   });
 
   afterAll(async () => {
@@ -41,7 +44,7 @@ describe('cross-repo dependencies', () => {
         '-c',
         'cd /workspace && node -e "' +
           "const p=require('./package.json');" +
-          "p.devDependencies=p.devDependencies||{};" +
+          'p.devDependencies=p.devDependencies||{};' +
           "p.devDependencies['@nx/devkit']='*';" +
           "require('fs').writeFileSync('package.json',JSON.stringify(p,null,2))" +
           '"',
@@ -75,8 +78,8 @@ describe('cross-repo dependencies', () => {
 
     // Discover an nx/* project to use as override target
     const preGraph = await getProjectGraph(container);
-    const overrideTarget = Object.keys(preGraph.nodes).find(
-      (name) => name.startsWith('nx/'),
+    const overrideTarget = Object.keys(preGraph.nodes).find((name) =>
+      name.startsWith('nx/'),
     );
 
     if (!overrideTarget) {
@@ -158,7 +161,14 @@ describe('cross-repo dependencies', () => {
     // This verifies the graph is computed from scratch, not served from
     // a stale Nx task cache (DAEMON-11).
     const result = await container.exec(
-      ['npx', 'nx', 'graph', '--print', '--skip-nx-cache', '--output-style=static'],
+      [
+        'npx',
+        'nx',
+        'graph',
+        '--print',
+        '--skip-nx-cache',
+        '--output-style=static',
+      ],
       { workingDir: '/workspace' },
     );
 
@@ -170,13 +180,18 @@ describe('cross-repo dependencies', () => {
     const parsed: {
       graph: {
         nodes: Record<string, unknown>;
-        dependencies: Record<string, Array<{ source: string; target: string; type: string }>>;
+        dependencies: Record<
+          string,
+          Array<{ source: string; target: string; type: string }>
+        >;
       };
     } = JSON.parse(result.stdout.substring(jsonStart));
 
     // Verify external projects from synced repo are present
     const projectNames = Object.keys(parsed.graph.nodes);
-    const externalProjects = projectNames.filter((name) => name.startsWith('nx/'));
+    const externalProjects = projectNames.filter((name) =>
+      name.startsWith('nx/'),
+    );
 
     expect(externalProjects.length).toBeGreaterThan(0);
 

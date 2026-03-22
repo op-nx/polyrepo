@@ -19,18 +19,18 @@ Two research tracks investigated independent solutions. **Approach A** (from `fi
 
 ## Decision Matrix
 
-| # | Criterion | Approach A: namedInputs override | Approach B: hybrid externalNodes | Winner |
-|---|-----------|----------------------------------|----------------------------------|--------|
-| 1 | Cross-repo edges in `nx graph --print` | YES -- edges use existing project names | YES -- edges target `repo:` prefixed names | A (preserves existing names) |
-| 2 | `nx graph` visualization | Normal project-to-project edges | Dual entries per external project (node + external) | A (cleaner graph) |
-| 3 | `nx test` / task running does NOT crash | YES -- no `ProjectFileSet` instructions generated for external deps | YES -- external nodes hashed by version, no file map | Tie |
-| 4 | External projects visible with tags/targets | YES -- unchanged, they remain regular project nodes | YES -- project nodes kept alongside external nodes | Tie |
-| 5 | `nx affected` works across repos | Partial -- edges exist but `.repos/` file changes invisible to `calculateFileChanges` | Same limitation -- `.repos/` still gitignored | Tie (both deferred to future milestone) |
-| 6 | Simplicity of implementation | One line added to `createNodesV2` + relax guard in `createDependencies` | Dual registration in `createNodesV2` + rename all edge targets + update detection logic | A (much simpler) |
-| 7 | Maintenance burden | Minimal -- standard Nx config pattern | Higher -- two representations to keep in sync, `repo:` naming convention | A |
-| 8 | User experience (edge semantics, naming) | Edges show `my-app -> nx/devkit` (natural) | Edges show `my-app -> repo:nx/devkit` (unfamiliar prefix) | A |
-| 9 | Risk of breakage with future Nx versions | LOW -- `namedInputs` is a stable, documented API | MEDIUM -- `CreateNodesResult.externalNodes` has zero first-party users | A |
-| 10 | Requires Nx core changes | NO | NO | Tie |
+| #   | Criterion                                   | Approach A: namedInputs override                                                      | Approach B: hybrid externalNodes                                                        | Winner                                  |
+| --- | ------------------------------------------- | ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | --------------------------------------- |
+| 1   | Cross-repo edges in `nx graph --print`      | YES -- edges use existing project names                                               | YES -- edges target `repo:` prefixed names                                              | A (preserves existing names)            |
+| 2   | `nx graph` visualization                    | Normal project-to-project edges                                                       | Dual entries per external project (node + external)                                     | A (cleaner graph)                       |
+| 3   | `nx test` / task running does NOT crash     | YES -- no `ProjectFileSet` instructions generated for external deps                   | YES -- external nodes hashed by version, no file map                                    | Tie                                     |
+| 4   | External projects visible with tags/targets | YES -- unchanged, they remain regular project nodes                                   | YES -- project nodes kept alongside external nodes                                      | Tie                                     |
+| 5   | `nx affected` works across repos            | Partial -- edges exist but `.repos/` file changes invisible to `calculateFileChanges` | Same limitation -- `.repos/` still gitignored                                           | Tie (both deferred to future milestone) |
+| 6   | Simplicity of implementation                | One line added to `createNodesV2` + relax guard in `createDependencies`               | Dual registration in `createNodesV2` + rename all edge targets + update detection logic | A (much simpler)                        |
+| 7   | Maintenance burden                          | Minimal -- standard Nx config pattern                                                 | Higher -- two representations to keep in sync, `repo:` naming convention                | A                                       |
+| 8   | User experience (edge semantics, naming)    | Edges show `my-app -> nx/devkit` (natural)                                            | Edges show `my-app -> repo:nx/devkit` (unfamiliar prefix)                               | A                                       |
+| 9   | Risk of breakage with future Nx versions    | LOW -- `namedInputs` is a stable, documented API                                      | MEDIUM -- `CreateNodesResult.externalNodes` has zero first-party users                  | A                                       |
+| 10  | Requires Nx core changes                    | NO                                                                                    | NO                                                                                      | Tie                                     |
 
 **Score: Approach A wins 6 criteria, Approach B wins 0, 4 ties.**
 
@@ -144,13 +144,13 @@ The 3 failing cross-repo e2e tests (`cross-repo-deps.spec.ts`) should now pass s
 
 ## Risks and Mitigations
 
-| Risk | Severity | Mitigation |
-|------|----------|------------|
-| Future Nx version adds a new implicitly-expanded named input beyond "default" | LOW | Monitor `DEFAULT_INPUTS` in `inputs.rs` across Nx releases. If a new named input is added, override it too. |
-| `ProjectConfiguration` hash changes when external project config changes | NEGLIGIBLE | This is correct behavior -- the project config hash SHOULD change when we update the external project's registration. |
-| `TsConfiguration` hash fails for external projects without tsconfig | LOW | `hash_tsconfig_selectively` gracefully handles missing tsconfig files -- returns empty hash. |
-| Workspace-level `namedInputs` (e.g., "production") reference file patterns | NEGLIGIBLE | Only matters if someone explicitly configures a target with `inputs: [{ input: "production", dependencies: true }]` AND the production named input includes file globs. The empty "default" override does not affect other named inputs. |
-| `.nxignore` vs `.gitignore` interaction | NONE | The fix does not depend on which ignore file excludes `.repos/`. It works regardless of file walker behavior because it prevents file map lookups entirely. |
+| Risk                                                                          | Severity   | Mitigation                                                                                                                                                                                                                               |
+| ----------------------------------------------------------------------------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Future Nx version adds a new implicitly-expanded named input beyond "default" | LOW        | Monitor `DEFAULT_INPUTS` in `inputs.rs` across Nx releases. If a new named input is added, override it too.                                                                                                                              |
+| `ProjectConfiguration` hash changes when external project config changes      | NEGLIGIBLE | This is correct behavior -- the project config hash SHOULD change when we update the external project's registration.                                                                                                                    |
+| `TsConfiguration` hash fails for external projects without tsconfig           | LOW        | `hash_tsconfig_selectively` gracefully handles missing tsconfig files -- returns empty hash.                                                                                                                                             |
+| Workspace-level `namedInputs` (e.g., "production") reference file patterns    | NEGLIGIBLE | Only matters if someone explicitly configures a target with `inputs: [{ input: "production", dependencies: true }]` AND the production named input includes file globs. The empty "default" override does not affect other named inputs. |
+| `.nxignore` vs `.gitignore` interaction                                       | NONE       | The fix does not depend on which ignore file excludes `.repos/`. It works regardless of file walker behavior because it prevents file map lookups entirely.                                                                              |
 
 ---
 
@@ -170,13 +170,13 @@ The 3 failing cross-repo e2e tests (`cross-repo-deps.spec.ts`) should now pass s
 
 ## Confidence Assessment
 
-| Area | Confidence | Notes |
-|------|------------|-------|
-| Crash root cause | HIGH | Traced exact Rust call chain from `nx test` to `collect_project_files` error |
-| namedInputs override mechanism | HIGH | Verified `get_named_inputs()` project-level override in `inputs.rs` source |
-| Hash planner behavior with empty default | HIGH | Traced through `gather_self_inputs`, `gather_dependency_inputs`, confirmed no `ProjectFileSet` generated |
-| externalNodes API correctness | HIGH | Verified types, merge logic, and hash behavior from source |
-| Approach comparison | HIGH | Both approaches analyzed against same source code; tradeoffs are objective |
+| Area                                     | Confidence | Notes                                                                                                    |
+| ---------------------------------------- | ---------- | -------------------------------------------------------------------------------------------------------- |
+| Crash root cause                         | HIGH       | Traced exact Rust call chain from `nx test` to `collect_project_files` error                             |
+| namedInputs override mechanism           | HIGH       | Verified `get_named_inputs()` project-level override in `inputs.rs` source                               |
+| Hash planner behavior with empty default | HIGH       | Traced through `gather_self_inputs`, `gather_dependency_inputs`, confirmed no `ProjectFileSet` generated |
+| externalNodes API correctness            | HIGH       | Verified types, merge logic, and hash behavior from source                                               |
+| Approach comparison                      | HIGH       | Both approaches analyzed against same source code; tradeoffs are objective                               |
 
 **Overall confidence: HIGH** -- All findings verified against primary Nx 22.x Rust and TypeScript source code. No inference or community hearsay.
 
@@ -191,6 +191,7 @@ The 3 failing cross-repo e2e tests (`cross-repo-deps.spec.ts`) should now pass s
 ## Sources
 
 ### Primary (HIGH confidence)
+
 - `packages/nx/src/native/tasks/hash_planner.rs` -- Hash plan generation, dependency traversal, `gather_dependency_inputs` (lines 306-358)
 - `packages/nx/src/native/tasks/inputs.rs` -- Input expansion, `get_named_inputs`, `DEFAULT_INPUTS` (lines 14-289)
 - `packages/nx/src/native/tasks/hashers/hash_project_files.rs` -- Crash site: `collect_project_files` (line 54)
@@ -202,10 +203,12 @@ The 3 failing cross-repo e2e tests (`cross-repo-deps.spec.ts`) should now pass s
 - `packages/nx/src/config/project-graph.ts` -- `ProjectGraph`, `ProjectGraphExternalNode` interfaces
 
 ### Detailed Research Files
+
 - `.planning/research/filemap-guard-nx-source.md` -- Full Rust call chain analysis, Solution F recommendation
 - `.planning/research/external-nodes-api.md` -- externalNodes API analysis, hybrid approach recommendation
 
 ---
-*Research synthesized: 2026-03-19*
-*Decision: Approach A (namedInputs override)*
-*Ready for implementation: yes*
+
+_Research synthesized: 2026-03-19_
+_Decision: Approach A (namedInputs override)_
+_Ready for implementation: yes_

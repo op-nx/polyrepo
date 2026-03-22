@@ -45,6 +45,7 @@ Host Nx process
 ```
 
 **The dominant sub-step is #3: `@nx/gradle` JVM cold start.** The Gradle plugin runs `nxProjectGraph` as a Gradle task, which requires:
+
 - JVM startup (~10-20s cold)
 - Gradle daemon initialization (~30-60s cold, no daemon running)
 - Gradle project evaluation and task execution (~30-60s for nrwl/nx's Gradle setup)
@@ -58,19 +59,20 @@ RUN cd /synced-nx && npx nx graph --print > /dev/null 2>&1 || true
 ```
 
 This warms:
+
 1. **`.nx/workspace-data/`** -- file-map cache, project-graph cache, source maps
 2. **Gradle daemon** -- a running JVM process with warm JIT caches
 3. **Native file cache** -- Nx's Rust `.node` binaries cached in `/tmp/nx-native-file-cache-<hash>`
 
 But after `COPY --link --from=nx-prep /synced-nx /workspace/.repos/nx`:
 
-| What Was Warmed | Survives COPY? | Why? |
-|-----------------|---------------|------|
-| `.nx/workspace-data/` | YES (files preserved) | Docker COPY preserves file content |
-| Gradle daemon process | **NO** | Processes don't survive between Docker layers |
-| JVM JIT compilation cache | **NO** | In-process memory, not on disk |
-| Native file cache in `/tmp/` | **NO** | `/tmp/` is not part of the COPY source |
-| pnpm store (BuildKit cache mount) | **NO** | BuildKit cache mounts are host-side only |
+| What Was Warmed                   | Survives COPY?        | Why?                                          |
+| --------------------------------- | --------------------- | --------------------------------------------- |
+| `.nx/workspace-data/`             | YES (files preserved) | Docker COPY preserves file content            |
+| Gradle daemon process             | **NO**                | Processes don't survive between Docker layers |
+| JVM JIT compilation cache         | **NO**                | In-process memory, not on disk                |
+| Native file cache in `/tmp/`      | **NO**                | `/tmp/` is not part of the COPY source        |
+| pnpm store (BuildKit cache mount) | **NO**                | BuildKit cache mounts are host-side only      |
 
 Even though `.nx/workspace-data/` survives, Nx's `buildProjectGraphAndSourceMapsWithoutDaemon()` still calls ALL plugins:
 
@@ -91,10 +93,18 @@ From `node_modules/nx/src/project-graph/utils/retrieve-workspace-files.js`:
 
 ```javascript
 async function retrieveProjectConfigurations(plugins, workspaceRoot, nxJson) {
-    const pluginsWithCreateNodes = plugins.filter((p) => !!p.createNodes);
-    const globPatterns = getGlobPatternsOfPlugins(pluginsWithCreateNodes);
-    const pluginConfigFiles = await multiGlobWithWorkspaceContext(workspaceRoot, globPatterns);
-    return createProjectConfigurationsWithPlugins(workspaceRoot, nxJson, pluginConfigFiles, pluginsWithCreateNodes);
+  const pluginsWithCreateNodes = plugins.filter((p) => !!p.createNodes);
+  const globPatterns = getGlobPatternsOfPlugins(pluginsWithCreateNodes);
+  const pluginConfigFiles = await multiGlobWithWorkspaceContext(
+    workspaceRoot,
+    globPatterns,
+  );
+  return createProjectConfigurationsWithPlugins(
+    workspaceRoot,
+    nxJson,
+    pluginConfigFiles,
+    pluginsWithCreateNodes,
+  );
 }
 ```
 
@@ -106,25 +116,26 @@ There is no "skip plugins if cache is valid" path. Plugins ALWAYS execute.
 
 The nrwl/nx monorepo at v22.5.4 has 18 plugin entries in `nx.json`:
 
-| Plugin | Estimated Cold createNodes Time | Why Slow |
-|--------|-------------------------------|----------|
-| `@nx/gradle` | **1-3 minutes** | JVM startup + Gradle daemon init + project evaluation |
-| `@nx/storybook/plugin` | 10-30s | Walks many Storybook configs ([GitHub #31276](https://github.com/nrwl/nx/issues/31276), [#32737](https://github.com/nrwl/nx/issues/32737)) |
-| `@nx/js/typescript` (x2) | 5-15s each | TypeScript config resolution across 149 projects |
-| `@nx/vite/plugin` (x2) | 3-10s each | Vite config detection |
-| `@nx/eslint/plugin` | 5-10s | ESLint config scanning |
-| `@nx/jest/plugin` (x3) | 3-5s each | Jest config detection |
-| `@nx/playwright/plugin` | 2-5s | Playwright config scanning |
-| `@nx/webpack/plugin` | 2-5s | Webpack config scanning |
-| `@nx/next/plugin` | 2-5s | Next.js config detection |
-| `@nx/rspack/plugin` | 2-5s | Rspack config scanning |
-| `@nx/vitest` (x2) | 2-5s each | Vitest config detection |
-| `@monodon/rust` | 1-3s | Rust/Cargo.toml scanning |
-| `@nx/enterprise-cloud` | 1-2s | Cloud config |
+| Plugin                   | Estimated Cold createNodes Time | Why Slow                                                                                                                                   |
+| ------------------------ | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `@nx/gradle`             | **1-3 minutes**                 | JVM startup + Gradle daemon init + project evaluation                                                                                      |
+| `@nx/storybook/plugin`   | 10-30s                          | Walks many Storybook configs ([GitHub #31276](https://github.com/nrwl/nx/issues/31276), [#32737](https://github.com/nrwl/nx/issues/32737)) |
+| `@nx/js/typescript` (x2) | 5-15s each                      | TypeScript config resolution across 149 projects                                                                                           |
+| `@nx/vite/plugin` (x2)   | 3-10s each                      | Vite config detection                                                                                                                      |
+| `@nx/eslint/plugin`      | 5-10s                           | ESLint config scanning                                                                                                                     |
+| `@nx/jest/plugin` (x3)   | 3-5s each                       | Jest config detection                                                                                                                      |
+| `@nx/playwright/plugin`  | 2-5s                            | Playwright config scanning                                                                                                                 |
+| `@nx/webpack/plugin`     | 2-5s                            | Webpack config scanning                                                                                                                    |
+| `@nx/next/plugin`        | 2-5s                            | Next.js config detection                                                                                                                   |
+| `@nx/rspack/plugin`      | 2-5s                            | Rspack config scanning                                                                                                                     |
+| `@nx/vitest` (x2)        | 2-5s each                       | Vitest config detection                                                                                                                    |
+| `@monodon/rust`          | 1-3s                            | Rust/Cargo.toml scanning                                                                                                                   |
+| `@nx/enterprise-cloud`   | 1-2s                            | Cloud config                                                                                                                               |
 
 **Total estimated cold plugin time: ~2.5-5 minutes**, dominated by `@nx/gradle` at ~1-3 minutes.
 
 Sources:
+
 - [nrwl/nx #32872: @nx/gradle plugin fails without Java](https://github.com/nrwl/nx/issues/32872)
 - [nrwl/nx #31835: @nx/gradle extremely slow](https://github.com/nrwl/nx/issues/31835)
 - [nrwl/nx #31276: @nx/storybook slow](https://github.com/nrwl/nx/issues/31276)
@@ -148,15 +159,15 @@ Even if we could pre-compute the cache file, the hash would need to match at run
 
 ```typescript
 // cache.ts computeOuterHash:
-hashArray([optionsHash, alias, headSha, dirtyFiles])
+hashArray([optionsHash, alias, headSha, dirtyFiles]);
 ```
 
-| Component | Dockerfile Value | Runtime Value | Match? |
-|-----------|-----------------|---------------|--------|
-| `optionsHash` | N/A (plugin not installed) | `hashObject({nx: {url:'file:///repos/nx', depth:1, ref:'22.5.4'}})` | N/A |
-| `alias` | N/A | `'nx'` | N/A |
-| `headSha` | SHA of nrwl/nx@22.5.4 | Same SHA (COPY preserves .git) | YES |
-| `dirtyFiles` | `''` (clean clone) | `''` (COPY preserves content, git sees no diff) | YES |
+| Component     | Dockerfile Value           | Runtime Value                                                       | Match? |
+| ------------- | -------------------------- | ------------------------------------------------------------------- | ------ |
+| `optionsHash` | N/A (plugin not installed) | `hashObject({nx: {url:'file:///repos/nx', depth:1, ref:'22.5.4'}})` | N/A    |
+| `alias`       | N/A                        | `'nx'`                                                              | N/A    |
+| `headSha`     | SHA of nrwl/nx@22.5.4      | Same SHA (COPY preserves .git)                                      | YES    |
+| `dirtyFiles`  | `''` (clean clone)         | `''` (COPY preserves content, git sees no diff)                     | YES    |
 
 If we pre-computed the cache file with the correct `optionsHash`, the hash would match at runtime. This is a viable optimization path.
 
@@ -171,6 +182,7 @@ If we pre-computed the cache file with the correct `optionsHash`, the hash would
 **Implementation:**
 
 Dockerfile change (Stage 1):
+
 ```dockerfile
 # Capture graph JSON to a file instead of discarding it
 RUN cd /synced-nx && npx nx graph --print > /synced-nx/.nx-graph-output.json 2>/dev/null || true
@@ -179,13 +191,16 @@ RUN cd /synced-nx && npx nx graph --print > /synced-nx/.nx-graph-output.json 2>/
 This file gets COPY'd to `/workspace/.repos/nx/.nx-graph-output.json`.
 
 Plugin change (extract.ts): Add a "cached JSON file" fast path:
+
 ```typescript
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const CACHED_GRAPH_FILENAME = '.nx-graph-output.json';
 
-export function extractGraphFromRepo(repoPath: string): Promise<ExternalGraphJson> {
+export function extractGraphFromRepo(
+  repoPath: string,
+): Promise<ExternalGraphJson> {
   // Fast path: pre-computed graph JSON from Docker build
   const cachedPath = join(repoPath, CACHED_GRAPH_FILENAME);
 
@@ -194,7 +209,9 @@ export function extractGraphFromRepo(repoPath: string): Promise<ExternalGraphJso
     const jsonStart = raw.indexOf('{');
 
     if (jsonStart >= 0) {
-      const result = externalGraphJsonSchema.safeParse(JSON.parse(raw.substring(jsonStart)));
+      const result = externalGraphJsonSchema.safeParse(
+        JSON.parse(raw.substring(jsonStart)),
+      );
 
       if (result.success) {
         return Promise.resolve(result.data);
@@ -208,12 +225,14 @@ export function extractGraphFromRepo(repoPath: string): Promise<ExternalGraphJso
 ```
 
 **Pros:**
+
 - Eliminates the entire child process (~4m42s -> ~1-2s for file read + JSON parse)
 - No JVM startup, no plugin loading, no file scanning
 - Works for any child repo, not just nrwl/nx
 - Minimal code change (add fast path to existing function)
 
 **Cons:**
+
 - Couples Docker build to plugin internals (must know to save the JSON)
 - The cached JSON could become stale if .repos/nx/ content changes at runtime (e.g., polyrepo-sync modifies files)
 - Adds a convention that Docker builders must follow
@@ -237,10 +256,12 @@ export function extractGraphFromRepo(repoPath: string): Promise<ExternalGraphJso
 This essentially moves Phases 3-5 of global-setup.ts into the Dockerfile.
 
 **Pros:**
+
 - No plugin code changes needed
 - Clean architectural boundary (all warming happens in Docker)
 
 **Cons:**
+
 - Requires installing the plugin during Docker build (needs Verdaccio or local tarball)
 - Makes the Docker build SLOWER (adds the 4m42s to Docker build time)
 - Only moves the cost, doesn't eliminate it
@@ -265,6 +286,7 @@ This essentially moves Phases 3-5 of global-setup.ts into the Dockerfile.
 **Implementation:**
 
 Dockerfile change:
+
 ```dockerfile
 # Remove @nx/gradle from the child repo's nx.json to avoid JVM startup
 RUN cd /synced-nx && node -e "
@@ -278,11 +300,13 @@ RUN cd /synced-nx && node -e "
 ```
 
 **Pros:**
+
 - No plugin code changes needed
 - Eliminates ~2-4 minutes of JVM + Storybook overhead
 - Simple Docker-side change
 
 **Cons:**
+
 - Loses Gradle-discovered projects from the graph (may or may not matter for e2e tests)
 - Fragile -- depends on plugin naming conventions
 - The pre-warmed `.nx/workspace-data/` cache from Stage 1 would be invalidated (different plugins = `shouldRecomputeWholeGraph` returns true because `nxJsonPlugins` hash changes)
@@ -300,12 +324,16 @@ RUN cd /synced-nx && node -e "
 **Implementation:**
 
 ```typescript
-export function extractGraphFromRepo(repoPath: string): Promise<ExternalGraphJson> {
+export function extractGraphFromRepo(
+  repoPath: string,
+): Promise<ExternalGraphJson> {
   const startTime = Date.now();
   // ... existing code ...
   // In the callback:
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-  console.log(`[polyrepo] extractGraphFromRepo ${repoPath} completed in ${elapsed}s`);
+  console.log(
+    `[polyrepo] extractGraphFromRepo ${repoPath} completed in ${elapsed}s`,
+  );
 }
 ```
 
@@ -335,6 +363,7 @@ Note: `NX_PERF_LOGGING` writes to stderr, not stdout, so it won't contaminate th
 **Approach:** Use a lighter-weight command to get project metadata without full graph construction.
 
 Candidates:
+
 - `nx show projects --json` -- returns project list but NOT full graph (no dependencies, no targets)
 - `nx print-affected` -- different purpose (affected analysis)
 - Reading `project.json` / `package.json` files directly -- loses plugin-inferred targets
@@ -420,12 +449,12 @@ Docker COPY preserves file content but modifies timestamps. Git tracks content, 
 
 ### The Outer Hash Components
 
-| Component | After COPY | Stability |
-|-----------|-----------|-----------|
-| `optionsHash` | Deterministic (same nx.json) | STABLE |
-| `alias` | `'nx'` | STABLE |
-| `headSha` | Same as clone source | STABLE |
-| `dirtyFiles` | `''` (COPY preserves content) | STABLE |
+| Component     | After COPY                    | Stability |
+| ------------- | ----------------------------- | --------- |
+| `optionsHash` | Deterministic (same nx.json)  | STABLE    |
+| `alias`       | `'nx'`                        | STABLE    |
+| `headSha`     | Same as clone source          | STABLE    |
+| `dirtyFiles`  | `''` (COPY preserves content) | STABLE    |
 
 **Conclusion:** The outer hash computed at runtime is deterministic and reproducible. If a cache file with the correct hash existed, it would be a cache hit.
 
@@ -433,16 +462,17 @@ Docker COPY preserves file content but modifies timestamps. Git tracks content, 
 
 ## 8. Docker COPY Behavior Summary (HIGH confidence)
 
-| Property | Dockerfile COPY Behavior | Impact on Our Pipeline |
-|----------|------------------------|----------------------|
-| File content | Preserved exactly | Content hashes match |
-| File timestamps | **NOT preserved** (set to build time) | git stat cache invalidated, minor overhead |
-| Symlinks | **Dereferenced** (target copied, not link) | pnpm node_modules structure may break if hard-linked |
-| `.git/` directory | Copied as regular files | git operations work correctly |
-| File permissions | Preserved (with caveats for git context) | No impact |
-| Running processes | Not applicable (COPYs files, not processes) | Gradle daemon lost |
+| Property          | Dockerfile COPY Behavior                    | Impact on Our Pipeline                               |
+| ----------------- | ------------------------------------------- | ---------------------------------------------------- |
+| File content      | Preserved exactly                           | Content hashes match                                 |
+| File timestamps   | **NOT preserved** (set to build time)       | git stat cache invalidated, minor overhead           |
+| Symlinks          | **Dereferenced** (target copied, not link)  | pnpm node_modules structure may break if hard-linked |
+| `.git/` directory | Copied as regular files                     | git operations work correctly                        |
+| File permissions  | Preserved (with caveats for git context)    | No impact                                            |
+| Running processes | Not applicable (COPYs files, not processes) | Gradle daemon lost                                   |
 
 Sources:
+
 - [Docker COPY reference](https://docs.docker.com/reference/dockerfile/#copy)
 - [Docker forum: timestamps not preserved](https://forums.docker.com/t/dockerfile-need-to-preserve-timestamps-of-files-copy-add/76224)
 - [moby/moby#23511: Feature request for timestamp preservation](https://github.com/moby/moby/issues/23511)
@@ -475,6 +505,7 @@ Sources:
 ## Sources
 
 ### Primary (HIGH confidence)
+
 - `node_modules/nx/src/project-graph/project-graph.js` -- `buildProjectGraphAndSourceMapsWithoutDaemon()` always calls `getPlugins()` and `retrieveProjectConfigurations()`
 - `node_modules/nx/src/project-graph/nx-deps-cache.js` -- `shouldRecomputeWholeGraph()` checks nxVersion, nxJsonPlugins, pathMappings, pluginsConfig
 - `node_modules/nx/src/project-graph/utils/retrieve-workspace-files.js` -- `retrieveProjectConfigurations()` always runs all plugins
@@ -486,6 +517,7 @@ Sources:
 - `packages/op-nx-polyrepo-e2e/src/setup/global-setup.ts` -- Phase 5 graph cache warming
 
 ### Secondary (MEDIUM confidence)
+
 - [nrwl/nx #32872: @nx/gradle fails without Java](https://github.com/nrwl/nx/issues/32872) -- Confirms @nx/gradle is active in nrwl/nx nx.json
 - [nrwl/nx #31835: @nx/gradle extremely slow](https://github.com/nrwl/nx/issues/31835) -- JVM cold start cost documented
 - [nrwl/nx #31276: @nx/storybook slow](https://github.com/nrwl/nx/issues/31276) -- Storybook plugin takes 13-27s
@@ -494,6 +526,7 @@ Sources:
 - [Docker COPY reference](https://docs.docker.com/reference/dockerfile/#copy) -- COPY dereferences symlinks, doesn't preserve timestamps
 
 ### Tertiary (LOW confidence)
+
 - Plugin-by-plugin time estimates are extrapolated from GitHub issues and general Nx benchmarks, not measured in this specific container environment
 
 ---
@@ -501,6 +534,7 @@ Sources:
 ## Metadata
 
 **Confidence breakdown:**
+
 - Root cause (plugins always execute): HIGH -- verified from Nx source code
 - @nx/gradle as dominant cost: MEDIUM-HIGH -- consistent with multiple GitHub issues, but not measured in this container
 - Docker COPY behavior: HIGH -- verified from Docker docs + source code

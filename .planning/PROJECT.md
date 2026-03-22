@@ -39,6 +39,7 @@ An open-source Nx plugin for synthetic monorepos. Merges project graphs from mul
 **Goal:** Harden existing features — fix temp directory naming, upgrade dependency edges to static type, and enable host-level caching for proxy targets.
 
 **Target features:**
+
 - Rename .tmp to tmp in child repo temp directories
 - Migrate auto-detected cross-repo edges from implicit to static
 - Enable host-level caching for proxy targets using runtime inputs tied to child repo git HEAD
@@ -72,6 +73,7 @@ Plugin package: `@op-nx/polyrepo` at `packages/op-nx-polyrepo/`.
 361 unit tests passing, 8 container-based e2e tests (cross-repo deps, daemon modes).
 
 Known issues:
+
 - DETECT-07 deferral: `nx affected` edge traversal works but `.repos/` gitignored blocks `calculateFileChanges()` — future `polyrepo-affected` executor needed
 - Pop-over cmd windows on Windows: Nx `runCommandsImpl` spawns without `windowsHide`
 - Scaling: ~4s for 150 projects from cached graph; may need optimization for 500+ project workspaces
@@ -86,28 +88,29 @@ Known issues:
 
 ## Key Decisions
 
-| Decision | Rationale | Outcome |
-|----------|-----------|---------|
-| Git clone/pull for repo assembly | Cross-platform, portable, full control over branch/commit | [x] Good -- shipped v1.0 |
-| Config in nx.json plugin options | Nx-native approach, repos configured where plugins are | [x] Good -- shipped v1.0 |
-| Namespace external projects by repo name | Avoids collisions when repos have same project names | [x] Good -- shipped v1.0 |
-| Shell out to `nx graph --print` for extraction | Each repo is a full Nx workspace with own plugins | [x] Good -- correct approach |
-| Three-layer per-repo cache (memory + disk + extraction) | Avoids re-extraction; selective invalidation per repo | [x] Good -- v1.1 upgrade from monolithic |
-| exec() not execFile() for child processes | .bin/* are .cmd shims on Windows | [x] Good -- cross-platform |
-| Corepack detection via packageManager field | Supports pnpm/yarn managed by corepack | [x] Good -- tested with nrwl/nx |
-| Zod schemas at all JSON.parse boundaries | Runtime validation with type inference | [x] Good -- 4+ boundaries covered |
-| SIFERS test pattern (no beforeEach/afterEach) | Typed mocks, explicit setup, better isolation | [x] Good -- 361 tests pass |
-| testcontainers for e2e | Isolated Docker env, prebaked fixtures, no host pollution | [x] Good -- 8 e2e tests |
-| Sanitize stdout by slicing from first '{' | Handles unknown contamination sources in nx output | [x] Good -- robust |
-| DependencyType.implicit for cross-repo edges | Static requires sourceFile in fileMap; .repos/ gitignored prevents this | [x] Good -- v1.1 |
-| External packageName wins on lookup map collision | External cross-repo edges resolve to correct external project | [x] Good -- v1.1 |
-| __host__ sentinel for host project repo alias | Uniform cross-repo guard logic | [x] Good -- v1.1 |
-| Negation as post-filter (not inline skip) | Clean separation: auto-detect accumulates, then negation filters | [x] Good -- v1.1 |
-| Per-repo hash: hashArray([reposConfigHash, alias, headSha, dirtyFiles]) | Lockfile hash unnecessary; repo state + config sufficient | [x] Good -- v1.1 |
-| Backoff formula min(2000*2^(n-1), 30000)ms | Prevents extraction storms on persistent failures | [x] Good -- v1.1 |
-| ensureTargetDefaultsShield auto-injected by createNodesV2 | Prevents host targetDefaults from leaking into proxy targets | [x] Good -- v1.1 |
-| rewriteDependsOn preserves external dependsOn | Proxy targets maintain correct task ordering from external repo | [x] Good -- v1.1 |
-| Proxy executor env isolation (TEMP, NX_DAEMON, NX_WORKSPACE_DATA_DIRECTORY) | Prevents SQLite WAL lock contention between host and child Nx | [x] Good -- v1.1 |
+| Decision                                                                    | Rationale                                                               | Outcome                                  |
+| --------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ---------------------------------------- |
+| Git clone/pull for repo assembly                                            | Cross-platform, portable, full control over branch/commit               | [x] Good -- shipped v1.0                 |
+| Config in nx.json plugin options                                            | Nx-native approach, repos configured where plugins are                  | [x] Good -- shipped v1.0                 |
+| Namespace external projects by repo name                                    | Avoids collisions when repos have same project names                    | [x] Good -- shipped v1.0                 |
+| Shell out to `nx graph --print` for extraction                              | Each repo is a full Nx workspace with own plugins                       | [x] Good -- correct approach             |
+| Three-layer per-repo cache (memory + disk + extraction)                     | Avoids re-extraction; selective invalidation per repo                   | [x] Good -- v1.1 upgrade from monolithic |
+| exec() not execFile() for child processes                                   | .bin/\* are .cmd shims on Windows                                       | [x] Good -- cross-platform               |
+| Corepack detection via packageManager field                                 | Supports pnpm/yarn managed by corepack                                  | [x] Good -- tested with nrwl/nx          |
+| Zod schemas at all JSON.parse boundaries                                    | Runtime validation with type inference                                  | [x] Good -- 4+ boundaries covered        |
+| SIFERS test pattern (no beforeEach/afterEach)                               | Typed mocks, explicit setup, better isolation                           | [x] Good -- 361 tests pass               |
+| testcontainers for e2e                                                      | Isolated Docker env, prebaked fixtures, no host pollution               | [x] Good -- 8 e2e tests                  |
+| Sanitize stdout by slicing from first '{'                                   | Handles unknown contamination sources in nx output                      | [x] Good -- robust                       |
+| DependencyType.implicit for cross-repo edges                                | Static requires sourceFile in fileMap; .repos/ gitignored prevents this | [x] Good -- v1.1                         |
+| External packageName wins on lookup map collision                           | External cross-repo edges resolve to correct external project           | [x] Good -- v1.1                         |
+| **host** sentinel for host project repo alias                               | Uniform cross-repo guard logic                                          | [x] Good -- v1.1                         |
+| Negation as post-filter (not inline skip)                                   | Clean separation: auto-detect accumulates, then negation filters        | [x] Good -- v1.1                         |
+| Per-repo hash: hashArray([reposConfigHash, alias, headSha, dirtyFiles])     | Lockfile hash unnecessary; repo state + config sufficient               | [x] Good -- v1.1                         |
+| Backoff formula min(2000\*2^(n-1), 30000)ms                                 | Prevents extraction storms on persistent failures                       | [x] Good -- v1.1                         |
+| ensureTargetDefaultsShield auto-injected by createNodesV2                   | Prevents host targetDefaults from leaking into proxy targets            | [x] Good -- v1.1                         |
+| rewriteDependsOn preserves external dependsOn                               | Proxy targets maintain correct task ordering from external repo         | [x] Good -- v1.1                         |
+| Proxy executor env isolation (TEMP, NX_DAEMON, NX_WORKSPACE_DATA_DIRECTORY) | Prevents SQLite WAL lock contention between host and child Nx           | [x] Good -- v1.1                         |
 
 ---
-*Last updated: 2026-03-22 after v1.2 milestone start*
+
+_Last updated: 2026-03-22 after v1.2 milestone start_

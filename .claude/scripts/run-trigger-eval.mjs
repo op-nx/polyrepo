@@ -17,10 +17,12 @@ import { resolve } from 'node:path';
 
 // --- Parse CLI args ---
 const args = process.argv.slice(2);
-const skillName = args.find(a => !a.startsWith('--'));
+const skillName = args.find((a) => !a.startsWith('--'));
 
 if (!skillName) {
-  console.error('Usage: run-trigger-eval.mjs <skill-name> [--model <id>] [--max-turns <n>]');
+  console.error(
+    'Usage: run-trigger-eval.mjs <skill-name> [--model <id>] [--max-turns <n>]',
+  );
   process.exit(1);
 }
 
@@ -45,14 +47,18 @@ const resultsPath = resolve(workspace, 'trigger-results.json');
 
 if (!existsSync(evalSetPath)) {
   console.error(`[ERROR] Eval set not found: ${evalSetPath}`);
-  console.error(`Create ${evalSetPath} with [{query, should_trigger}] entries.`);
+  console.error(
+    `Create ${evalSetPath} with [{query, should_trigger}] entries.`,
+  );
   process.exit(1);
 }
 
 // --- Run eval ---
 const evalSet = JSON.parse(readFileSync(evalSetPath, 'utf8'));
 console.log(`[INFO] Skill: ${skillName}`);
-console.log(`[INFO] Running trigger eval: ${evalSet.length} queries, model=${model}, max-turns=${maxTurns}`);
+console.log(
+  `[INFO] Running trigger eval: ${evalSet.length} queries, model=${model}, max-turns=${maxTurns}`,
+);
 
 const results = [];
 let passCount = 0;
@@ -151,21 +157,27 @@ for (let i = 0; i < evalSet.length; i++) {
   }
 
   const status = pass ? 'PASS' : 'FAIL';
-  console.log(`  [${status}] expected=${shouldTrigger} triggered=${triggered}: ${displayQuery}...`);
+  console.log(
+    `  [${status}] expected=${shouldTrigger} triggered=${triggered}: ${displayQuery}...`,
+  );
 
   results.push({ query, should_trigger: shouldTrigger, triggered, pass });
 }
 
 console.log('');
 console.log('============================================================');
-console.log(`Results: ${passCount}/${evalSet.length} passed, ${failCount} failed`);
+console.log(
+  `Results: ${passCount}/${evalSet.length} passed, ${failCount} failed`,
+);
 console.log('============================================================');
 console.log('');
 
-const failures = results.filter(r => !r.pass);
+const failures = results.filter((r) => !r.pass);
 
 for (const f of failures) {
-  console.log(`  FAIL: expected=${f.should_trigger} triggered=${f.triggered}: ${f.query.slice(0, 80)}...`);
+  console.log(
+    `  FAIL: expected=${f.should_trigger} triggered=${f.triggered}: ${f.query.slice(0, 80)}...`,
+  );
 }
 
 writeFileSync(resultsPath, JSON.stringify(results, null, 2));

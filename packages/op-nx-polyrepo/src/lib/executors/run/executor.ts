@@ -27,10 +27,10 @@ export default async function runExecutor(
   options: RunExecutorOptions,
   context: ExecutorContext,
 ): Promise<{ success: boolean }> {
-  const repoPath = normalizePath(join(context.root, '.repos', options.repoAlias));
-  const nxBin = normalizePath(
-    join(repoPath, 'node_modules', '.bin', 'nx'),
+  const repoPath = normalizePath(
+    join(context.root, '.repos', options.repoAlias),
   );
+  const nxBin = normalizePath(join(repoPath, 'node_modules', '.bin', 'nx'));
 
   const command = `"${nxBin}" run ${options.originalProject}:${options.targetName}`;
 

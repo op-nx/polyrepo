@@ -9,7 +9,12 @@ vi.mock('node:fs', async (importOriginal) => {
 });
 
 vi.mock('nx/src/executors/run-commands/run-commands.impl', () => ({
-  default: vi.fn<(...args: unknown[]) => Promise<{ success: boolean; terminalOutput: string }>>(),
+  default:
+    vi.fn<
+      (
+        ...args: unknown[]
+      ) => Promise<{ success: boolean; terminalOutput: string }>
+    >(),
 }));
 
 import runExecutor from './executor';

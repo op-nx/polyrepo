@@ -47,7 +47,13 @@ function createChildProcessStub(): ChildProcess {
     stdin: null,
     stdout: null,
     stderr: null,
-    stdio: [null, null, null, undefined, undefined] satisfies ChildProcess['stdio'],
+    stdio: [
+      null,
+      null,
+      null,
+      undefined,
+      undefined,
+    ] satisfies ChildProcess['stdio'],
     pid: undefined,
     connected: false,
     exitCode: null,
@@ -80,16 +86,18 @@ function mockExecFileImpl(
     callback: ExecFileCallback | undefined,
   ) => void,
 ): void {
-  mock.mockImplementation((
-    _file: string,
-    _args: readonly string[] | null | undefined,
-    _options: unknown,
-    callback?: ExecFileCallback | null,
-  ) => {
-    handler(_args, callback ?? undefined);
+  mock.mockImplementation(
+    (
+      _file: string,
+      _args: readonly string[] | null | undefined,
+      _options: unknown,
+      callback?: ExecFileCallback | null,
+    ) => {
+      handler(_args, callback ?? undefined);
 
-    return createChildProcessStub();
-  });
+      return createChildProcessStub();
+    },
+  );
 }
 
 function setup(stdout: string, stderr = '') {
@@ -376,9 +384,7 @@ describe(getWorkingTreeState, () => {
   it('counts lines where X in MADRC as staged', async () => {
     expect.hasAssertions();
 
-    setup(
-      'M  src/changed.ts\nA  src/added.ts\nD  src/deleted.ts\n',
-    );
+    setup('M  src/changed.ts\nA  src/added.ts\nD  src/deleted.ts\n');
 
     const result = await getWorkingTreeState('/workspace/.repos/repo');
 
@@ -421,9 +427,7 @@ describe(getWorkingTreeState, () => {
   it('counts conflict patterns as conflicts', async () => {
     expect.hasAssertions();
 
-    setup(
-      'UU src/conflict1.ts\nAA src/conflict2.ts\nDD src/conflict3.ts\n',
-    );
+    setup('UU src/conflict1.ts\nAA src/conflict2.ts\nDD src/conflict3.ts\n');
 
     const result = await getWorkingTreeState('/workspace/.repos/repo');
 
@@ -435,9 +439,7 @@ describe(getWorkingTreeState, () => {
   it('counts AU, UA, DU, UD conflict patterns', async () => {
     expect.hasAssertions();
 
-    setup(
-      'AU src/c1.ts\nUA src/c2.ts\nDU src/c3.ts\nUD src/c4.ts\n',
-    );
+    setup('AU src/c1.ts\nUA src/c2.ts\nDU src/c3.ts\nUD src/c4.ts\n');
 
     const result = await getWorkingTreeState('/workspace/.repos/repo');
 

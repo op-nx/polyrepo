@@ -15,7 +15,11 @@ import { execSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { unlinkSync, writeFileSync } from 'node:fs';
 
-import { GenericContainer, type StartedTestContainer, Wait } from 'testcontainers';
+import {
+  GenericContainer,
+  type StartedTestContainer,
+  Wait,
+} from 'testcontainers';
 import type { TestProject } from 'vitest/node';
 
 import { releasePublish, releaseVersion } from 'nx/release';
@@ -27,7 +31,10 @@ import { releasePublish, releaseVersion } from 'nx/release';
  * global npm config. The env vars npm_config_userconfig and
  * npm_config_registry direct npm to use the temporary config.
  */
-async function publishPlugin(registryPort: number, registryUrl: string): Promise<void> {
+async function publishPlugin(
+  registryPort: number,
+  registryUrl: string,
+): Promise<void> {
   const npmrcPath = resolve(process.cwd(), '.npmrc.e2e');
   const saved = {
     registry: process.env['npm_config_registry'],
@@ -88,10 +95,10 @@ async function publishPlugin(registryPort: number, registryUrl: string): Promise
  */
 function cleanupStaleResources(): void {
   try {
-    const stale = execSync(
-      'docker ps -aq --filter name=op-nx-polyrepo-e2e',
-      { encoding: 'utf-8', windowsHide: true },
-    ).trim();
+    const stale = execSync('docker ps -aq --filter name=op-nx-polyrepo-e2e', {
+      encoding: 'utf-8',
+      windowsHide: true,
+    }).trim();
 
     if (stale) {
       execSync(`docker rm -f ${stale}`, { stdio: 'ignore', windowsHide: true });
@@ -101,7 +108,10 @@ function cleanupStaleResources(): void {
   }
 
   try {
-    execSync('docker rmi op-nx-e2e-snapshot:latest', { stdio: 'ignore', windowsHide: true });
+    execSync('docker rmi op-nx-e2e-snapshot:latest', {
+      stdio: 'ignore',
+      windowsHide: true,
+    });
   } catch {
     // Image doesn't exist — continue
   }
@@ -120,31 +130,44 @@ export default async function setup(project: TestProject) {
       const sec = (performance.now() - start) / 1000;
       const m = Math.floor(sec / 60);
       const s = sec % 60;
-      const duration = m > 0 ? `${String(m)}m${s.toFixed(1)}s` : `${s.toFixed(1)}s`;
+      const duration =
+        m > 0 ? `${String(m)}m${s.toFixed(1)}s` : `${s.toFixed(1)}s`;
       console.log(`[e2e] ${label} (${duration})`);
 
       return result;
     }
 
     // Phase 1: Build base image and start Verdaccio in parallel
-    const dockerfilePath = resolve(__dirname, '../../docker').replaceAll('\\', '/');
-    const verdaccioConfig = resolve(__dirname, '../../docker/verdaccio.yaml').replaceAll('\\', '/');
+    const dockerfilePath = resolve(__dirname, '../../docker').replaceAll(
+      '\\',
+      '/',
+    );
+    const verdaccioConfig = resolve(
+      __dirname,
+      '../../docker/verdaccio.yaml',
+    ).replaceAll('\\', '/');
 
     const [_baseImage, startedVerdaccio] = await timed(
       'Base image + Verdaccio ready',
-      () => Promise.all([
-        GenericContainer.fromDockerfile(dockerfilePath)
-          .withTarget('workspace')
-          .withBuildkit()
-          .withCache(true)
-          .build('op-nx-e2e-workspace', { deleteOnExit: false }),
-        new GenericContainer('hertzg/verdaccio')
-          .withExposedPorts({ container: 4873, host: 4873 })
-          .withName('op-nx-polyrepo-e2e-verdaccio')
-          .withCopyFilesToContainer([{ source: verdaccioConfig, target: '/verdaccio/conf/config.yaml' }])
-          .withWaitStrategy(Wait.forListeningPorts())
-          .start(),
-      ]),
+      () =>
+        Promise.all([
+          GenericContainer.fromDockerfile(dockerfilePath)
+            .withTarget('workspace')
+            .withBuildkit()
+            .withCache(true)
+            .build('op-nx-e2e-workspace', { deleteOnExit: false }),
+          new GenericContainer('hertzg/verdaccio')
+            .withExposedPorts({ container: 4873, host: 4873 })
+            .withName('op-nx-polyrepo-e2e-verdaccio')
+            .withCopyFilesToContainer([
+              {
+                source: verdaccioConfig,
+                target: '/verdaccio/conf/config.yaml',
+              },
+            ])
+            .withWaitStrategy(Wait.forListeningPorts())
+            .start(),
+        ]),
     );
 
     verdaccio = startedVerdaccio;
@@ -152,7 +175,9 @@ export default async function setup(project: TestProject) {
     const registryUrl = `http://localhost:${String(registryPort)}`;
 
     // Phase 2: Publish plugin to Verdaccio
-    await timed('Plugin published', () => publishPlugin(registryPort, registryUrl));
+    await timed('Plugin published', () =>
+      publishPlugin(registryPort, registryUrl),
+    );
 
     // Get the published tarball's shasum for content-based cache busting.
     // When plugin source is unchanged, the shasum is the same → BuildKit
@@ -168,9 +193,8 @@ export default async function setup(project: TestProject) {
     // busts cache only when the tarball content changes.
     const snapshotImageName = 'op-nx-e2e-snapshot';
 
-    await timed(
-      'Snapshot built',
-      () => GenericContainer.fromDockerfile(dockerfilePath)
+    await timed('Snapshot built', () =>
+      GenericContainer.fromDockerfile(dockerfilePath)
         .withTarget('snapshot')
         .withBuildArgs({
           PLUGIN_HASH: pluginHash,

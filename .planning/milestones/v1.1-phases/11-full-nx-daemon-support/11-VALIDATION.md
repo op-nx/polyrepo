@@ -15,13 +15,13 @@ created: 2026-03-20
 
 ## Test Infrastructure
 
-| Property | Value |
-|----------|-------|
-| **Framework** | Vitest (workspace version) |
-| **Config file** | `packages/op-nx-polyrepo/vitest.config.mts` (unit), `packages/op-nx-polyrepo-e2e/vitest.config.mts` (e2e) |
-| **Quick run command** | `npm exec nx -- test @op-nx/polyrepo --output-style=static` |
-| **Full suite command** | `npm exec nx -- run-many -t test,lint,e2e --output-style=static` |
-| **Estimated runtime** | ~120 seconds (unit ~5s, e2e ~110s) |
+| Property               | Value                                                                                                     |
+| ---------------------- | --------------------------------------------------------------------------------------------------------- |
+| **Framework**          | Vitest (workspace version)                                                                                |
+| **Config file**        | `packages/op-nx-polyrepo/vitest.config.mts` (unit), `packages/op-nx-polyrepo-e2e/vitest.config.mts` (e2e) |
+| **Quick run command**  | `npm exec nx -- test @op-nx/polyrepo --output-style=static`                                               |
+| **Full suite command** | `npm exec nx -- run-many -t test,lint,e2e --output-style=static`                                          |
+| **Estimated runtime**  | ~120 seconds (unit ~5s, e2e ~110s)                                                                        |
 
 ---
 
@@ -36,21 +36,21 @@ created: 2026-03-20
 
 ## Per-Task Verification Map
 
-| Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
-|---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| TBD | 01 | 1 | DAEMON-01 | unit | `npm exec nx -- test @op-nx/polyrepo --output-style=static -- --run -t "global gate"` | Partial | pending |
-| TBD | 01 | 1 | DAEMON-02 | unit | `npm exec nx -- test @op-nx/polyrepo --output-style=static -- --run -t "disk cache"` | Partial | pending |
-| TBD | 01 | 1 | DAEMON-03 | unit | `npm exec nx -- test @op-nx/polyrepo --output-style=static -- --run -t "selective"` | No | pending |
-| TBD | 01 | 1 | DAEMON-04 | unit | `npm exec nx -- test @op-nx/polyrepo --output-style=static -- --run -t "pre-cache"` | No | pending |
-| TBD | 01 | 1 | DAEMON-05 | unit | `npm exec nx -- test @op-nx/polyrepo --output-style=static -- --run -t "pre-cache.*warn"` | No | pending |
-| TBD | 01 | 1 | DAEMON-06 | unit | `npm exec nx -- test @op-nx/polyrepo --output-style=static -- --run -t "backoff"` | No | pending |
-| TBD | 01 | 1 | DAEMON-07 | unit | `npm exec nx -- test @op-nx/polyrepo --output-style=static -- --run -t "hash.*reset"` | No | pending |
-| TBD | 01 | 1 | DAEMON-08 | unit | `npm exec nx -- test @op-nx/polyrepo --output-style=static -- --run -t "warning"` | No | pending |
-| TBD | 02 | 2 | DAEMON-09 | e2e | `NX_DAEMON=true npm exec nx -- e2e op-nx-polyrepo-e2e --output-style=static` | No | pending |
-| TBD | 02 | 2 | DAEMON-10 | e2e | `NX_DAEMON=false npm exec nx -- e2e op-nx-polyrepo-e2e --output-style=static` | Partial | pending |
-| TBD | 02 | 2 | DAEMON-11 | e2e | `npm exec nx -- e2e op-nx-polyrepo-e2e --output-style=static` | No | pending |
+| Task ID | Plan | Wave | Requirement | Test Type | Automated Command                                                                         | File Exists | Status  |
+| ------- | ---- | ---- | ----------- | --------- | ----------------------------------------------------------------------------------------- | ----------- | ------- |
+| TBD     | 01   | 1    | DAEMON-01   | unit      | `npm exec nx -- test @op-nx/polyrepo --output-style=static -- --run -t "global gate"`     | Partial     | pending |
+| TBD     | 01   | 1    | DAEMON-02   | unit      | `npm exec nx -- test @op-nx/polyrepo --output-style=static -- --run -t "disk cache"`      | Partial     | pending |
+| TBD     | 01   | 1    | DAEMON-03   | unit      | `npm exec nx -- test @op-nx/polyrepo --output-style=static -- --run -t "selective"`       | No          | pending |
+| TBD     | 01   | 1    | DAEMON-04   | unit      | `npm exec nx -- test @op-nx/polyrepo --output-style=static -- --run -t "pre-cache"`       | No          | pending |
+| TBD     | 01   | 1    | DAEMON-05   | unit      | `npm exec nx -- test @op-nx/polyrepo --output-style=static -- --run -t "pre-cache.*warn"` | No          | pending |
+| TBD     | 01   | 1    | DAEMON-06   | unit      | `npm exec nx -- test @op-nx/polyrepo --output-style=static -- --run -t "backoff"`         | No          | pending |
+| TBD     | 01   | 1    | DAEMON-07   | unit      | `npm exec nx -- test @op-nx/polyrepo --output-style=static -- --run -t "hash.*reset"`     | No          | pending |
+| TBD     | 01   | 1    | DAEMON-08   | unit      | `npm exec nx -- test @op-nx/polyrepo --output-style=static -- --run -t "warning"`         | No          | pending |
+| TBD     | 02   | 2    | DAEMON-09   | e2e       | `NX_DAEMON=true npm exec nx -- e2e op-nx-polyrepo-e2e --output-style=static`              | No          | pending |
+| TBD     | 02   | 2    | DAEMON-10   | e2e       | `NX_DAEMON=false npm exec nx -- e2e op-nx-polyrepo-e2e --output-style=static`             | Partial     | pending |
+| TBD     | 02   | 2    | DAEMON-11   | e2e       | `npm exec nx -- e2e op-nx-polyrepo-e2e --output-style=static`                             | No          | pending |
 
-*Status: pending / green / red / flaky*
+_Status: pending / green / red / flaky_
 
 ---
 
@@ -66,9 +66,9 @@ created: 2026-03-20
 
 ## Manual-Only Verifications
 
-| Behavior | Requirement | Why Manual | Test Instructions |
-|----------|-------------|------------|-------------------|
-| Docker build baseline timing | DAEMON-09 | Build timing varies by machine; regression is a relative comparison | Record build times before/after Dockerfile change, verify no >10% regression |
+| Behavior                     | Requirement | Why Manual                                                          | Test Instructions                                                            |
+| ---------------------------- | ----------- | ------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Docker build baseline timing | DAEMON-09   | Build timing varies by machine; regression is a relative comparison | Record build times before/after Dockerfile change, verify no >10% regression |
 
 ---
 

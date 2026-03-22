@@ -15,6 +15,7 @@ description: >
 # Skill: ESLint conflict audit
 
 ## Trigger
+
 Detect conflicts between ESLint rules that are already enabled in the project's flat config. Use when two active rules demand opposite code patterns, cause circular auto-fix loops, or make each other redundant. Audit for mutually exclusive rule pairs inherited from broad presets like `all`, `strict`, or `stylistic`. Use this skill when: eslint errors cannot all be fixed because rules contradict each other, CI keeps failing because two rules want different things, `eslint --fix` oscillates or never converges, specific rule names seem to conflict (e.g. prefer-to-be-truthy vs prefer-strict-boolean-matchers), or import ordering rules fight each other.
 
 ## Prompt
@@ -46,12 +47,14 @@ Using only the active rules from Step 1, check every enabled rule against every 
 Two rules that demand opposite code patterns. Enabling both means every file violates at least one.
 
 Detection -- look for rule name pairs that share a stem but have opposing prefixes/suffixes:
+
 - `prefer-X` vs `no-X` (e.g. `prefer-importing-vitest-globals` vs `no-importing-vitest-globals`)
 - `prefer-X` vs `prefer-Y` where X and Y are alternative spellings of the same assertion (e.g. `prefer-to-be-truthy` vs `prefer-strict-boolean-matchers` -- both govern `.toBe(true)` vs `.toBeTruthy()`)
 - `prefer-called-once` vs `prefer-called-times` (`.toHaveBeenCalledOnce()` vs `.toHaveBeenCalledTimes(1)`)
 - `require-X` vs `no-X`
 
 Also check cross-plugin pairs. Common patterns:
+
 - ESLint core `no-unused-vars` vs `@typescript-eslint/no-unused-vars` (TS version extends core; enabling both double-reports)
 - Prettier vs any stylistic/formatting ESLint rule (Prettier owns formatting; ESLint stylistic rules conflict)
 - ESLint core `no-shadow` vs `@typescript-eslint/no-shadow` (TS version handles enums and type declarations)
@@ -60,6 +63,7 @@ Also check cross-plugin pairs. Common patterns:
 Rule A's `--fix` output triggers Rule B, and vice versa. Running `eslint --fix` repeatedly never converges.
 
 Detection -- static analysis: load the plugin and inspect `rule.meta.fixable` for each enabled rule. If two fixable rules in the same scope target the same AST node type or code pattern, check whether Rule A's fix output would violate Rule B and vice versa. Common signals:
+
 - Both rules are fixable and target import declarations
 - Both rules are fixable and target assertion/matcher expressions
 - One rule adds code that the other rule removes
@@ -72,6 +76,7 @@ A conflict can be both Type A and Type B (mutually exclusive rules that are also
 A stricter rule makes a weaker rule redundant. Not a hard conflict, but enabling both adds noise (the weaker rule's violations are a subset of the stricter rule's).
 
 Detection -- check plugin documentation or rule descriptions for phrases like "stricter version of", "supersedes", or "extends". Common patterns:
+
 - `prefer-strict-equal` supersedes `prefer-to-be` for object comparisons
 - `prefer-strict-boolean-matchers` supersedes `prefer-to-be-truthy` / `prefer-to-be-falsy`
 - `consistent-type-assertions` with `assertionStyle: 'never'` supersedes `no-non-null-assertion`
@@ -79,6 +84,7 @@ Detection -- check plugin documentation or rule descriptions for phrases like "s
 
 **Type D -- Config-level impossibility**
 A rule's options make it impossible to satisfy another rule. For example:
+
 - `consistent-type-assertions` with `assertionStyle: 'never'` + `consistent-type-assertions` with `assertionStyle: 'as'` in overlapping scopes
 - `valid-title` without `allowArguments: true` + `prefer-describe-function-title` (one demands strings, the other demands function references)
 
@@ -87,6 +93,7 @@ A rule's options make it impossible to satisfy another rule. For example:
 When a config spreads a plugin's `all`, `strict`, or `stylistic` preset, flag it for review. These presets enable large rule sets that may include mutually exclusive pairs the plugin intentionally separates into different presets.
 
 For each broad preset found:
+
 1. List which mutually exclusive pairs it enables
 2. List which rules the plugin's `recommended` preset intentionally excludes (these were excluded for a reason)
 3. Check if the config overrides disable one side of each conflict
@@ -112,6 +119,7 @@ Use exactly one type label per finding (A, B, C, or D). Do not combine types (no
 Sort conflicts by severity (B first, then A, D, C), then alphabetically by rule name within each type.
 
 End with a summary:
+
 ```
 ## Summary
 

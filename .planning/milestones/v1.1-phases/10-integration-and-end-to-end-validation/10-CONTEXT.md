@@ -55,6 +55,7 @@ Wire `detectCrossRepoDependencies` into `createDependencies` and validate that c
 </decisions>
 
 <code_context>
+
 ## Existing Code Insights
 
 ### Reusable Assets
@@ -70,7 +71,6 @@ Wire `detectCrossRepoDependencies` into `createDependencies` and validate that c
 - `DependencyType.static` for auto-detected edges, `DependencyType.implicit` for overrides (Phase 9)
 - SIFERS test pattern: no `beforeEach`/`afterEach`; typed mocks via explicit setup functions
 - Silent skip on missing files: `try/catch` with `continue` for missing `package.json` / tsconfig
-
 
 ### Integration Points
 
@@ -103,5 +103,5 @@ Wire `detectCrossRepoDependencies` into `createDependencies` and validate that c
 
 ---
 
-*Phase: 10-integration-and-end-to-end-validation*
-*Context gathered: 2026-03-18*
+_Phase: 10-integration-and-end-to-end-validation_
+_Context gathered: 2026-03-18_

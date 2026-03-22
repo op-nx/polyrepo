@@ -7,9 +7,9 @@ tags: [status, executor, ahead-behind, dirty-summary]
 # Dependency graph
 requires:
   - phase: 03-multi-repo-git-dx (03-04)
-    provides: "Status executor with behind/ahead dirty summary fallback"
+    provides: 'Status executor with behind/ahead dirty summary fallback'
 provides:
-  - "Count-free behind/ahead labels in status dirty summary column"
+  - 'Count-free behind/ahead labels in status dirty summary column'
 affects: []
 
 # Tech tracking
@@ -24,7 +24,7 @@ key-files:
     - packages/op-nx-polyrepo/src/lib/executors/status/executor.spec.ts
 
 key-decisions:
-  - "No decisions needed -- straightforward label change following UAT feedback"
+  - 'No decisions needed -- straightforward label change following UAT feedback'
 
 patterns-established: []
 
@@ -48,6 +48,7 @@ completed: 2026-03-11
 - **Files modified:** 2
 
 ## Accomplishments
+
 - Removed redundant numeric prefix from dirty summary behind/ahead labels
 - Added two new test cases for behind-only and ahead-only scenarios
 - Updated existing combined behind+ahead test assertion
@@ -61,22 +62,28 @@ Each task was committed atomically:
    - `fa03e79` (feat) - GREEN: implementation removing numeric prefix
 
 ## Files Created/Modified
+
 - `packages/op-nx-polyrepo/src/lib/executors/status/executor.ts` - Changed `statusParts.push` from `'${N} behind'`/`'${N} ahead'` to `'behind'`/`'ahead'`
 - `packages/op-nx-polyrepo/src/lib/executors/status/executor.spec.ts` - Updated existing assertion, added behind-only and ahead-only test cases
 
 ## Decisions Made
+
 None - followed plan as specified.
 
 ## Deviations from Plan
+
 None - plan executed exactly as written.
 
 ## Issues Encountered
+
 Pre-existing test failures in `commands.spec.ts` (12 tests) related to `disableHooks` feature from plan 03-07. These tests were written ahead of implementation and are unrelated to this plan's changes. Confirmed by running status executor tests in isolation (24/24 pass).
 
 ## User Setup Required
+
 None - no external service configuration required.
 
 ## Next Phase Readiness
+
 - Status executor dirty summary column now shows clean labels without count duplication
 - Plan 03-07 (disable external repo git hooks during sync) is the remaining gap closure plan
 
@@ -89,5 +96,6 @@ None - no external service configuration required.
 - [x] executor.spec.ts exists with updated assertions
 
 ---
-*Phase: 03-multi-repo-git-dx*
-*Completed: 2026-03-11*
+
+_Phase: 03-multi-repo-git-dx_
+_Completed: 2026-03-11_

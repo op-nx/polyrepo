@@ -16,13 +16,13 @@ audited: 2026-03-16
 
 ## Test Infrastructure
 
-| Property | Value |
-|----------|-------|
-| **Framework** | Vitest 4.x (existing) |
-| **Config file** | packages/op-nx-polyrepo/vitest.config.ts |
-| **Quick run command** | `npm exec nx test @op-nx/polyrepo` |
-| **Full suite command** | `npm exec nx test @op-nx/polyrepo` |
-| **Estimated runtime** | ~5 seconds |
+| Property               | Value                                    |
+| ---------------------- | ---------------------------------------- |
+| **Framework**          | Vitest 4.x (existing)                    |
+| **Config file**        | packages/op-nx-polyrepo/vitest.config.ts |
+| **Quick run command**  | `npm exec nx test @op-nx/polyrepo`       |
+| **Full suite command** | `npm exec nx test @op-nx/polyrepo`       |
+| **Estimated runtime**  | ~5 seconds                               |
 
 ---
 
@@ -37,12 +37,12 @@ audited: 2026-03-16
 
 ## Per-Task Verification Map
 
-| Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
-|---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 04-01-01 | 01 | 1 | Export CACHE_FILENAME + resolvePluginConfig | unit | `npm exec nx test @op-nx/polyrepo` | resolve.spec.ts, cache.spec.ts | COVERED |
-| 04-01-02 | 01 | 1 | Refactor executors to shared utilities | unit | `npm exec nx test @op-nx/polyrepo` | status/executor.spec.ts, sync/executor.spec.ts | COVERED |
+| Task ID  | Plan | Wave | Requirement                                 | Test Type | Automated Command                  | File Exists                                    | Status  |
+| -------- | ---- | ---- | ------------------------------------------- | --------- | ---------------------------------- | ---------------------------------------------- | ------- |
+| 04-01-01 | 01   | 1    | Export CACHE_FILENAME + resolvePluginConfig | unit      | `npm exec nx test @op-nx/polyrepo` | resolve.spec.ts, cache.spec.ts                 | COVERED |
+| 04-01-02 | 01   | 1    | Refactor executors to shared utilities      | unit      | `npm exec nx test @op-nx/polyrepo` | status/executor.spec.ts, sync/executor.spec.ts | COVERED |
 
-*Status: COVERED -- all requirements verified*
+_Status: COVERED -- all requirements verified_
 
 ---
 
@@ -73,10 +73,10 @@ All phase behaviors have automated verification. The refactoring preserves exist
 
 ## Validation Audit 2026-03-16
 
-| Metric | Count |
-|--------|-------|
-| Gaps found | 0 |
-| Resolved | 0 |
-| Escalated | 0 |
+| Metric     | Count |
+| ---------- | ----- |
+| Gaps found | 0     |
+| Resolved   | 0     |
+| Escalated  | 0     |
 
 **Notes:** Refactoring phase -- existing test suite (271 tests) validates behavior preservation. New `resolve.spec.ts` (3 tests) directly covers the new `resolvePluginConfig` shared utility. Executor specs exercise the refactored code paths through transitive module mocks. No hardcoded cache filename strings remain outside `cache.ts`.

@@ -11,6 +11,7 @@ each test. Each test explicitly destructures only the state it needs.
 ## Why: Hooks Are Banned
 
 This project enforces `vitest/no-hooks: error` in ESLint. The following are all banned:
+
 - `beforeEach`
 - `afterEach`
 - `beforeAll`
@@ -72,7 +73,9 @@ Everything a test might need must be returned from `setup()`. No module-level
 ```typescript
 // BAD: mutable module-level state
 let mockExec: MockInstance;
-beforeEach(() => { mockExec = vi.fn(); });
+beforeEach(() => {
+  mockExec = vi.fn();
+});
 
 // GOOD: returned from setup
 function setup() {

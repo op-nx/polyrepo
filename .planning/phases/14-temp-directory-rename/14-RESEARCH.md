@@ -17,15 +17,18 @@ The change surface is small and well-isolated: two production files (`executor.t
 ## User Constraints (from CONTEXT.md)
 
 ### Locked Decisions
+
 - Rename `.tmp` to `tmp` in both usage sites (executor and graph extraction)
 - No other naming alternatives considered -- `tmp` is the Nx convention
 
 ### Claude's Discretion
+
 - Whether to extract the directory name into a shared constant or keep it inline
 - Whether to clean up orphaned `.tmp/` directories from prior runs or leave them
 - Test assertion updates -- mechanical, match new path
 
 ### Deferred Ideas (OUT OF SCOPE)
+
 None -- discussion stayed within phase scope
 
 </user_constraints>
@@ -34,28 +37,31 @@ None -- discussion stayed within phase scope
 
 ## Phase Requirements
 
-| ID | Description | Research Support |
-|----|-------------|-----------------|
-| EXEC-01 | Child repo temp directories use `tmp/` instead of `.tmp/` to align with Nx default `.gitignore` convention | Change `'.tmp'` to `'tmp'` in `executor.ts` lines 41-42; update test assertions in `executor.spec.ts` lines 300-302 |
-| EXEC-02 | Graph extraction temp directory uses `tmp/` instead of `.tmp/` | Change `'.tmp'` to `'tmp'` in `extract.ts` lines 91-92; no test assertions to update for extract (tests don't assert on temp paths) |
+| ID      | Description                                                                                                | Research Support                                                                                                                    |
+| ------- | ---------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| EXEC-01 | Child repo temp directories use `tmp/` instead of `.tmp/` to align with Nx default `.gitignore` convention | Change `'.tmp'` to `'tmp'` in `executor.ts` lines 41-42; update test assertions in `executor.spec.ts` lines 300-302                 |
+| EXEC-02 | Graph extraction temp directory uses `tmp/` instead of `.tmp/`                                             | Change `'.tmp'` to `'tmp'` in `extract.ts` lines 91-92; no test assertions to update for extract (tests don't assert on temp paths) |
 
 </phase_requirements>
 
 ## Standard Stack
 
 ### Core
-| Library | Version | Purpose | Why Standard |
-|---------|---------|---------|--------------|
-| vitest | (workspace) | Unit testing framework | Already configured for `@op-nx/polyrepo` |
-| node:fs | Node.js built-in | `mkdirSync` for temp dir creation | Already used in both files |
-| node:path | Node.js built-in | `join` for path construction | Already used in both files |
+
+| Library   | Version          | Purpose                           | Why Standard                             |
+| --------- | ---------------- | --------------------------------- | ---------------------------------------- |
+| vitest    | (workspace)      | Unit testing framework            | Already configured for `@op-nx/polyrepo` |
+| node:fs   | Node.js built-in | `mkdirSync` for temp dir creation | Already used in both files               |
+| node:path | Node.js built-in | `join` for path construction      | Already used in both files               |
 
 ### Supporting
+
 No additional libraries needed -- this is a string literal change in existing code.
 
 ### Alternatives Considered
-| Instead of | Could Use | Tradeoff |
-|------------|-----------|----------|
+
+| Instead of            | Could Use       | Tradeoff                                                                |
+| --------------------- | --------------- | ----------------------------------------------------------------------- |
 | Inline `'tmp'` string | Shared constant | Constant prevents drift between executor and extract; minor indirection |
 
 ## Architecture Patterns
@@ -78,11 +84,11 @@ Both files use an identical pattern for temp directory creation:
 
 ```typescript
 // Source: packages/op-nx-polyrepo/src/lib/executors/run/executor.ts:41-42
-const repoTmpDir = normalizePath(join(repoPath, '.tmp'));  // BEFORE
-mkdirSync(join(repoPath, '.tmp'), { recursive: true });    // BEFORE
+const repoTmpDir = normalizePath(join(repoPath, '.tmp')); // BEFORE
+mkdirSync(join(repoPath, '.tmp'), { recursive: true }); // BEFORE
 
-const repoTmpDir = normalizePath(join(repoPath, 'tmp'));   // AFTER
-mkdirSync(join(repoPath, 'tmp'), { recursive: true });     // AFTER
+const repoTmpDir = normalizePath(join(repoPath, 'tmp')); // AFTER
+mkdirSync(join(repoPath, 'tmp'), { recursive: true }); // AFTER
 ```
 
 ### Pattern: Env Var Assignment
@@ -128,36 +134,41 @@ However, given the simplicity (two files, each using the literal twice), inline 
 **Recommendation: Do not clean up orphaned `.tmp/` directories.**
 
 Reasons:
+
 1. `.tmp/` directories live inside `.repos/<alias>/` which is already gitignored
 2. Users who have existing `.tmp/` directories will not be harmed by their presence
 3. Adding cleanup logic increases scope and introduces edge cases (permissions, concurrent runs)
 4. The directories will be naturally cleaned when repos are re-synced
 
 ### Anti-Patterns to Avoid
+
 - **Partial rename:** Changing only one of the two files would create inconsistency between executor and graph extraction temp paths
 - **Changing env var names:** Only the path value changes, not the env var names (TEMP, TMP, TMPDIR)
 
 ## Don't Hand-Roll
 
-| Problem | Don't Build | Use Instead | Why |
-|---------|-------------|-------------|-----|
-| N/A | N/A | N/A | This phase is a string literal change, no hand-rolling risk |
+| Problem | Don't Build | Use Instead | Why                                                         |
+| ------- | ----------- | ----------- | ----------------------------------------------------------- |
+| N/A     | N/A         | N/A         | This phase is a string literal change, no hand-rolling risk |
 
 ## Common Pitfalls
 
 ### Pitfall 1: Missing the `mkdirSync` Call
+
 **What goes wrong:** Each file has TWO references to `.tmp` -- the `normalizePath(join(...))` assignment and the `mkdirSync(join(...))` call. Missing the second one means the directory is created with the old name but env vars point to the new name.
 **Why it happens:** The string literal appears in two consecutive lines per file.
 **How to avoid:** Change both lines in each file. The complete list is 4 source lines across 2 files.
 **Warning signs:** Tests pass (they mock `mkdirSync`) but runtime fails with ENOENT.
 
 ### Pitfall 2: Missing Test Assertion Updates
+
 **What goes wrong:** Tests assert the old `.tmp` path and fail after the rename.
 **Why it happens:** Only `executor.spec.ts` has explicit path assertions (lines 300-302). `extract.spec.ts` does not assert on temp paths.
 **How to avoid:** Update exactly 3 assertions in `executor.spec.ts` from `.tmp` to `tmp`.
 **Warning signs:** Test failure on lines 300-302.
 
 ### Pitfall 3: Gitignore Pattern Mismatch
+
 **What goes wrong:** Using a name that is NOT covered by the default Nx `.gitignore`.
 **Why it happens:** The whole point of this phase is to align with Nx convention.
 **How to avoid:** Use exactly `tmp` (no leading dot). The Nx default `.gitignore` includes `tmp` as a bare entry which matches any `tmp` directory at any depth.
@@ -205,9 +216,9 @@ expect(env['TMPDIR']).toBe('/workspace/.repos/repo-a/tmp');
 
 ## State of the Art
 
-| Old Approach | Current Approach | When Changed | Impact |
-|--------------|------------------|--------------|--------|
-| `.tmp` (hidden dir) | `tmp` (Nx convention) | This phase | Synced repos with default Nx `.gitignore` automatically ignore plugin temp dirs |
+| Old Approach        | Current Approach      | When Changed | Impact                                                                          |
+| ------------------- | --------------------- | ------------ | ------------------------------------------------------------------------------- |
+| `.tmp` (hidden dir) | `tmp` (Nx convention) | This phase   | Synced repos with default Nx `.gitignore` automatically ignore plugin temp dirs |
 
 **Context:** The Nx default `.gitignore` generated by `create-nx-workspace` includes `tmp` (not `.tmp`). This has been the case since early Nx versions. The `nrwl/nx-example-workspace` repository confirms this pattern with `/tmp` in its `.gitignore`. This project's own `.gitignore` also includes `tmp` on line 5.
 
@@ -218,25 +229,29 @@ None. This is a well-scoped mechanical change with no ambiguity.
 ## Validation Architecture
 
 ### Test Framework
-| Property | Value |
-|----------|-------|
-| Framework | Vitest (workspace version) |
-| Config file | `packages/op-nx-polyrepo/vitest.config.mts` |
-| Quick run command | `npm exec nx -- test @op-nx/polyrepo` |
+
+| Property           | Value                                                 |
+| ------------------ | ----------------------------------------------------- |
+| Framework          | Vitest (workspace version)                            |
+| Config file        | `packages/op-nx-polyrepo/vitest.config.mts`           |
+| Quick run command  | `npm exec nx -- test @op-nx/polyrepo`                 |
 | Full suite command | `npm exec nx -- test @op-nx/polyrepo --skip-nx-cache` |
 
 ### Phase Requirements -> Test Map
-| Req ID | Behavior | Test Type | Automated Command | File Exists? |
-|--------|----------|-----------|-------------------|-------------|
-| EXEC-01 | Proxy executor temp dir uses `tmp/` path in TEMP/TMP/TMPDIR env vars | unit | `npm exec nx -- test @op-nx/polyrepo` | Yes -- `executor.spec.ts` lines 300-302 (assertions need updating) |
-| EXEC-02 | Graph extraction temp dir uses `tmp/` path | unit | `npm exec nx -- test @op-nx/polyrepo` | Partial -- `extract.spec.ts` verifies env vars contain NX_DAEMON etc. but does not assert TEMP/TMP/TMPDIR paths specifically |
+
+| Req ID  | Behavior                                                             | Test Type | Automated Command                     | File Exists?                                                                                                                 |
+| ------- | -------------------------------------------------------------------- | --------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| EXEC-01 | Proxy executor temp dir uses `tmp/` path in TEMP/TMP/TMPDIR env vars | unit      | `npm exec nx -- test @op-nx/polyrepo` | Yes -- `executor.spec.ts` lines 300-302 (assertions need updating)                                                           |
+| EXEC-02 | Graph extraction temp dir uses `tmp/` path                           | unit      | `npm exec nx -- test @op-nx/polyrepo` | Partial -- `extract.spec.ts` verifies env vars contain NX_DAEMON etc. but does not assert TEMP/TMP/TMPDIR paths specifically |
 
 ### Sampling Rate
+
 - **Per task commit:** `npm exec nx -- test @op-nx/polyrepo`
 - **Per wave merge:** `npm exec nx -- test @op-nx/polyrepo --skip-nx-cache`
 - **Phase gate:** Full suite green before `/gsd:verify-work`
 
 ### Wave 0 Gaps
+
 None -- existing test infrastructure covers all phase requirements. The only change needed is updating 3 existing assertion values in `executor.spec.ts`.
 
 **Optional enhancement for EXEC-02:** The `extract.spec.ts` test on line 138-158 checks for `NX_DAEMON`, `NX_VERBOSE_LOGGING`, and `NX_PERF_LOGGING` in env vars but does not check `TEMP`/`TMP`/`TMPDIR`. Adding assertions for those env vars would provide explicit coverage for EXEC-02. This is Claude's discretion per CONTEXT.md.
@@ -244,16 +259,19 @@ None -- existing test infrastructure covers all phase requirements. The only cha
 ## Sources
 
 ### Primary (HIGH confidence)
+
 - Project source code: `executor.ts`, `extract.ts`, `executor.spec.ts`, `extract.spec.ts` -- direct inspection
 - Project `.gitignore` line 5: `tmp` entry confirms Nx convention in use
 
 ### Secondary (MEDIUM confidence)
+
 - [nrwl/nx-example-workspace .gitignore](https://github.com/nrwl/nx-example-workspace/blob/master/.gitignore) -- confirms `/tmp` in default Nx gitignore
 - [Nx manual migration guide](https://nx.dev/docs/guides/adopting-nx/manual) -- references default gitignore entries
 
 ## Metadata
 
 **Confidence breakdown:**
+
 - Standard stack: HIGH -- no new dependencies, verified from project source
 - Architecture: HIGH -- exact line numbers identified, complete change surface mapped
 - Pitfalls: HIGH -- exhaustive search confirms exactly 8 occurrences of `.tmp` across 3 files

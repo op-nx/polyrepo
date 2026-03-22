@@ -46,8 +46,7 @@ vi.mock('./lib/graph/cache', () => ({
 }));
 
 vi.mock('./lib/graph/detect', () => ({
-  detectCrossRepoDependencies:
-    vi.fn<typeof detectCrossRepoDependencies>(),
+  detectCrossRepoDependencies: vi.fn<typeof detectCrossRepoDependencies>(),
 }));
 
 import { createNodesV2, createDependencies } from './index';
@@ -197,7 +196,11 @@ describe('createNodesV2 plugin', () => {
 
     await callback(['nx.json'], options, mockContext);
 
-    expect(mockedPopulateGraphReport).toHaveBeenCalledExactlyOnceWith(options, '/workspace', 'mock-hash');
+    expect(mockedPopulateGraphReport).toHaveBeenCalledExactlyOnceWith(
+      options,
+      '/workspace',
+      'mock-hash',
+    );
   });
 
   it('registers external projects from graph report alongside root project', async () => {
@@ -350,7 +353,8 @@ describe('createNodesV2 plugin', () => {
   it('logs warning and registers only root project when populateGraphReport throws', async () => {
     expect.hasAssertions();
 
-    const { mockedPopulateGraphReport, mockedLoggerWarn, mockContext } = setup();
+    const { mockedPopulateGraphReport, mockedLoggerWarn, mockContext } =
+      setup();
 
     mockedPopulateGraphReport.mockRejectedValue(new Error('extraction failed'));
 
@@ -467,7 +471,9 @@ describe(createDependencies, () => {
     const deps = await createDependencies(options, depContext);
 
     expect(deps).toHaveLength(1);
-    expect(deps[0]).toStrictEqual(expect.objectContaining({ target: 'repo-a/my-lib' }));
+    expect(deps[0]).toStrictEqual(
+      expect.objectContaining({ target: 'repo-a/my-lib' }),
+    );
   });
 
   it('returns empty array when populateGraphReport fails', async () => {
@@ -687,9 +693,9 @@ describe(createDependencies, () => {
       repos: { 'repo-a': 'git@github.com:org/repo-a.git' },
     };
 
-    await expect(
-      createDependencies(options, depContext),
-    ).rejects.toThrowError('Unknown project in overrides: bad-project');
+    await expect(createDependencies(options, depContext)).rejects.toThrowError(
+      'Unknown project in overrides: bad-project',
+    );
   });
 
   it('does not call detectCrossRepoDependencies when extraction fails', async () => {
@@ -697,9 +703,7 @@ describe(createDependencies, () => {
 
     const { mockedPopulateGraphReport, mockedDetectCrossRepoDeps } = setup();
 
-    mockedPopulateGraphReport.mockRejectedValue(
-      new Error('extraction failed'),
-    );
+    mockedPopulateGraphReport.mockRejectedValue(new Error('extraction failed'));
 
     const depContext = createDepContext({});
 

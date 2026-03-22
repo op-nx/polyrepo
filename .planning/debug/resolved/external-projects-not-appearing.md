@@ -1,6 +1,6 @@
 ---
 status: resolved
-trigger: "Investigate why external repo projects are not appearing in `nx show projects` despite the graph cache being populated and readable."
+trigger: 'Investigate why external repo projects are not appearing in `nx show projects` despite the graph cache being populated and readable.'
 created: 2026-03-12T00:00:00Z
 updated: 2026-03-12T00:00:00Z
 ---
@@ -78,28 +78,28 @@ started: When disk cache hash does not match current computeOuterHash result
 ## Resolution
 
 root_cause: |
-  Two conditions combine to produce the failure:
+Two conditions combine to produce the failure:
 
-  1. CACHE MISS: The disk cache hash (.repos/.polyrepo-graph-cache.json hash: "1222891923678234250")
-     does not match the hash computed by the current plugin invocation
-     (computeOuterHash produces "15195226177213616514"). This forces live extraction via
-     extractGraphFromRepo every time createNodesV2 runs.
+1. CACHE MISS: The disk cache hash (.repos/.polyrepo-graph-cache.json hash: "1222891923678234250")
+   does not match the hash computed by the current plugin invocation
+   (computeOuterHash produces "15195226177213616514"). This forces live extraction via
+   extractGraphFromRepo every time createNodesV2 runs.
 
-  2. STDOUT CONTAMINATION: extractGraphFromRepo at
-     packages/op-nx-polyrepo/src/lib/graph/extract.ts:25-32 passes
-     `env: { ...process.env, NX_DAEMON: 'false' }`, inheriting all parent env vars including
-     NX_VERBOSE_LOGGING=true when the Nx daemon or CLI was started with verbose logging.
-     The child `nx graph --print` process then emits "[isolated-plugin]" log lines to stdout
-     before the JSON payload. JSON.parse(stdout) at extract.ts:45 fails with:
-     "Unexpected token 'i', \"[isolated-p\"... is not valid JSON".
+2. STDOUT CONTAMINATION: extractGraphFromRepo at
+   packages/op-nx-polyrepo/src/lib/graph/extract.ts:25-32 passes
+   `env: { ...process.env, NX_DAEMON: 'false' }`, inheriting all parent env vars including
+   NX_VERBOSE_LOGGING=true when the Nx daemon or CLI was started with verbose logging.
+   The child `nx graph --print` process then emits "[isolated-plugin]" log lines to stdout
+   before the JSON payload. JSON.parse(stdout) at extract.ts:45 fails with:
+   "Unexpected token 'i', \"[isolated-p\"... is not valid JSON".
 
-  The error is silently swallowed at index.ts:39-46 (try/catch sets report=undefined),
-  causing createNodesV2 to return only the root workspace targets (.projects key with
-  just the '.' entry), explaining the 3-project output.
+The error is silently swallowed at index.ts:39-46 (try/catch sets report=undefined),
+causing createNodesV2 to return only the root workspace targets (.projects key with
+just the '.' entry), explaining the 3-project output.
 
-  The direct fix location is extract.ts:32: add NX_VERBOSE_LOGGING: 'false' to the env
-  override alongside NX_DAEMON: 'false'. This prevents the child nx process from
-  emitting diagnostic log lines to stdout, keeping stdout clean for JSON parsing.
+The direct fix location is extract.ts:32: add NX_VERBOSE_LOGGING: 'false' to the env
+override alongside NX_DAEMON: 'false'. This prevents the child nx process from
+emitting diagnostic log lines to stdout, keeping stdout clean for JSON parsing.
 
 fix: Not applied (read-only research task)
 verification: n/a

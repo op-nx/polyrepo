@@ -32,31 +32,31 @@ autonomous: true
 requirements: []
 must_haves:
   truths:
-    - "Package publishes as @op-nx/polyrepo (npm name)"
-    - "Plugin registers in nx.json as @op-nx/polyrepo"
-    - "Executor references use @op-nx/polyrepo:sync and @op-nx/polyrepo:status"
-    - "Root package.json name is @op-nx/source"
-    - "README title is OpNx Polyrepo"
-    - "All tests pass after rename"
-    - "Build succeeds after rename"
+    - 'Package publishes as @op-nx/polyrepo (npm name)'
+    - 'Plugin registers in nx.json as @op-nx/polyrepo'
+    - 'Executor references use @op-nx/polyrepo:sync and @op-nx/polyrepo:status'
+    - 'Root package.json name is @op-nx/source'
+    - 'README title is OpNx Polyrepo'
+    - 'All tests pass after rename'
+    - 'Build succeeds after rename'
   artifacts:
-    - path: "packages/op-nx-polyrepo/package.json"
-      provides: "Plugin package with name @op-nx/polyrepo"
+    - path: 'packages/op-nx-polyrepo/package.json'
+      provides: 'Plugin package with name @op-nx/polyrepo'
       contains: '"name": "@op-nx/polyrepo"'
-    - path: "packages/op-nx-polyrepo-e2e/package.json"
-      provides: "E2E test package"
-      contains: "op-nx-polyrepo-e2e"
-    - path: "nx.json"
-      provides: "Plugin registration"
+    - path: 'packages/op-nx-polyrepo-e2e/package.json'
+      provides: 'E2E test package'
+      contains: 'op-nx-polyrepo-e2e'
+    - path: 'nx.json'
+      provides: 'Plugin registration'
       contains: '"plugin": "@op-nx/polyrepo"'
   key_links:
-    - from: "packages/op-nx-polyrepo/src/index.ts"
-      to: "packages/op-nx-polyrepo/executors.json"
-      via: "executor string references"
-      pattern: "@op-nx/polyrepo:(sync|status)"
-    - from: "nx.json"
-      to: "packages/op-nx-polyrepo"
-      via: "plugin registration"
+    - from: 'packages/op-nx-polyrepo/src/index.ts'
+      to: 'packages/op-nx-polyrepo/executors.json'
+      via: 'executor string references'
+      pattern: '@op-nx/polyrepo:(sync|status)'
+    - from: 'nx.json'
+      to: 'packages/op-nx-polyrepo'
+      via: 'plugin registration'
       pattern: '"plugin": "@op-nx/polyrepo"'
 ---
 
@@ -79,15 +79,15 @@ Output: Fully renamed workspace where build and all tests pass.
 
 The following renames apply throughout the codebase:
 
-| Old value | New value | Where |
-|-----------|-----------|-------|
-| `nx-openpolyrepo` (npm package name) | `@op-nx/polyrepo` | plugin package.json `name`, all executor strings, nx.json plugin registration, e2e install commands, npm ls checks |
-| `@nx-openpolyrepo/source` (root package name) | `@op-nx/source` | root package.json `name`, `tools/scripts/start-local-registry.ts` target |
-| `@nx-openpolyrepo/source` (custom condition) | `@op-nx/source` | `tsconfig.base.json` customConditions, plugin package.json exports condition |
-| `nx-openpolyrepo-e2e` (e2e package name) | `op-nx-polyrepo-e2e` | e2e package.json `name` |
-| `packages/nx-openpolyrepo` (directory) | `packages/op-nx-polyrepo` | all path references |
-| `packages/nx-openpolyrepo-e2e` (directory) | `packages/op-nx-polyrepo-e2e` | all path references |
-| `Nx OpenPolyrepo` (README title) | `OpNx Polyrepo` | root README.md |
+| Old value                                     | New value                     | Where                                                                                                              |
+| --------------------------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `nx-openpolyrepo` (npm package name)          | `@op-nx/polyrepo`             | plugin package.json `name`, all executor strings, nx.json plugin registration, e2e install commands, npm ls checks |
+| `@nx-openpolyrepo/source` (root package name) | `@op-nx/source`               | root package.json `name`, `tools/scripts/start-local-registry.ts` target                                           |
+| `@nx-openpolyrepo/source` (custom condition)  | `@op-nx/source`               | `tsconfig.base.json` customConditions, plugin package.json exports condition                                       |
+| `nx-openpolyrepo-e2e` (e2e package name)      | `op-nx-polyrepo-e2e`          | e2e package.json `name`                                                                                            |
+| `packages/nx-openpolyrepo` (directory)        | `packages/op-nx-polyrepo`     | all path references                                                                                                |
+| `packages/nx-openpolyrepo-e2e` (directory)    | `packages/op-nx-polyrepo-e2e` | all path references                                                                                                |
+| `Nx OpenPolyrepo` (README title)              | `OpNx Polyrepo`               | root README.md                                                                                                     |
 
 **Important:** The Nx `@nx/workspace:move` generator handles directory moves and updates tsconfig references, but it does NOT update string literals inside source code. Task 2 handles all remaining string replacements after the move.
 
@@ -96,6 +96,7 @@ The following renames apply throughout the codebase:
 These files contain hardcoded `nx-openpolyrepo` string literals that the Nx move generator will NOT update:
 
 **Source code:**
+
 - `packages/op-nx-polyrepo/src/index.ts` — executor strings `nx-openpolyrepo:sync`, `nx-openpolyrepo:status`
 - `packages/op-nx-polyrepo/src/index.spec.ts` — same executor strings in test assertions
 - `packages/op-nx-polyrepo/src/lib/config/validate.ts` — error message string
@@ -105,6 +106,7 @@ These files contain hardcoded `nx-openpolyrepo` string literals that the Nx move
 - `packages/op-nx-polyrepo/src/lib/executors/sync/executor.spec.ts` — plugin lookup in test fixtures
 
 **Config and root files:**
+
 - `nx.json` — `"plugin": "nx-openpolyrepo"` registration
 - `package.json` — root package name `@nx-openpolyrepo/source`
 - `tsconfig.base.json` — customConditions `@nx-openpolyrepo/source`
@@ -112,8 +114,9 @@ These files contain hardcoded `nx-openpolyrepo` string literals that the Nx move
 - `README.md` — title
 
 **E2E test:**
+
 - `packages/op-nx-polyrepo-e2e/src/op-nx-polyrepo.spec.ts` (renamed by generator) — install commands, npm ls, describe block, plugin lookups, temp dir prefix
-</context>
+  </context>
 
 <tasks>
 
@@ -149,6 +152,7 @@ These files contain hardcoded `nx-openpolyrepo` string literals that the Nx move
        - `tsconfig.lib.json` has updated outDir/tsBuildInfoFile paths
 
     If the generator leaves stale references, fix them manually. The generator is a starting point, not the final word.
+
   </action>
   <verify>
     <automated>ls packages/op-nx-polyrepo/package.json packages/op-nx-polyrepo-e2e/package.json 2>&1 && echo "--- old dirs ---" && ls packages/nx-openpolyrepo/package.json packages/nx-openpolyrepo-e2e/package.json 2>&1 || echo "[OK] Old directories removed"</automated>
@@ -220,6 +224,7 @@ These files contain hardcoded `nx-openpolyrepo` string literals that the Nx move
     16. After all changes, run `npm install` to regenerate `package-lock.json` with the new package names.
 
     17. Verify no remaining references: run `git grep "nx-openpolyrepo"` and confirm ONLY `.planning/` files match (those are historical and should NOT be changed).
+
   </action>
   <verify>
     <automated>npx nx run-many -t build,test --projects=op-nx-polyrepo 2>&1 | tail -20</automated>
@@ -238,12 +243,13 @@ These files contain hardcoded `nx-openpolyrepo` string literals that the Nx move
 </verification>
 
 <success_criteria>
+
 - All references to `nx-openpolyrepo` replaced with `@op-nx/polyrepo` (package name) or `op-nx-polyrepo` (directory/project name) or `@op-nx/source` (root package/condition)
 - Project directories are `packages/op-nx-polyrepo` and `packages/op-nx-polyrepo-e2e`
 - `npx nx run-many -t build,test` passes for the renamed project
 - README title reads "OpNx Polyrepo"
 - No stale references outside .planning/ directory
-</success_criteria>
+  </success_criteria>
 
 <output>
 After completion, create `.planning/quick/2-rename-package-to-op-nx-polyrepo-update-/2-SUMMARY.md`

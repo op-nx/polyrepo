@@ -26,11 +26,13 @@ Wire it into `createDependencies` in Phase 10. Keep the pure function completely
 except for the two file reads (tsconfig files) needed to expand the lookup map.
 
 <user_constraints>
+
 ## User Constraints (from CONTEXT.md)
 
 ### Locked Decisions
 
 **Lookup Map Construction**
+
 - Build a single `Map<alias, projectName>` used throughout detection
 - Primary source: `packageName` from `TransformedNode` (populated by Phase 8)
 - Secondary source: provider-side tsconfig path aliases — read each external repo's
@@ -41,6 +43,7 @@ except for the two file reads (tsconfig files) needed to expand the lookup map.
   at detection time (zero I/O)
 
 **Auto-detection: package.json**
+
 - Scan `dependencies`, `devDependencies`, and `peerDependencies` on every `TransformedNode`
   (external projects) and every host project's package.json
 - All three fields emit `DependencyType.static` edges
@@ -50,6 +53,7 @@ except for the two file reads (tsconfig files) needed to expand the lookup map.
   targets via `implicitDependencies` overrides
 
 **Auto-detection: tsconfig path mappings (DETECT-04)**
+
 - Tsconfig path aliases from providing repos expand the lookup map (provider-side only)
 - Consumer-side tsconfig paths are NOT dep declarations (deferred to v1.2)
 - Tsconfig-detected edges: `DependencyType.static` with `sourceFile` pointing to the tsconfig
@@ -58,16 +62,19 @@ except for the two file reads (tsconfig files) needed to expand the lookup map.
   map for host-provided projects
 
 **Detection Scope**
+
 - Full bidirectional coverage: host→external, external→host, external→external
 - All pairs scanned
 
 **Override Processing (OVRD-01, OVRD-02)**
+
 - `implicitDependencies` is `Record<string, string[]>` with minimatch globs on both keys and
   target values, `!` negation prefix on targets
 - Explicit override edges: `DependencyType.implicit` (no `sourceFile`)
 - Negation (`!target`) suppresses auto-detected edges matching that target
 
 **Override Validation (OVRD-03)**
+
 - Hard fail — throw, not warn
 - Collect ALL unknown project references across all override entries first, then throw once
 - Error message format: `Unknown projects in implicitDependencies: nx/missing-lib, shared/ghost-app`
@@ -87,43 +94,48 @@ except for the two file reads (tsconfig files) needed to expand the lookup map.
 - Extended path alias resolution for consuming repos
 - Dependency edge type control per override
 - Extended path alias resolution without packageName
-</user_constraints>
+  </user_constraints>
 
 <phase_requirements>
+
 ## Phase Requirements
 
-| ID | Description | Research Support |
-|----|-------------|-----------------|
-| DETECT-01 | Plugin auto-detects cross-repo edges from `dependencies` field | `TransformedNode.dependencies` already populated; lookup map match → emit `StaticDependency` |
-| DETECT-02 | Plugin auto-detects cross-repo edges from `devDependencies` field | `TransformedNode.devDependencies` already populated; same lookup map match |
-| DETECT-03 | Plugin auto-detects cross-repo edges from `peerDependencies` field | `TransformedNode.peerDependencies` already populated; same lookup map match |
-| DETECT-04 | Plugin auto-detects cross-repo edges from tsconfig path mappings | Provider-side tsconfig read expands lookup map; match during dep-list scan |
-| OVRD-01 | User can declare explicit cross-repo dependency edges in plugin config | `implicitDependencies` already validated in schema.ts; emit `ImplicitDependency` |
-| OVRD-02 | User can negate auto-detected edges via override config | `!target` prefix suppresses edges from auto-detection output |
-| OVRD-03 | Plugin fails at load time when override references unknown project | Throw with collected list; validate against `context.projects` |
+| ID        | Description                                                            | Research Support                                                                             |
+| --------- | ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| DETECT-01 | Plugin auto-detects cross-repo edges from `dependencies` field         | `TransformedNode.dependencies` already populated; lookup map match → emit `StaticDependency` |
+| DETECT-02 | Plugin auto-detects cross-repo edges from `devDependencies` field      | `TransformedNode.devDependencies` already populated; same lookup map match                   |
+| DETECT-03 | Plugin auto-detects cross-repo edges from `peerDependencies` field     | `TransformedNode.peerDependencies` already populated; same lookup map match                  |
+| DETECT-04 | Plugin auto-detects cross-repo edges from tsconfig path mappings       | Provider-side tsconfig read expands lookup map; match during dep-list scan                   |
+| OVRD-01   | User can declare explicit cross-repo dependency edges in plugin config | `implicitDependencies` already validated in schema.ts; emit `ImplicitDependency`             |
+| OVRD-02   | User can negate auto-detected edges via override config                | `!target` prefix suppresses edges from auto-detection output                                 |
+| OVRD-03   | Plugin fails at load time when override references unknown project     | Throw with collected list; validate against `context.projects`                               |
+
 </phase_requirements>
 
 ## Standard Stack
 
 ### Core
-| Library | Version | Purpose | Why Standard |
-|---------|---------|---------|--------------|
-| `@nx/devkit` | `>=20.0.0` (peer) | `DependencyType`, `RawProjectGraphDependency`, `CreateDependenciesContext` | Already the plugin's peer dependency; provides exact output types |
-| `node:fs` (`readFileSync`) | Node built-in | Synchronous tsconfig file reads | Already used in `transform.ts` for package.json reads; same pattern |
-| `node:path` (`join`) | Node built-in | Construct tsconfig file paths | Already imported throughout codebase |
-| `zod` v4 | `^4.0.0` | Validate tsconfig JSON at file-read boundary | Project-wide Zod policy; tsconfig is an external file |
-| `minimatch` | `10.2.4` | Glob matching for `implicitDependencies` keys and values | Transitive dep from `nx`; already at workspace root |
+
+| Library                    | Version           | Purpose                                                                    | Why Standard                                                        |
+| -------------------------- | ----------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `@nx/devkit`               | `>=20.0.0` (peer) | `DependencyType`, `RawProjectGraphDependency`, `CreateDependenciesContext` | Already the plugin's peer dependency; provides exact output types   |
+| `node:fs` (`readFileSync`) | Node built-in     | Synchronous tsconfig file reads                                            | Already used in `transform.ts` for package.json reads; same pattern |
+| `node:path` (`join`)       | Node built-in     | Construct tsconfig file paths                                              | Already imported throughout codebase                                |
+| `zod` v4                   | `^4.0.0`          | Validate tsconfig JSON at file-read boundary                               | Project-wide Zod policy; tsconfig is an external file               |
+| `minimatch`                | `10.2.4`          | Glob matching for `implicitDependencies` keys and values                   | Transitive dep from `nx`; already at workspace root                 |
 
 ### Supporting
-| Library | Version | Purpose | When to Use |
-|---------|---------|---------|-------------|
-| `minimatch` (named export) | 10.2.4 | `minimatch(string, pattern)` for glob matching | Override key and value matching |
+
+| Library                    | Version | Purpose                                        | When to Use                     |
+| -------------------------- | ------- | ---------------------------------------------- | ------------------------------- |
+| `minimatch` (named export) | 10.2.4  | `minimatch(string, pattern)` for glob matching | Override key and value matching |
 
 ### Alternatives Considered
-| Instead of | Could Use | Tradeoff |
-|------------|-----------|----------|
-| `minimatch` | `micromatch` | micromatch is faster but not available as a transitive dep; minimatch is already present via nx |
-| `readFileSync` | `readFile` (async) | Async adds complexity with no benefit; tsconfig reads happen once at startup |
+
+| Instead of     | Could Use          | Tradeoff                                                                                        |
+| -------------- | ------------------ | ----------------------------------------------------------------------------------------------- |
+| `minimatch`    | `micromatch`       | micromatch is faster but not available as a transitive dep; minimatch is already present via nx |
+| `readFileSync` | `readFile` (async) | Async adds complexity with no benefit; tsconfig reads happen once at startup                    |
 
 **Installation:**
 
@@ -157,6 +169,7 @@ validation) consult this single map.
 **When to use:** At the start of `detectCrossRepoDependencies`, before iterating any node lists.
 
 **Example:**
+
 ```typescript
 // Source: project codebase pattern from transform.ts
 function buildLookupMap(
@@ -201,6 +214,7 @@ map only if no `packageName` entry already exists for that identifier.
 **When to use:** During lookup map construction, once per external repo.
 
 **Tsconfig Zod schema** (new, minimal):
+
 ```typescript
 // Source: project Zod convention from types.ts/config/resolve.ts
 const tsConfigPathsSchema = z
@@ -216,6 +230,7 @@ const tsConfigPathsSchema = z
 ```
 
 **Path alias → project root matching:**
+
 ```typescript
 // alias value example: ["libs/core/src/index.ts"]
 // strip filename: "libs/core/src"
@@ -225,6 +240,7 @@ const tsConfigPathsSchema = z
 ```
 
 **Silent skip pattern** (consistent with Phase 8 `transform.ts`):
+
 ```typescript
 try {
   const raw = JSON.parse(readFileSync(tsconfigPath, 'utf-8'));
@@ -246,11 +262,12 @@ repo than the source, emit a `StaticDependency`.
 **When to use:** After lookup map is built; the main detection loop.
 
 **Key shape** (from verified `@nx/devkit` types):
+
 ```typescript
 // StaticDependency from nx/src/project-graph/project-graph-builder.d.ts
 const edge: RawProjectGraphDependency = {
-  source: sourceProjectName,         // namespaced, e.g. "repo-a/my-app"
-  target: targetProjectName,         // namespaced, e.g. "repo-b/my-lib"
+  source: sourceProjectName, // namespaced, e.g. "repo-a/my-app"
+  target: targetProjectName, // namespaced, e.g. "repo-b/my-lib"
   sourceFile: relativePathToPackageJson, // e.g. ".repos/repo-a/apps/my-app/package.json"
   type: DependencyType.static,
 };
@@ -273,12 +290,13 @@ patterns. Handle `!` prefix (negation) separately from positive targets.
 remove any edge whose source+target matches a negation override.
 
 **Minimatch usage:**
+
 ```typescript
 import { minimatch } from 'minimatch';
 
 // key matching (project name patterns)
-const matchedSources = Object.keys(context.projects).filter(
-  name => minimatch(name, keyPattern),
+const matchedSources = Object.keys(context.projects).filter((name) =>
+  minimatch(name, keyPattern),
 );
 
 // target matching (strip ! prefix first)
@@ -286,8 +304,8 @@ const targetPattern = targetEntry.startsWith('!')
   ? targetEntry.slice(1)
   : targetEntry;
 const isNegation = targetEntry.startsWith('!');
-const matchedTargets = Object.keys(context.projects).filter(
-  name => minimatch(name, targetPattern),
+const matchedTargets = Object.keys(context.projects).filter((name) =>
+  minimatch(name, targetPattern),
 );
 ```
 
@@ -302,8 +320,8 @@ const unknowns: string[] = [];
 
 for (const [keyPattern, targets] of Object.entries(implicitDeps)) {
   // Check if ANY existing project matches the key pattern
-  const keyHasMatch = Object.keys(context.projects).some(
-    name => minimatch(name, keyPattern),
+  const keyHasMatch = Object.keys(context.projects).some((name) =>
+    minimatch(name, keyPattern),
   );
 
   if (!keyHasMatch) {
@@ -312,8 +330,8 @@ for (const [keyPattern, targets] of Object.entries(implicitDeps)) {
 
   for (const target of targets) {
     const targetPattern = target.startsWith('!') ? target.slice(1) : target;
-    const targetHasMatch = Object.keys(context.projects).some(
-      name => minimatch(name, targetPattern),
+    const targetHasMatch = Object.keys(context.projects).some((name) =>
+      minimatch(name, targetPattern),
     );
 
     if (!targetHasMatch) {
@@ -349,11 +367,11 @@ project references.
 
 ## Don't Hand-Roll
 
-| Problem | Don't Build | Use Instead | Why |
-|---------|-------------|-------------|-----|
-| Glob pattern matching | Custom regex or string-split matching | `minimatch` | Edge cases in `{a,b}` brace expansion, `**` globstar, case sensitivity; minimatch handles all of them |
-| tsconfig parsing | Custom regex JSON extraction | Zod + `JSON.parse` + `safeParse` | Project-wide Zod policy; tsconfig files have comments in practice but Node's `JSON.parse` is sufficient for the `paths` use case; if tsconfig has comments it will throw and the silent-skip catches it |
-| Project name lookup deduplication | Manual Set operations | `Map.has()` guard before `Map.set()` | `packageName` precedence over tsconfig alias is simply "only set if key not already present" |
+| Problem                           | Don't Build                           | Use Instead                          | Why                                                                                                                                                                                                     |
+| --------------------------------- | ------------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Glob pattern matching             | Custom regex or string-split matching | `minimatch`                          | Edge cases in `{a,b}` brace expansion, `**` globstar, case sensitivity; minimatch handles all of them                                                                                                   |
+| tsconfig parsing                  | Custom regex JSON extraction          | Zod + `JSON.parse` + `safeParse`     | Project-wide Zod policy; tsconfig files have comments in practice but Node's `JSON.parse` is sufficient for the `paths` use case; if tsconfig has comments it will throw and the silent-skip catches it |
+| Project name lookup deduplication | Manual Set operations                 | `Map.has()` guard before `Map.set()` | `packageName` precedence over tsconfig alias is simply "only set if key not already present"                                                                                                            |
 
 **Key insight:** The entire detection algorithm reduces to a lookup table join — build the map
 once, iterate consumer dep lists once. No graph traversal, no recursive resolution. This
@@ -465,16 +483,19 @@ type ImplicitDependency = {
   type: typeof DependencyType.implicit; // 'implicit'
 };
 
-type RawProjectGraphDependency = ImplicitDependency | StaticDependency | DynamicDependency;
+type RawProjectGraphDependency =
+  | ImplicitDependency
+  | StaticDependency
+  | DynamicDependency;
 ```
 
 ### DependencyType Values (verified at runtime)
 
 ```typescript
 // Source: runtime check against @nx/devkit
-DependencyType.static   === 'static'
-DependencyType.implicit === 'implicit'
-DependencyType.dynamic  === 'dynamic'
+DependencyType.static === 'static';
+DependencyType.implicit === 'implicit';
+DependencyType.dynamic === 'dynamic';
 ```
 
 ### minimatch Named Import (verified at runtime)
@@ -483,9 +504,9 @@ DependencyType.dynamic  === 'dynamic'
 // Source: minimatch v10.2.4 package in workspace node_modules
 import { minimatch } from 'minimatch';
 
-minimatch('repo-a/my-app', 'repo-a/*') // true
-minimatch('repo-b/my-lib', 'repo-a/*') // false
-minimatch('nx/missing', 'nx/missing')  // true (exact match also works)
+minimatch('repo-a/my-app', 'repo-a/*'); // true
+minimatch('repo-b/my-lib', 'repo-a/*'); // false
+minimatch('nx/missing', 'nx/missing'); // true (exact match also works)
 ```
 
 ### Tsconfig paths Zod Schema
@@ -517,13 +538,14 @@ try {
 
 ## State of the Art
 
-| Old Approach | Current Approach | When Changed | Impact |
-|--------------|------------------|--------------|--------|
-| `z.object().passthrough()` | `z.object().loose()` | Phase 8 | `passthrough()` was deprecated in Zod v4; `.loose()` is the correct equivalent |
-| Manual dep array loops | Dep arrays pre-populated on `TransformedNode` | Phase 8 | No per-node file reads in detect.ts for external nodes |
-| `import minimatch from 'minimatch'` | `import { minimatch } from 'minimatch'` | minimatch v10 | Default export removed; named export only |
+| Old Approach                        | Current Approach                              | When Changed  | Impact                                                                         |
+| ----------------------------------- | --------------------------------------------- | ------------- | ------------------------------------------------------------------------------ |
+| `z.object().passthrough()`          | `z.object().loose()`                          | Phase 8       | `passthrough()` was deprecated in Zod v4; `.loose()` is the correct equivalent |
+| Manual dep array loops              | Dep arrays pre-populated on `TransformedNode` | Phase 8       | No per-node file reads in detect.ts for external nodes                         |
+| `import minimatch from 'minimatch'` | `import { minimatch } from 'minimatch'`       | minimatch v10 | Default export removed; named export only                                      |
 
 **Deprecated/outdated:**
+
 - `z.passthrough()`: Replaced by `.loose()` in Zod v4 (already corrected in Phase 8 — `types.ts` uses `.loose()`)
 
 ## Open Questions
@@ -554,24 +576,24 @@ try {
 
 ### Test Framework
 
-| Property | Value |
-|----------|-------|
-| Framework | Vitest (configured in `packages/op-nx-polyrepo/vitest.config.mts`) |
-| Config file | `packages/op-nx-polyrepo/vitest.config.mts` |
-| Quick run command | `pnpm nx test @op-nx/polyrepo --output-style=static` |
-| Full suite command | `pnpm nx test @op-nx/polyrepo --output-style=static` |
+| Property           | Value                                                              |
+| ------------------ | ------------------------------------------------------------------ |
+| Framework          | Vitest (configured in `packages/op-nx-polyrepo/vitest.config.mts`) |
+| Config file        | `packages/op-nx-polyrepo/vitest.config.mts`                        |
+| Quick run command  | `pnpm nx test @op-nx/polyrepo --output-style=static`               |
+| Full suite command | `pnpm nx test @op-nx/polyrepo --output-style=static`               |
 
 ### Phase Requirements → Test Map
 
-| Req ID | Behavior | Test Type | Automated Command | File Exists? |
-|--------|----------|-----------|-------------------|-------------|
-| DETECT-01 | Emits `static` edge when consumer's `dependencies` contains a packageName from lookup map | unit | `pnpm nx test @op-nx/polyrepo --output-style=static` | Wave 0 |
-| DETECT-02 | Emits `static` edge when consumer's `devDependencies` contains a lookup map entry | unit | `pnpm nx test @op-nx/polyrepo --output-style=static` | Wave 0 |
-| DETECT-03 | Emits `static` edge when consumer's `peerDependencies` contains a lookup map entry | unit | `pnpm nx test @op-nx/polyrepo --output-style=static` | Wave 0 |
-| DETECT-04 | tsconfig path alias in providing repo expands lookup map; detected as cross-repo edge | unit | `pnpm nx test @op-nx/polyrepo --output-style=static` | Wave 0 |
-| OVRD-01 | Explicit `implicitDependencies` entries emit `implicit` edges for matched project pairs | unit | `pnpm nx test @op-nx/polyrepo --output-style=static` | Wave 0 |
-| OVRD-02 | `!target` negation in `implicitDependencies` suppresses auto-detected edges | unit | `pnpm nx test @op-nx/polyrepo --output-style=static` | Wave 0 |
-| OVRD-03 | Throw with all unknown project names when override references non-existent project | unit | `pnpm nx test @op-nx/polyrepo --output-style=static` | Wave 0 |
+| Req ID    | Behavior                                                                                  | Test Type | Automated Command                                    | File Exists? |
+| --------- | ----------------------------------------------------------------------------------------- | --------- | ---------------------------------------------------- | ------------ |
+| DETECT-01 | Emits `static` edge when consumer's `dependencies` contains a packageName from lookup map | unit      | `pnpm nx test @op-nx/polyrepo --output-style=static` | Wave 0       |
+| DETECT-02 | Emits `static` edge when consumer's `devDependencies` contains a lookup map entry         | unit      | `pnpm nx test @op-nx/polyrepo --output-style=static` | Wave 0       |
+| DETECT-03 | Emits `static` edge when consumer's `peerDependencies` contains a lookup map entry        | unit      | `pnpm nx test @op-nx/polyrepo --output-style=static` | Wave 0       |
+| DETECT-04 | tsconfig path alias in providing repo expands lookup map; detected as cross-repo edge     | unit      | `pnpm nx test @op-nx/polyrepo --output-style=static` | Wave 0       |
+| OVRD-01   | Explicit `implicitDependencies` entries emit `implicit` edges for matched project pairs   | unit      | `pnpm nx test @op-nx/polyrepo --output-style=static` | Wave 0       |
+| OVRD-02   | `!target` negation in `implicitDependencies` suppresses auto-detected edges               | unit      | `pnpm nx test @op-nx/polyrepo --output-style=static` | Wave 0       |
+| OVRD-03   | Throw with all unknown project names when override references non-existent project        | unit      | `pnpm nx test @op-nx/polyrepo --output-style=static` | Wave 0       |
 
 ### Sampling Rate
 
@@ -581,11 +603,11 @@ try {
 
 ### Wave 0 Gaps
 
-- [ ] `packages/op-nx-polyrepo/src/lib/graph/detect.spec.ts` — covers all DETECT-* and OVRD-* requirements (new file)
+- [ ] `packages/op-nx-polyrepo/src/lib/graph/detect.spec.ts` — covers all DETECT-_ and OVRD-_ requirements (new file)
 - [ ] `packages/op-nx-polyrepo/src/lib/graph/detect.ts` — the module under test (new file)
 
-*(Existing test infrastructure — vitest config, `assertDefined`, SIFERS pattern, Zod mocking
-patterns — fully covers everything else. No new config or shared fixture files needed.)*
+_(Existing test infrastructure — vitest config, `assertDefined`, SIFERS pattern, Zod mocking
+patterns — fully covers everything else. No new config or shared fixture files needed.)_
 
 ## Sources
 
@@ -612,6 +634,7 @@ None — all findings verified from primary sources.
 ## Metadata
 
 **Confidence breakdown:**
+
 - Standard stack: HIGH — all libraries verified at runtime from workspace node_modules
 - Architecture: HIGH — pattern is direct extension of Phase 8's established transform.ts approach
 - Nx type shapes: HIGH — verified from .d.ts files in installed nx package

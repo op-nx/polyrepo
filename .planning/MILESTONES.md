@@ -7,6 +7,7 @@
 **Commits:** 151 | **LOC:** 13,760 TypeScript (plugin) + 623 TypeScript (e2e)
 
 **Key accomplishments:**
+
 - Cross-repo dependency auto-detection from package.json (dependencies, devDependencies, peerDependencies) and tsconfig path aliases
 - Override system with explicit dependency declaration, negation suppression, and load-time validation of unknown project references
 - Three-layer per-repo caching with global hash gate, per-repo disk cache, selective invalidation, and exponential backoff with hash-change reset
@@ -23,6 +24,7 @@
 **Commits:** 291 | **LOC:** 9,237 TypeScript
 
 **Key accomplishments:**
+
 - Plugin foundation with Zod-validated config, git clone/pull assembly, polyrepo-sync and polyrepo-status executors
 - Unified project graph -- external repo projects in nx graph/nx show projects with namespaced prefixes and cached extraction
 - Multi-repo git DX -- combined status with aligned output, bulk sync with dry-run, per-repo warnings, conditional dep install
@@ -31,4 +33,3 @@
 - Full tech debt resolution -- dead exports removed, documentation traceability complete, Nyquist compliant
 
 ---
-

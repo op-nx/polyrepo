@@ -15,13 +15,13 @@ created: 2026-03-17
 
 ## Test Infrastructure
 
-| Property | Value |
-|----------|-------|
-| **Framework** | Vitest |
-| **Config file** | `packages/op-nx-polyrepo/vitest.config.mts` |
-| **Quick run command** | `pnpm nx test @op-nx/polyrepo --output-style=static` |
+| Property               | Value                                                |
+| ---------------------- | ---------------------------------------------------- |
+| **Framework**          | Vitest                                               |
+| **Config file**        | `packages/op-nx-polyrepo/vitest.config.mts`          |
+| **Quick run command**  | `pnpm nx test @op-nx/polyrepo --output-style=static` |
 | **Full suite command** | `pnpm nx test @op-nx/polyrepo --output-style=static` |
-| **Estimated runtime** | ~10 seconds |
+| **Estimated runtime**  | ~10 seconds                                          |
 
 ---
 
@@ -36,15 +36,15 @@ created: 2026-03-17
 
 ## Per-Task Verification Map
 
-| Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
-|---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 9-01-01 | 01 | 0 | DETECT-01, DETECT-02, DETECT-03, DETECT-04, OVRD-01, OVRD-02, OVRD-03 | unit (stub) | `pnpm nx test @op-nx/polyrepo --output-style=static` | ❌ W0 | ⬜ pending |
-| 9-02-01 | 02 | 1 | DETECT-01, DETECT-02, DETECT-03 | unit | `pnpm nx test @op-nx/polyrepo --output-style=static` | ❌ W0 | ⬜ pending |
-| 9-02-02 | 02 | 1 | DETECT-04 | unit | `pnpm nx test @op-nx/polyrepo --output-style=static` | ❌ W0 | ⬜ pending |
-| 9-02-03 | 02 | 1 | OVRD-01, OVRD-02 | unit | `pnpm nx test @op-nx/polyrepo --output-style=static` | ❌ W0 | ⬜ pending |
-| 9-02-04 | 02 | 1 | OVRD-03 | unit | `pnpm nx test @op-nx/polyrepo --output-style=static` | ❌ W0 | ⬜ pending |
+| Task ID | Plan | Wave | Requirement                                                           | Test Type   | Automated Command                                    | File Exists | Status     |
+| ------- | ---- | ---- | --------------------------------------------------------------------- | ----------- | ---------------------------------------------------- | ----------- | ---------- |
+| 9-01-01 | 01   | 0    | DETECT-01, DETECT-02, DETECT-03, DETECT-04, OVRD-01, OVRD-02, OVRD-03 | unit (stub) | `pnpm nx test @op-nx/polyrepo --output-style=static` | ❌ W0       | ⬜ pending |
+| 9-02-01 | 02   | 1    | DETECT-01, DETECT-02, DETECT-03                                       | unit        | `pnpm nx test @op-nx/polyrepo --output-style=static` | ❌ W0       | ⬜ pending |
+| 9-02-02 | 02   | 1    | DETECT-04                                                             | unit        | `pnpm nx test @op-nx/polyrepo --output-style=static` | ❌ W0       | ⬜ pending |
+| 9-02-03 | 02   | 1    | OVRD-01, OVRD-02                                                      | unit        | `pnpm nx test @op-nx/polyrepo --output-style=static` | ❌ W0       | ⬜ pending |
+| 9-02-04 | 02   | 1    | OVRD-03                                                               | unit        | `pnpm nx test @op-nx/polyrepo --output-style=static` | ❌ W0       | ⬜ pending |
 
-*Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
+_Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky_
 
 ---
 
@@ -53,13 +53,13 @@ created: 2026-03-17
 - [ ] `packages/op-nx-polyrepo/src/lib/graph/detect.spec.ts` — stubs for DETECT-01, DETECT-02, DETECT-03, DETECT-04, OVRD-01, OVRD-02, OVRD-03
 - [ ] `packages/op-nx-polyrepo/src/lib/graph/detect.ts` — the module under test (skeleton/stub)
 
-*Existing infrastructure (vitest config, `assertDefined`, SIFERS pattern, Zod mocking patterns) covers everything else. No new config or shared fixture files needed.*
+_Existing infrastructure (vitest config, `assertDefined`, SIFERS pattern, Zod mocking patterns) covers everything else. No new config or shared fixture files needed._
 
 ---
 
 ## Manual-Only Verifications
 
-*All phase behaviors have automated verification.*
+_All phase behaviors have automated verification._
 
 ---
 

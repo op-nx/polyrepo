@@ -13,9 +13,11 @@ The architecture is: Vitest globalSetup starts a testcontainers Network, launche
 **Primary recommendation:** Use `testcontainers` v11.x with `GenericContainer`, Vitest 4.x `provide()`/`inject()` for cross-thread data sharing, and `hertzg/verdaccio` for multi-arch registry. Build the Dockerfile with `node:22-slim` base, prebake `create-nx-workspace` output and `git clone --depth 1` of nrwl/nx as cached layers.
 
 <user_constraints>
+
 ## User Constraints (from CONTEXT.md)
 
 ### Locked Decisions
+
 - Use **testcontainers** (`testcontainers` npm package) with `GenericContainer` (not `DockerComposeEnvironment`) for programmatic container lifecycle management
 - testcontainers manages Docker in both local (Docker Desktop) and CI (GitHub Actions ubuntu-latest) -- same code path, no environment-specific branching
 - Vitest `globalSetup` starts containers, `globalTeardown` calls `.down()` -- `nx run op-nx-polyrepo-e2e:e2e` stays the single entry point
@@ -42,6 +44,7 @@ The architecture is: Vitest globalSetup starts a testcontainers Network, launche
 - Dockerfile, Nx version, and nrwl/nx ref are the rebuild triggers. Plugin source changes do NOT trigger rebuild
 
 ### Claude's Discretion
+
 - Dockerfile layer ordering and optimization
 - testcontainers wait strategy details (health check vs log message vs port)
 - Exact `commit()` options and image tagging
@@ -50,36 +53,41 @@ The architecture is: Vitest globalSetup starts a testcontainers Network, launche
 - Whether to keep `docker-compose.e2e.yml` or go pure GenericContainer
 
 ### Deferred Ideas (OUT OF SCOPE)
+
 - Parallel test files (increase `maxWorkers` later)
 - GHCR pre-built images
 - Multi-platform builds
 - Scalability test images
-</user_constraints>
+  </user_constraints>
 
 ## Standard Stack
 
 ### Core
-| Library | Version | Purpose | Why Standard |
-|---------|---------|---------|--------------|
-| testcontainers | ^11.12.0 | Container lifecycle management | De facto standard for container-based testing in Node.js; typed API, auto-cleanup via Ryuk, cross-platform |
-| vitest | ^4.0.0 (4.0.18 installed) | Test runner | Already in use; provides globalSetup with `provide()`/`inject()` for cross-thread data |
-| Docker (engine) | 20.10+ | Container runtime | Docker Desktop on local (Snapdragon X Elite arm64), standard ubuntu-latest in CI |
+
+| Library         | Version                   | Purpose                        | Why Standard                                                                                               |
+| --------------- | ------------------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| testcontainers  | ^11.12.0                  | Container lifecycle management | De facto standard for container-based testing in Node.js; typed API, auto-cleanup via Ryuk, cross-platform |
+| vitest          | ^4.0.0 (4.0.18 installed) | Test runner                    | Already in use; provides globalSetup with `provide()`/`inject()` for cross-thread data                     |
+| Docker (engine) | 20.10+                    | Container runtime              | Docker Desktop on local (Snapdragon X Elite arm64), standard ubuntu-latest in CI                           |
 
 ### Supporting
-| Library | Version | Purpose | When to Use |
-|---------|---------|---------|-------------|
-| hertzg/verdaccio | latest | Multi-arch npm registry container | arm64 + amd64 support; drop-in replacement for `verdaccio/verdaccio` |
-| node:22-slim | LTS | Base Docker image for workspace container | Prebaked with create-nx-workspace output |
-| nx/release | 22.5.4 | `releaseVersion()` + `releasePublish()` APIs | Already used in current e2e; publishes plugin to Verdaccio |
+
+| Library          | Version | Purpose                                      | When to Use                                                          |
+| ---------------- | ------- | -------------------------------------------- | -------------------------------------------------------------------- |
+| hertzg/verdaccio | latest  | Multi-arch npm registry container            | arm64 + amd64 support; drop-in replacement for `verdaccio/verdaccio` |
+| node:22-slim     | LTS     | Base Docker image for workspace container    | Prebaked with create-nx-workspace output                             |
+| nx/release       | 22.5.4  | `releaseVersion()` + `releasePublish()` APIs | Already used in current e2e; publishes plugin to Verdaccio           |
 
 ### Alternatives Considered
-| Instead of | Could Use | Tradeoff |
-|------------|-----------|----------|
-| testcontainers | docker-compose CLI + execSync | Loses typed API, auto-cleanup, wait strategies; zero npm deps |
-| hertzg/verdaccio | verdaccio/verdaccio | amd64 only -- requires QEMU emulation on Snapdragon X Elite |
-| container.commit() | Docker volumes / bind mounts | Loses snapshot isolation; filesystem I/O slower with bind mounts on Windows |
+
+| Instead of         | Could Use                     | Tradeoff                                                                    |
+| ------------------ | ----------------------------- | --------------------------------------------------------------------------- |
+| testcontainers     | docker-compose CLI + execSync | Loses typed API, auto-cleanup, wait strategies; zero npm deps               |
+| hertzg/verdaccio   | verdaccio/verdaccio           | amd64 only -- requires QEMU emulation on Snapdragon X Elite                 |
+| container.commit() | Docker volumes / bind mounts  | Loses snapshot isolation; filesystem I/O slower with bind mounts on Windows |
 
 **Installation:**
+
 ```bash
 npm install -D testcontainers
 ```
@@ -89,6 +97,7 @@ Note: `testcontainers` has no peer dependencies. It bundles `dockerode` for Dock
 ## Architecture Patterns
 
 ### Recommended Project Structure
+
 ```
 packages/op-nx-polyrepo-e2e/
   docker/
@@ -106,9 +115,11 @@ packages/op-nx-polyrepo-e2e/
 ```
 
 ### Pattern 1: testcontainers Network + GenericContainer
+
 **What:** Create a shared Docker network, attach Verdaccio and workspace containers to it, use network aliases for inter-container DNS resolution.
 **When to use:** Always -- this is the core orchestration pattern.
 **Example:**
+
 ```typescript
 // Source: https://node.testcontainers.org/features/networking/
 import { GenericContainer, Network } from 'testcontainers';
@@ -133,19 +144,28 @@ const workspace = await new GenericContainer('op-nx-e2e-workspace')
 ```
 
 ### Pattern 2: Snapshot via container.commit()
+
 **What:** After installing the plugin into the prebaked workspace, commit the container filesystem as a new Docker image. Each test file starts a fresh container from this snapshot.
 **When to use:** globalSetup -- once per test run.
 **Example:**
+
 ```typescript
 // Source: https://node.testcontainers.org/features/containers/
 // Install plugin into workspace
-await workspace.exec(['npm', 'install', '-D', '@op-nx/polyrepo@e2e', '--registry', 'http://verdaccio:4873']);
+await workspace.exec([
+  'npm',
+  'install',
+  '-D',
+  '@op-nx/polyrepo@e2e',
+  '--registry',
+  'http://verdaccio:4873',
+]);
 
 // Commit snapshot
 const snapshotImageId = await workspace.commit({
   repo: 'op-nx-e2e-snapshot',
   tag: 'latest',
-  deleteOnExit: true,  // Ryuk cleans up the image
+  deleteOnExit: true, // Ryuk cleans up the image
 });
 
 // In test files, start fresh containers from snapshot:
@@ -156,9 +176,11 @@ const testContainer = await new GenericContainer(snapshotImageId)
 ```
 
 ### Pattern 3: Vitest provide()/inject() for Cross-Thread Data
+
 **What:** globalSetup runs in a separate thread from test workers. Use Vitest's `provide()` to pass snapshot image ID and network metadata.
 **When to use:** Always -- required to share testcontainers state with test files.
 **Example:**
+
 ```typescript
 // Source: https://vitest.dev/config/globalsetup.html
 // global-setup.ts
@@ -193,14 +215,16 @@ const snapshotImage = inject('snapshotImage');
 ```
 
 ### Pattern 4: container.exec() Replacing execSync
+
 **What:** Replace host-side `execSync('npx nx ...')` with `container.exec(['npx', 'nx', ...])`.
 **When to use:** Every test assertion that runs Nx commands.
 **Example:**
+
 ```typescript
 // Source: https://node.testcontainers.org/features/containers/
 const { stdout, exitCode } = await container.exec(
   ['npx', 'nx', 'polyrepo-status'],
-  { workingDir: '/workspace' }
+  { workingDir: '/workspace' },
 );
 
 expect(exitCode).toBe(0);
@@ -208,6 +232,7 @@ expect(stdout).toContain('[not synced]');
 ```
 
 ### Anti-Patterns to Avoid
+
 - **Bind mounts for workspace:** All filesystem I/O should stay on container's overlay2/ext4. Bind mounts are slower and break on Windows with path translation issues.
 - **Sharing containers across test files:** Each test file gets its own container from snapshot for isolation. Never reuse a started container across files.
 - **Using container hostnames for inter-container communication:** Use `withNetworkAliases()` instead -- hostnames are not DNS-resolvable across containers.
@@ -215,55 +240,62 @@ expect(stdout).toContain('[not synced]');
 
 ## Don't Hand-Roll
 
-| Problem | Don't Build | Use Instead | Why |
-|---------|-------------|-------------|-----|
-| Container lifecycle | Manual `docker run`/`docker stop` scripts | testcontainers GenericContainer | Auto-cleanup (Ryuk), wait strategies, typed exec API, port mapping |
-| Container-to-container networking | Manual `docker network create` + IP addresses | testcontainers Network + network aliases | DNS resolution via aliases, automatic cleanup |
-| Cross-thread data passing | `global` variables, temp files, env vars | Vitest `provide()`/`inject()` | Type-safe, serialization-safe, designed for globalSetup-to-test communication |
-| Wait for container readiness | `sleep` / polling loops | testcontainers wait strategies | Built-in log, port, HTTP health check strategies |
-| Registry setup/teardown | Shell scripts for Verdaccio lifecycle | testcontainers GenericContainer for hertzg/verdaccio | Same lifecycle management as workspace container |
+| Problem                           | Don't Build                                   | Use Instead                                          | Why                                                                           |
+| --------------------------------- | --------------------------------------------- | ---------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Container lifecycle               | Manual `docker run`/`docker stop` scripts     | testcontainers GenericContainer                      | Auto-cleanup (Ryuk), wait strategies, typed exec API, port mapping            |
+| Container-to-container networking | Manual `docker network create` + IP addresses | testcontainers Network + network aliases             | DNS resolution via aliases, automatic cleanup                                 |
+| Cross-thread data passing         | `global` variables, temp files, env vars      | Vitest `provide()`/`inject()`                        | Type-safe, serialization-safe, designed for globalSetup-to-test communication |
+| Wait for container readiness      | `sleep` / polling loops                       | testcontainers wait strategies                       | Built-in log, port, HTTP health check strategies                              |
+| Registry setup/teardown           | Shell scripts for Verdaccio lifecycle         | testcontainers GenericContainer for hertzg/verdaccio | Same lifecycle management as workspace container                              |
 
 **Key insight:** testcontainers abstracts Docker CLI complexity into a typed Node.js API. The auto-cleanup via Ryuk prevents orphaned containers even when tests crash.
 
 ## Common Pitfalls
 
 ### Pitfall 1: Ryuk Container Conflicts on Windows
+
 **What goes wrong:** Ryuk (testcontainers' cleanup daemon) may fail to start or conflict with existing Ryuk instances, especially on Docker Desktop for Windows.
 **Why it happens:** Ryuk runs as a privileged container that monitors and cleans up other containers. Docker Desktop socket permissions differ across OS.
 **How to avoid:** testcontainers handles this automatically. If issues arise, set `TESTCONTAINERS_RYUK_DISABLED=true` (already planned for CI). Locally, Ryuk should work with Docker Desktop defaults.
 **Warning signs:** Timeout errors during container startup mentioning "ryuk" or "reaper".
 
 ### Pitfall 2: Network Not Available After commit()
+
 **What goes wrong:** The committed snapshot image does not inherit network configuration. Starting a container from the snapshot without re-attaching to the network means it cannot reach Verdaccio.
 **Why it happens:** `commit()` captures filesystem state, not runtime configuration (network, ports, env vars).
 **How to avoid:** When starting a container from the snapshot in test files, always re-attach `.withNetwork(network)` and set any needed environment variables.
 **Warning signs:** `ECONNREFUSED` when tests try to reach Verdaccio from snapshot containers.
 
 ### Pitfall 3: Vitest provide() Only Accepts Serializable Data
+
 **What goes wrong:** Attempting to pass testcontainers objects (StartedGenericContainer, Network) via `provide()` fails.
 **Why it happens:** `provide()` uses structured clone -- only serializable primitives, arrays, and plain objects work.
 **How to avoid:** Pass string IDs (image name, network ID/name), not object references. Reconstruct testcontainers references in test files using the IDs.
 **Warning signs:** Serialization errors in globalSetup, or `undefined` values when using `inject()`.
 
 ### Pitfall 4: create-nx-workspace Needs npm Registry During Docker Build
+
 **What goes wrong:** `create-nx-workspace` downloads packages from the npm registry. If the Dockerfile runs this without a registry, the build fails.
 **Why it happens:** The prebake layer runs during `docker build`, which has full network access.
 **How to avoid:** This is fine -- `docker build` has network access by default. The constraint "no network dependency" applies only to test execution time, not image build time.
 **Warning signs:** None if network is available during build.
 
 ### Pitfall 5: NX_DAEMON Must Be Disabled Inside Container
+
 **What goes wrong:** Nx daemon starts inside the container and holds file locks, preventing clean container stop. Or daemon timeout causes test failures.
 **Why it happens:** Container lifecycle is controlled externally; daemon assumes long-lived process.
 **How to avoid:** Set `ENV NX_DAEMON=false` in the Dockerfile and pass it to `container.exec()` calls.
 **Warning signs:** Hung container stop, timeout errors in exec calls.
 
 ### Pitfall 6: npm Registry URL Configuration Inside Container
+
 **What goes wrong:** `npm install @op-nx/polyrepo@e2e` inside the container uses the default npm registry instead of the containerized Verdaccio.
 **Why it happens:** The container's npm config points to `registry.npmjs.org` by default.
 **How to avoid:** Either set `npm config set registry http://verdaccio:4873` in the container before install, or use `--registry http://verdaccio:4873` flag.
 **Warning signs:** 404 errors for `@op-nx/polyrepo@0.0.0-e2e`.
 
 ### Pitfall 7: Snapshot Image Reconstruction in Test Files
+
 **What goes wrong:** Test files need to start containers from the committed snapshot, but `GenericContainer` needs an image name, not an image ID hash.
 **Why it happens:** `commit()` returns an image ID. `GenericContainer` accepts image names/IDs.
 **How to avoid:** Use the repo:tag format from `commit({ repo: 'name', tag: 'tag' })` -- e.g., `new GenericContainer('op-nx-e2e-snapshot:latest')`. Alternatively, pass the returned image ID directly.
@@ -349,10 +381,17 @@ export default async function setup(project: TestProject) {
     .withName('op-nx-polyrepo-e2e-workspace')
     .start();
 
-  await workspace.exec([
-    'npm', 'install', '-D', '@op-nx/polyrepo@e2e',
-    '--registry', 'http://verdaccio:4873',
-  ], { workingDir: '/workspace' });
+  await workspace.exec(
+    [
+      'npm',
+      'install',
+      '-D',
+      '@op-nx/polyrepo@e2e',
+      '--registry',
+      'http://verdaccio:4873',
+    ],
+    { workingDir: '/workspace' },
+  );
 
   // 6. Commit snapshot
   const snapshotImage = await workspace.commit({
@@ -410,7 +449,11 @@ describe('@op-nx/polyrepo e2e', () => {
 
   it('should report unsynced repos', async () => {
     // Register plugin in nx.json
-    await container.exec(['sh', '-c', `cat > /workspace/nx.json << 'NXJSON'
+    await container.exec(
+      [
+        'sh',
+        '-c',
+        `cat > /workspace/nx.json << 'NXJSON'
 {
   "plugins": [{
     "plugin": "@op-nx/polyrepo",
@@ -421,12 +464,14 @@ describe('@op-nx/polyrepo e2e', () => {
     }
   }]
 }
-NXJSON`], { workingDir: '/workspace' });
-
-    const { stdout } = await container.exec(
-      ['npx', 'nx', 'polyrepo-status'],
+NXJSON`,
+      ],
       { workingDir: '/workspace' },
     );
+
+    const { stdout } = await container.exec(['npx', 'nx', 'polyrepo-status'], {
+      workingDir: '/workspace',
+    });
 
     expect(stdout).toContain('[not synced]');
   });
@@ -435,15 +480,16 @@ NXJSON`], { workingDir: '/workspace' });
 
 ## State of the Art
 
-| Old Approach | Current Approach | When Changed | Impact |
-|--------------|------------------|--------------|--------|
-| Host-side create-nx-workspace per test run | Prebaked Docker image with cached layers | This phase | ~3 min -> ~8-30s e2e runtime |
-| Host-side git clone from GitHub | Prebaked local clone in Docker image | This phase | Zero network dependency at test time |
-| `@nx/js:verdaccio` executor on host | `hertzg/verdaccio` container via testcontainers | This phase | arm64-native, consistent across local/CI |
-| `execSync()` for in-workspace commands | `container.exec()` typed API | This phase | Typed return values, no shell escaping issues |
-| `global.stopLocalRegistry` for cleanup | Vitest `provide()`/`inject()` + testcontainers Ryuk | This phase | Type-safe data sharing, automatic orphan cleanup |
+| Old Approach                               | Current Approach                                    | When Changed | Impact                                           |
+| ------------------------------------------ | --------------------------------------------------- | ------------ | ------------------------------------------------ |
+| Host-side create-nx-workspace per test run | Prebaked Docker image with cached layers            | This phase   | ~3 min -> ~8-30s e2e runtime                     |
+| Host-side git clone from GitHub            | Prebaked local clone in Docker image                | This phase   | Zero network dependency at test time             |
+| `@nx/js:verdaccio` executor on host        | `hertzg/verdaccio` container via testcontainers     | This phase   | arm64-native, consistent across local/CI         |
+| `execSync()` for in-workspace commands     | `container.exec()` typed API                        | This phase   | Typed return values, no shell escaping issues    |
+| `global.stopLocalRegistry` for cleanup     | Vitest `provide()`/`inject()` + testcontainers Ryuk | This phase   | Type-safe data sharing, automatic orphan cleanup |
 
 **Deprecated/outdated:**
+
 - `startLocalRegistry` from `@nx/js/plugins/jest/local-registry`: Despite the jest path, this is a generic Verdaccio launcher. Replaced by testcontainers-managed Verdaccio container.
 - `global.stopLocalRegistry` pattern: Replaced by testcontainers automatic cleanup and Vitest teardown function return.
 
@@ -467,30 +513,33 @@ NXJSON`], { workingDir: '/workspace' });
 ## Validation Architecture
 
 ### Test Framework
-| Property | Value |
-|----------|-------|
-| Framework | Vitest 4.0.18 |
-| Config file | `packages/op-nx-polyrepo-e2e/vitest.config.mts` |
-| Quick run command | `npm exec nx e2e op-nx-polyrepo-e2e` |
+
+| Property           | Value                                                            |
+| ------------------ | ---------------------------------------------------------------- |
+| Framework          | Vitest 4.0.18                                                    |
+| Config file        | `packages/op-nx-polyrepo-e2e/vitest.config.mts`                  |
+| Quick run command  | `npm exec nx e2e op-nx-polyrepo-e2e`                             |
 | Full suite command | `npm exec nx e2e op-nx-polyrepo-e2e` (same -- single e2e target) |
 
 ### Phase Requirements -> Test Map
 
 This phase has no formal requirement IDs (DX improvement). Validation is against the success criteria from the phase description:
 
-| Criterion | Behavior | Test Type | Automated Command | File Exists? |
-|-----------|----------|-----------|-------------------|-------------|
-| SC-01 | e2e completes in under 30 seconds | smoke | `npm exec nx e2e op-nx-polyrepo-e2e` (check wall time) | Existing spec, refactored |
-| SC-02 | e2e tests pass with identical assertions | e2e | `npm exec nx e2e op-nx-polyrepo-e2e` | Existing spec, refactored |
-| SC-03 | No network dependency during test execution | manual-only | Verify Verdaccio is localhost, repo is local path | N/A |
-| SC-04 | Docker image rebuilds only when Nx version or repo ref changes | manual-only | Change source, rebuild, verify layer cache hit | N/A |
+| Criterion | Behavior                                                       | Test Type   | Automated Command                                      | File Exists?              |
+| --------- | -------------------------------------------------------------- | ----------- | ------------------------------------------------------ | ------------------------- |
+| SC-01     | e2e completes in under 30 seconds                              | smoke       | `npm exec nx e2e op-nx-polyrepo-e2e` (check wall time) | Existing spec, refactored |
+| SC-02     | e2e tests pass with identical assertions                       | e2e         | `npm exec nx e2e op-nx-polyrepo-e2e`                   | Existing spec, refactored |
+| SC-03     | No network dependency during test execution                    | manual-only | Verify Verdaccio is localhost, repo is local path      | N/A                       |
+| SC-04     | Docker image rebuilds only when Nx version or repo ref changes | manual-only | Change source, rebuild, verify layer cache hit         | N/A                       |
 
 ### Sampling Rate
+
 - **Per task commit:** `npm exec nx e2e op-nx-polyrepo-e2e`
 - **Per wave merge:** Same (single e2e target)
 - **Phase gate:** Full e2e green + wall time under 30 seconds
 
 ### Wave 0 Gaps
+
 - [ ] `packages/op-nx-polyrepo-e2e/docker/Dockerfile` -- prebaked workspace image
 - [ ] `packages/op-nx-polyrepo-e2e/src/setup/global-setup.ts` -- testcontainers lifecycle
 - [ ] `packages/op-nx-polyrepo-e2e/src/setup/provided-context.ts` -- ProvidedContext type declaration
@@ -499,6 +548,7 @@ This phase has no formal requirement IDs (DX improvement). Validation is against
 ## Sources
 
 ### Primary (HIGH confidence)
+
 - [testcontainers npm v11.12.0](https://www.npmjs.com/package/testcontainers) - version, dependencies, API surface
 - [testcontainers Containers docs](https://node.testcontainers.org/features/containers/) - exec(), commit(), lifecycle, wait strategies
 - [testcontainers Networking docs](https://node.testcontainers.org/features/networking/) - Network class, aliases, inter-container communication
@@ -506,15 +556,18 @@ This phase has no formal requirement IDs (DX improvement). Validation is against
 - [hertzg/verdaccio Docker Hub](https://hub.docker.com/r/hertzg/verdaccio) - multi-arch image availability
 
 ### Secondary (MEDIUM confidence)
+
 - [testcontainers DeepWiki](https://deepwiki.com/testcontainers/testcontainers-node/2.1-genericcontainer) - GenericContainer internals, commit() source analysis
 - [Vitest + Testcontainers blog](https://nikolamilovic.com/posts/2025-4-15-integration-testing-node-vitest-testcontainers/) - real-world integration patterns
 
 ### Tertiary (LOW confidence)
+
 - Dockerfile layer optimization best practices -- general Docker knowledge, not project-specific verified
 
 ## Metadata
 
 **Confidence breakdown:**
+
 - Standard stack: HIGH - testcontainers v11.12.0 verified via npm registry, API verified via official docs
 - Architecture: HIGH - commit() + exec() + Network patterns all documented in official testcontainers docs; provide()/inject() documented in Vitest 4.x docs
 - Pitfalls: MEDIUM - based on Docker experience and testcontainers docs; some pitfalls (Ryuk on Windows, network after commit) are inferred from architecture understanding

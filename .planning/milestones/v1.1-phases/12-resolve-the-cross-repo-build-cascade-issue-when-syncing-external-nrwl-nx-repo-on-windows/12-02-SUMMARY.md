@@ -2,7 +2,8 @@
 phase: 12-resolve-the-cross-repo-build-cascade-issue-when-syncing-external-nrwl-nx-repo-on-windows
 plan: 02
 subsystem: graph, executor, sync
-tags: [nx, targetDefaults, proxy-executor, env-isolation, cache-coherence, windows]
+tags:
+  [nx, targetDefaults, proxy-executor, env-isolation, cache-coherence, windows]
 
 # Dependency graph
 requires:
@@ -22,9 +23,9 @@ affects: [e2e tests, release workflow, sync executor, graph extraction]
 tech-stack:
   added: []
   patterns:
-    - "Proxy executor env isolation: NX_DAEMON=false + NX_NO_CLOUD=true + NX_WORKSPACE_DATA_DIRECTORY + TEMP/TMP/TMPDIR per-repo"
-    - "targetDefaults shield: empty executor-scoped entry intercepts Nx name-based lookup, blocks host overrides"
-    - "needsInstall checks node_modules existence before lockfile hash comparison"
+    - 'Proxy executor env isolation: NX_DAEMON=false + NX_NO_CLOUD=true + NX_WORKSPACE_DATA_DIRECTORY + TEMP/TMP/TMPDIR per-repo'
+    - 'targetDefaults shield: empty executor-scoped entry intercepts Nx name-based lookup, blocks host overrides'
+    - 'needsInstall checks node_modules existence before lockfile hash comparison'
 
 key-files:
   created:
@@ -40,17 +41,17 @@ key-files:
     - packages/op-nx-polyrepo/src/lib/graph/extract.ts
 
 key-decisions:
-  - "targetDefaults shield: Nx resolves targetDefaults by executor key first (readTargetDefaultsForTarget line 1225). Empty @op-nx/polyrepo:run entry intercepts lookup, returns nothing to merge. Auto-injected by createNodesV2."
-  - "NX_NO_CLOUD=true: external repo Cloud config points to wrong workspace. Remote cache entries from CI (Linux) have incomplete output restoration on Windows. Fundamental correctness requirement, not per-tool bandaid."
-  - "TEMP/TMP/TMPDIR per-repo: general isolation layer catching ~80% of lock contention (Nx Cloud, npm, pnpm, Gradle, NuGet). All tools using os.tmpdir()/GetTempPath()/$TMPDIR get isolated paths."
-  - "needsInstall node_modules check: git clean -fdx deletes node_modules but lockfile hash matches stored hash. Sync skipped install, leaving proxy executor without nx binary."
-  - "Stale child cache clearing: tryInstallDeps clears .nx/cache/ and dist/ when node_modules missing. Prevents Cloud remote cache from backfilling stale entries whose output files are gone."
-  - "cache:false on sync/status targets: these depend on external filesystem state (.repos/ contents) that Nx input hashing cannot track."
+  - 'targetDefaults shield: Nx resolves targetDefaults by executor key first (readTargetDefaultsForTarget line 1225). Empty @op-nx/polyrepo:run entry intercepts lookup, returns nothing to merge. Auto-injected by createNodesV2.'
+  - 'NX_NO_CLOUD=true: external repo Cloud config points to wrong workspace. Remote cache entries from CI (Linux) have incomplete output restoration on Windows. Fundamental correctness requirement, not per-tool bandaid.'
+  - 'TEMP/TMP/TMPDIR per-repo: general isolation layer catching ~80% of lock contention (Nx Cloud, npm, pnpm, Gradle, NuGet). All tools using os.tmpdir()/GetTempPath()/$TMPDIR get isolated paths.'
+  - 'needsInstall node_modules check: git clean -fdx deletes node_modules but lockfile hash matches stored hash. Sync skipped install, leaving proxy executor without nx binary.'
+  - 'Stale child cache clearing: tryInstallDeps clears .nx/cache/ and dist/ when node_modules missing. Prevents Cloud remote cache from backfilling stale entries whose output files are gone.'
+  - 'cache:false on sync/status targets: these depend on external filesystem state (.repos/ contents) that Nx input hashing cannot track.'
 
 patterns-established:
-  - "Proxy executor env block is the single place for child process isolation"
-  - "Sync executor validates node_modules existence, not just lockfile hash"
-  - "External repo operations use per-repo .tmp/ for temp files"
+  - 'Proxy executor env block is the single place for child process isolation'
+  - 'Sync executor validates node_modules existence, not just lockfile hash'
+  - 'External repo operations use per-repo .tmp/ for temp files'
 
 requirements-completed: [BUILD-02]
 
@@ -102,15 +103,15 @@ env: {
 
 ## Verified Results
 
-| Check | Result |
-|-------|--------|
-| `nx test @op-nx/polyrepo` (no workarounds) | 359 tests, 8 proxy tasks pass |
-| Scorched earth recovery (nuke + sync + test) | Pass on first run |
-| Second run child cache | `[local cache]` hits on all child tasks |
-| `nx/devkit:build.dependsOn` | `["^build","build-base","legacy-post-build"]` (preserved) |
-| `nx/devkit:test.dependsOn` | `["test-native","build-native","^build-native"]` (preserved) |
-| `nx/devkit:lint.executor` | `@op-nx/polyrepo:run` (correct, not nx:run-commands) |
-| targetDefaults shield in nx.json | `{}` present |
+| Check                                        | Result                                                       |
+| -------------------------------------------- | ------------------------------------------------------------ |
+| `nx test @op-nx/polyrepo` (no workarounds)   | 359 tests, 8 proxy tasks pass                                |
+| Scorched earth recovery (nuke + sync + test) | Pass on first run                                            |
+| Second run child cache                       | `[local cache]` hits on all child tasks                      |
+| `nx/devkit:build.dependsOn`                  | `["^build","build-base","legacy-post-build"]` (preserved)    |
+| `nx/devkit:test.dependsOn`                   | `["test-native","build-native","^build-native"]` (preserved) |
+| `nx/devkit:lint.executor`                    | `@op-nx/polyrepo:run` (correct, not nx:run-commands)         |
+| targetDefaults shield in nx.json             | `{}` present                                                 |
 
 ## Self-Check: PASSED
 
@@ -120,5 +121,6 @@ env: {
 - [x] User approved checkpoint
 
 ---
-*Phase: 12-resolve-the-cross-repo-build-cascade-issue-when-syncing-external-nrwl-nx-repo-on-windows*
-*Completed: 2026-03-21*
+
+_Phase: 12-resolve-the-cross-repo-build-cascade-issue-when-syncing-external-nrwl-nx-repo-on-windows_
+_Completed: 2026-03-21_

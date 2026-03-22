@@ -34,12 +34,14 @@ When `container.commit()` is called (testcontainers wraps Dockerode's `container
 **The committed layer size is NOT the full container filesystem.** It is ONLY the changes made at runtime (in the upperdir). Unchanged files from the base image layers remain in the lowerdir and are referenced by pointer, not copied.
 
 Speed is determined by:
+
 - **Number of changed files** in the upperdir (more files = longer diff walk)
 - **Total size of changed files** (more data = longer tar creation and write)
 - **NaiveDiffDriver fallback** (if overlay2 native diff is disabled by `CONFIG_OVERLAY_FS_REDIRECT_DIR`, Docker falls back to walking the entire filesystem tree -- can be 10x+ slower)
 - **Disk I/O throughput** (WSL2's ext4-in-VHD adds virtualization overhead)
 
 **Sources:**
+
 - [Docker overlay2 storage driver docs](https://docs.docker.com/engine/storage/drivers/overlayfs-driver/)
 - [Docker container commit docs](https://docs.docker.com/reference/cli/docker/container/commit/)
 - [Portworx: Speed Up Docker Commit](https://portworx.com/blog/lcfs-speed-up-docker-commit/)
@@ -48,12 +50,12 @@ Speed is determined by:
 
 ### Real-World Benchmarks
 
-| Scenario | Commit Time | Source |
-|----------|-------------|--------|
-| Small container (~few MB diff) | < 1 second | Portworx LCFS benchmark |
-| 1GB file in busybox container | 15-20 seconds | moby/moby#23457 |
-| 50GB container | ~10 minutes | Docker forum reports |
-| Our case (~200MB diff, many small files) | ~3m27s | Measured |
+| Scenario                                 | Commit Time   | Source                  |
+| ---------------------------------------- | ------------- | ----------------------- |
+| Small container (~few MB diff)           | < 1 second    | Portworx LCFS benchmark |
+| 1GB file in busybox container            | 15-20 seconds | moby/moby#23457         |
+| 50GB container                           | ~10 minutes   | Docker forum reports    |
+| Our case (~200MB diff, many small files) | ~3m27s        | Measured                |
 
 The 3m27s for our ~200MB diff is disproportionately slow, suggesting either the NaiveDiffDriver fallback is active, or the "many small files" pattern is the bottleneck (overlay2 must stat each file individually during diff computation).
 
@@ -63,20 +65,21 @@ The 3m27s for our ~200MB diff is disproportionately slow, suggesting either the 
 
 ### Container Filesystem Breakdown
 
-| Path | Source | In Writable Layer? | Size |
-|------|--------|---------------------|------|
-| `/workspace/.repos/nx/` | Dockerfile `COPY --from=nx-prep` | **NO** (base image layer) | ~800MB |
-| `/workspace/.repos/nx/node_modules/` | Dockerfile `COPY --from=nx-prep` | **NO** (base image layer) | ~700MB |
-| `/workspace/node_modules/` | Runtime `npm install -D @op-nx/polyrepo` | **YES** | ~200MB |
-| `/workspace/.nx/` | Runtime `npx nx show projects` | **YES** | ~50MB |
-| `/workspace/.repos/.polyrepo-graph-cache.json` | Runtime graph cache warming | **YES** | ~500KB |
-| `/workspace/nx.json` | Runtime `container.exec()` write | **YES** | ~1KB |
-| `/workspace/package.json` | Modified by `npm install` | **YES** (copy-on-write) | ~1KB |
-| `/workspace/package-lock.json` | Created by `npm install` | **YES** | ~100KB |
-| `/workspace/.gitignore` | Dockerfile `RUN echo >> .gitignore` | **NO** (base image layer) | ~1KB |
-| `~/.npm/_cacache/` | Populated by `npm install` | **YES** | ~50-100MB |
+| Path                                           | Source                                   | In Writable Layer?        | Size      |
+| ---------------------------------------------- | ---------------------------------------- | ------------------------- | --------- |
+| `/workspace/.repos/nx/`                        | Dockerfile `COPY --from=nx-prep`         | **NO** (base image layer) | ~800MB    |
+| `/workspace/.repos/nx/node_modules/`           | Dockerfile `COPY --from=nx-prep`         | **NO** (base image layer) | ~700MB    |
+| `/workspace/node_modules/`                     | Runtime `npm install -D @op-nx/polyrepo` | **YES**                   | ~200MB    |
+| `/workspace/.nx/`                              | Runtime `npx nx show projects`           | **YES**                   | ~50MB     |
+| `/workspace/.repos/.polyrepo-graph-cache.json` | Runtime graph cache warming              | **YES**                   | ~500KB    |
+| `/workspace/nx.json`                           | Runtime `container.exec()` write         | **YES**                   | ~1KB      |
+| `/workspace/package.json`                      | Modified by `npm install`                | **YES** (copy-on-write)   | ~1KB      |
+| `/workspace/package-lock.json`                 | Created by `npm install`                 | **YES**                   | ~100KB    |
+| `/workspace/.gitignore`                        | Dockerfile `RUN echo >> .gitignore`      | **NO** (base image layer) | ~1KB      |
+| `~/.npm/_cacache/`                             | Populated by `npm install`               | **YES**                   | ~50-100MB |
 
 **Key finding:** `.repos/nx/` and its ~800MB of node_modules are from the Dockerfile's COPY layer and are NOT in the writable layer. They do NOT affect commit speed at all. The commit diff is dominated by:
+
 1. `/workspace/node_modules/` (~200MB, many thousands of files)
 2. `~/.npm/_cacache/` (~50-100MB, many small files)
 3. `/workspace/.nx/` (~50MB)
@@ -94,6 +97,7 @@ Before implementing, verify with `docker diff <container_id>` to see exactly wha
 Before calling `container.commit()`, run `rm -rf /workspace/node_modules/` inside the container. This removes the ~200MB of many small files from the writable layer. The `~/.npm/_cacache/` stays (it is needed to restore node_modules in each test).
 
 After this change, the commit diff shrinks to:
+
 - `~/.npm/_cacache/` (~50-100MB, but content-addressable = fewer files than node_modules)
 - `/workspace/.nx/` (~50MB)
 - `/workspace/.repos/.polyrepo-graph-cache.json` (~500KB)
@@ -110,11 +114,11 @@ This is the key: deleting runtime-created files GENUINELY reduces the writable l
 
 ### Expected Impact
 
-| Metric | Before | After | Change |
-|--------|--------|-------|--------|
-| Writable layer size | ~300-350MB | ~100-150MB | -60% |
-| File count in diff | ~10,000+ | ~2,000-3,000 | -70-80% |
-| Commit time (est.) | ~3m27s | ~30-60s | -70-85% |
+| Metric              | Before     | After        | Change  |
+| ------------------- | ---------- | ------------ | ------- |
+| Writable layer size | ~300-350MB | ~100-150MB   | -60%    |
+| File count in diff  | ~10,000+   | ~2,000-3,000 | -70-80% |
+| Commit time (est.)  | ~3m27s     | ~30-60s      | -70-85% |
 
 The file count reduction is the most impactful factor, as overlay2 diff speed is dominated by per-file operations (stat, read, archive).
 
@@ -122,17 +126,20 @@ The file count reduction is the most impactful factor, as overlay2 diff speed is
 
 ```typescript
 // Phase 5.5: Shrink writable layer before commit
-await timed('node_modules deleted for snapshot', () => ctr.exec(
-  ['rm', '-rf', '/workspace/node_modules'],
-  { workingDir: '/workspace' },
-));
+await timed('node_modules deleted for snapshot', () =>
+  ctr.exec(['rm', '-rf', '/workspace/node_modules'], {
+    workingDir: '/workspace',
+  }),
+);
 
 // Phase 6: Commit snapshot image (now much faster)
-const snapshotImage = await timed('Snapshot committed', () => ctr.commit({
-  repo: 'op-nx-e2e-snapshot',
-  tag: 'latest',
-  deleteOnExit: true,
-}));
+const snapshotImage = await timed('Snapshot committed', () =>
+  ctr.commit({
+    repo: 'op-nx-e2e-snapshot',
+    tag: 'latest',
+    deleteOnExit: true,
+  }),
+);
 ```
 
 ### Trade-off: Per-Test Restore Cost
@@ -140,17 +147,19 @@ const snapshotImage = await timed('Snapshot committed', () => ctr.commit({
 Each test file's `beforeAll` must now restore node_modules:
 
 ```typescript
-export async function startContainer(snapshotImage: string, name: string): Promise<StartedTestContainer> {
+export async function startContainer(
+  snapshotImage: string,
+  name: string,
+): Promise<StartedTestContainer> {
   const ctr = await new GenericContainer(snapshotImage)
     .withName(`op-nx-polyrepo-e2e-${name}`)
     .withCommand(['sleep', 'infinity'])
     .start();
 
   // Restore node_modules from warm npm cache
-  await ctr.exec(
-    ['npm', 'install', '--prefer-offline'],
-    { workingDir: '/workspace' },
-  );
+  await ctr.exec(['npm', 'install', '--prefer-offline'], {
+    workingDir: '/workspace',
+  });
 
   return ctr;
 }
@@ -173,13 +182,13 @@ npm stores compressed tarballs in `~/.npm/_cacache/` (content-addressable by SHA
 
 For a workspace with ~20-30 direct dependencies (typical create-nx-workspace + our plugin):
 
-| Factor | Impact |
-|--------|--------|
-| Lock file present | Skips dependency resolution (~2-5s saving) |
-| Warm cache | No network requests (~5-15s saving) |
-| `--prefer-offline` | Skips staleness checks |
-| Overlay2 write overhead | Writing to upperdir = file-level I/O |
-| Total estimated time | **15-30 seconds** |
+| Factor                  | Impact                                     |
+| ----------------------- | ------------------------------------------ |
+| Lock file present       | Skips dependency resolution (~2-5s saving) |
+| Warm cache              | No network requests (~5-15s saving)        |
+| `--prefer-offline`      | Skips staleness checks                     |
+| Overlay2 write overhead | Writing to upperdir = file-level I/O       |
+| Total estimated time    | **15-30 seconds**                          |
 
 ### Key Flags
 
@@ -189,6 +198,7 @@ For a workspace with ~20-30 direct dependencies (typical create-nx-workspace + o
 - `--no-audit`: Skip vulnerability check. Saves a few seconds.
 
 **Recommended command:**
+
 ```bash
 npm install --prefer-offline --no-audit
 ```
@@ -200,6 +210,7 @@ npm install --prefer-offline --no-audit
 - No specific benchmark found for "20-30 deps from warm cache" but consensus is sub-30 seconds
 
 **Sources:**
+
 - [Speeding up npm install in CI](https://www.tiernok.com/posts/2019/faster-npm-installs-during-ci/)
 - [npm cli install docs](https://docs.npmjs.com/cli/v10/commands/npm-install)
 - [npm cache docs](https://docs.npmjs.com/cli/v10/commands/npm-cache)
@@ -235,10 +246,12 @@ RUN cd /synced-nx && corepack enable && \
 ```
 
 This bakes the pnpm store into the image layer. Then at runtime:
+
 1. Delete `/workspace/.repos/nx/node_modules/` before commit
 2. Each test restores with `pnpm install --offline --frozen-lockfile`
 
 **Trade-offs:**
+
 - Image size increase: The pnpm store is content-addressable, so it shares content with node_modules. Net size increase is modest (~100-300MB for the store metadata).
 - Build speed regression: Without the BuildKit cache mount, `docker build` re-downloads packages on every rebuild when the NX_VERSION changes.
 - Complexity: Two package managers to restore in each test (npm + pnpm).
@@ -272,12 +285,20 @@ RUN cd /synced-nx && corepack pnpm install --frozen-lockfile && \
 
 ```typescript
 // Before commit
-await ctr.exec(['rm', '-rf', '/workspace/node_modules'], { workingDir: '/workspace' });
+await ctr.exec(['rm', '-rf', '/workspace/node_modules'], {
+  workingDir: '/workspace',
+});
 // Commit is now fast
-const snapshotImage = await ctr.commit({ repo: 'op-nx-e2e-snapshot', tag: 'latest', deleteOnExit: true });
+const snapshotImage = await ctr.commit({
+  repo: 'op-nx-e2e-snapshot',
+  tag: 'latest',
+  deleteOnExit: true,
+});
 
 // In each test's startContainer:
-await ctr.exec(['npm', 'install', '--prefer-offline', '--no-audit'], { workingDir: '/workspace' });
+await ctr.exec(['npm', 'install', '--prefer-offline', '--no-audit'], {
+  workingDir: '/workspace',
+});
 ```
 
 ### Strategy 2: docker export | docker import Instead of docker commit
@@ -289,7 +310,9 @@ await ctr.exec(['npm', 'install', '--prefer-offline', '--no-audit'], { workingDi
 ```typescript
 // Pseudocode -- NOT directly supported by testcontainers
 const containerId = ctr.getId();
-execSync(`docker export ${containerId} | docker import - op-nx-e2e-snapshot:latest`);
+execSync(
+  `docker export ${containerId} | docker import - op-nx-e2e-snapshot:latest`,
+);
 ```
 
 **Verdict:** Not recommended. The diff-only approach (Strategy 1) reduces the data that needs to be processed. Export streams the entire filesystem regardless.
@@ -315,7 +338,7 @@ execSync(`docker export ${containerId} | docker import - op-nx-e2e-snapshot:late
 **Problem:** Cannot use with the snapshot pattern. Each test would need the volume mounted, and volumes cannot be duplicated efficiently for parallel tests.
 **Verdict:** Incompatible with the current snapshot-per-test pattern.
 
-### Strategy 6: Also Delete ~/.npm/_cacache Before Commit
+### Strategy 6: Also Delete ~/.npm/\_cacache Before Commit
 
 **Complexity:** Very Low (additive to Strategy 1)
 **Risk:** Each test would need to download packages from Verdaccio again (no warm cache).
@@ -370,6 +393,7 @@ When overlay2's native diff support is incompatible with `CONFIG_OVERLAY_FS_REDI
 ### Warning Signs
 
 Docker logs a warning when falling back:
+
 ```
 Not using native diff for overlay2, this may cause degraded performance for building images
 ```
@@ -379,6 +403,7 @@ Check with `docker info | grep "Native Overlay Diff"`. If it shows `false`, the 
 ### Workaround
 
 Inside the WSL2 VM:
+
 ```bash
 echo 'options overlay redirect_dir=off' > /etc/modprobe.d/disable_overlay_redirect_dir.conf
 ```
@@ -394,6 +419,7 @@ This requires access to the Docker Desktop WSL2 VM's kernel module configuration
 ### Phase 1: Verify the Analysis (Quick)
 
 Before changing any code:
+
 1. Run the e2e global setup
 2. Before the commit step, run `docker diff <container_id>` to see exactly what files are in the writable layer
 3. Confirm that `.repos/nx/node_modules/` is NOT in the diff
@@ -415,21 +441,27 @@ Before changing any code:
 ### Implementation Code
 
 **global-setup.ts changes:**
+
 ```typescript
 // Between Phase 5 (graph cache warming) and Phase 6 (commit):
 
 // Phase 5.5: Shrink writable layer for fast snapshot commit.
 // Delete node_modules (created at runtime, so no whiteout files).
 // The npm cache (~/.npm/_cacache/) stays -- tests restore from it.
-await timed('Snapshot prep (rm node_modules)', () => ctr.exec(
-  ['rm', '-rf', '/workspace/node_modules'],
-  { workingDir: '/workspace' },
-));
+await timed('Snapshot prep (rm node_modules)', () =>
+  ctr.exec(['rm', '-rf', '/workspace/node_modules'], {
+    workingDir: '/workspace',
+  }),
+);
 ```
 
 **container.ts changes:**
+
 ```typescript
-export async function startContainer(snapshotImage: string, name: string): Promise<StartedTestContainer> {
+export async function startContainer(
+  snapshotImage: string,
+  name: string,
+): Promise<StartedTestContainer> {
   const ctr = await new GenericContainer(snapshotImage)
     .withName(`op-nx-polyrepo-e2e-${name}`)
     .withCommand(['sleep', 'infinity'])
@@ -456,7 +488,7 @@ export async function startContainer(snapshotImage: string, name: string): Promi
 
 ## 10. Additional Considerations
 
-### What About Also Deleting ~/.npm/_cacache?
+### What About Also Deleting ~/.npm/\_cacache?
 
 If the npm cache is also deleted, the commit diff shrinks further. But test containers would have no way to restore node_modules without network access. Since Verdaccio is stopped before tests run, this is only viable if Verdaccio stays alive through the test suite, adding complexity. **Not recommended for the first iteration.**
 
@@ -477,6 +509,7 @@ With 3 test files running in parallel, the per-test `npm install` runs concurren
 ## Sources
 
 ### Primary (HIGH confidence)
+
 - [Docker overlay2 storage driver docs](https://docs.docker.com/engine/storage/drivers/overlayfs-driver/) -- CoW behavior, upperdir/lowerdir, whiteout files
 - [Docker container commit docs](https://docs.docker.com/reference/cli/docker/container/commit/) -- Pause behavior, commit semantics
 - [Docker image layers docs](https://docs.docker.com/get-started/docker-concepts/building-images/understanding-image-layers/) -- Layer composition
@@ -485,6 +518,7 @@ With 3 test files running in parallel, the per-test `npm install` runs concurren
 - [pnpm Docker docs](https://pnpm.io/docker) -- `pnpm fetch`, BuildKit cache mounts
 
 ### Secondary (MEDIUM confidence)
+
 - [Portworx: LCFS Speed Up Docker Commit](https://portworx.com/blog/lcfs-speed-up-docker-commit/) -- Diff computation internals, performance benchmarks
 - [moby/moby#23457](https://github.com/moby/moby/issues/23457) -- Slow docker commit reports
 - [Docker forum: commit slow on large images](https://forums.docker.com/t/docker-commit-is-quite-slow-on-large-images/45966) -- Real-world commit times
@@ -493,6 +527,7 @@ With 3 test files running in parallel, the per-test `npm install` runs concurren
 - [Docker forum: NaiveDiffDriver](https://jarekprzygodzki.dev/post/a-curious-case-of-slow-docker-image-builds/) -- CONFIG_OVERLAY_FS_REDIRECT_DIR fallback
 
 ### Tertiary (LOW confidence)
+
 - npm cache restore timing estimates -- extrapolated from CI benchmark reports, not directly measured for this project's dependency count
 - NaiveDiffDriver diagnosis -- cannot confirm without running `docker info` (Docker Desktop not currently running)
 
@@ -501,6 +536,7 @@ With 3 test files running in parallel, the per-test `npm install` runs concurren
 ## Metadata
 
 **Confidence breakdown:**
+
 - Docker commit mechanics: HIGH -- verified from Docker official docs + source code inspection
 - Writable layer analysis: HIGH -- based on Dockerfile review + overlay2 semantics
 - Whiteout behavior for runtime files: HIGH -- overlay2 spec: deleting upperdir files removes them, no whiteout

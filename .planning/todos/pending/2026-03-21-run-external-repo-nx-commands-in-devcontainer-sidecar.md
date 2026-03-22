@@ -23,6 +23,7 @@ Explore a devcontainer-based execution model:
 6. Consider lifecycle management — keep sidecars warm between runs, shut down on workspace close
 
 Key considerations:
+
 - Fallback to host execution when no devcontainer config exists
 - Volume mounting `.repos/<alias>/` into the container vs. cloning inside
 - Port forwarding for dev servers

@@ -16,13 +16,13 @@ validated: 2026-03-11
 
 ## Test Infrastructure
 
-| Property | Value |
-|----------|-------|
-| **Framework** | Vitest 4.x |
-| **Config file** | `packages/op-nx-polyrepo/vitest.config.mts` |
-| **Quick run command** | `npm exec nx test @op-nx/polyrepo` |
+| Property               | Value                                         |
+| ---------------------- | --------------------------------------------- |
+| **Framework**          | Vitest 4.x                                    |
+| **Config file**        | `packages/op-nx-polyrepo/vitest.config.mts`   |
+| **Quick run command**  | `npm exec nx test @op-nx/polyrepo`            |
 | **Full suite command** | `npm exec nx run-many -t test,lint,typecheck` |
-| **Estimated runtime** | ~1 second (275 tests) |
+| **Estimated runtime**  | ~1 second (275 tests)                         |
 
 ---
 
@@ -37,16 +37,16 @@ validated: 2026-03-11
 
 ## Per-Task Verification Map
 
-| Task ID | Plan | Wave | Requirement | Test Type | Automated Command | Test Files | Status |
-|---------|------|------|-------------|-----------|-------------------|------------|--------|
-| 02-01-01 | 01 | 1 | GRPH-03, GRPH-04 | unit | `npm exec nx test @op-nx/polyrepo` | `normalize-url.spec.ts`, `detect.spec.ts` | green |
-| 02-01-02 | 01 | 1 | GRPH-03, GRPH-04 | unit | `npm exec nx test @op-nx/polyrepo` | `schema.spec.ts`, `sync/executor.spec.ts` | green |
-| 02-02-01 | 02 | 2 | GRPH-04 | unit | `npm exec nx test @op-nx/polyrepo` | `extract.spec.ts`, `cache.spec.ts` | green |
-| 02-02-02 | 02 | 2 | GRPH-03 | unit | `npm exec nx test @op-nx/polyrepo` | `transform.spec.ts` | green |
-| 02-03-01 | 03 | 3 | GRPH-01, GRPH-02 | unit | `npm exec nx test @op-nx/polyrepo` | `run/executor.spec.ts` | green |
-| 02-03-02 | 03 | 3 | GRPH-01, GRPH-02, GRPH-03, GRPH-04 | unit | `npm exec nx test @op-nx/polyrepo` | `index.spec.ts`, `validate.spec.ts` | green |
+| Task ID  | Plan | Wave | Requirement                        | Test Type | Automated Command                  | Test Files                                | Status |
+| -------- | ---- | ---- | ---------------------------------- | --------- | ---------------------------------- | ----------------------------------------- | ------ |
+| 02-01-01 | 01   | 1    | GRPH-03, GRPH-04                   | unit      | `npm exec nx test @op-nx/polyrepo` | `normalize-url.spec.ts`, `detect.spec.ts` | green  |
+| 02-01-02 | 01   | 1    | GRPH-03, GRPH-04                   | unit      | `npm exec nx test @op-nx/polyrepo` | `schema.spec.ts`, `sync/executor.spec.ts` | green  |
+| 02-02-01 | 02   | 2    | GRPH-04                            | unit      | `npm exec nx test @op-nx/polyrepo` | `extract.spec.ts`, `cache.spec.ts`        | green  |
+| 02-02-02 | 02   | 2    | GRPH-03                            | unit      | `npm exec nx test @op-nx/polyrepo` | `transform.spec.ts`                       | green  |
+| 02-03-01 | 03   | 3    | GRPH-01, GRPH-02                   | unit      | `npm exec nx test @op-nx/polyrepo` | `run/executor.spec.ts`                    | green  |
+| 02-03-02 | 03   | 3    | GRPH-01, GRPH-02, GRPH-03, GRPH-04 | unit      | `npm exec nx test @op-nx/polyrepo` | `index.spec.ts`, `validate.spec.ts`       | green  |
 
-*Status: pending / green / red / flaky*
+_Status: pending / green / red / flaky_
 
 ---
 
@@ -69,10 +69,10 @@ All originally-listed Wave 0 items were delivered during execution:
 
 ## Manual-Only Verifications
 
-| Behavior | Requirement | Why Manual | Test Instructions | Verified |
-|----------|-------------|------------|-------------------|----------|
-| `nx graph` visualizes external projects | GRPH-01 | Visual graph rendering requires browser | Run `nx graph` and verify external projects appear in visualization | Yes (02-03 Task 3) |
-| `nx show projects` lists external projects | GRPH-02 | Requires synced repos in .repos/ | Run sync, then `nx show projects` -- 152 projects listed | Yes (02-03 Task 3) |
+| Behavior                                   | Requirement | Why Manual                              | Test Instructions                                                   | Verified           |
+| ------------------------------------------ | ----------- | --------------------------------------- | ------------------------------------------------------------------- | ------------------ |
+| `nx graph` visualizes external projects    | GRPH-01     | Visual graph rendering requires browser | Run `nx graph` and verify external projects appear in visualization | Yes (02-03 Task 3) |
+| `nx show projects` lists external projects | GRPH-02     | Requires synced repos in .repos/        | Run sync, then `nx show projects` -- 152 projects listed            | Yes (02-03 Task 3) |
 
 ---
 
@@ -91,14 +91,14 @@ All originally-listed Wave 0 items were delivered during execution:
 
 ## Validation Audit 2026-03-11
 
-| Metric | Count |
-|--------|-------|
+| Metric               | Count                                  |
+| -------------------- | -------------------------------------- |
 | Requirements audited | 4 (GRPH-01, GRPH-02, GRPH-03, GRPH-04) |
-| Gaps found | 0 |
-| Resolved | 0 |
-| Escalated | 0 |
-| Total test files | 13 |
-| Total tests | 275 |
+| Gaps found           | 0                                      |
+| Resolved             | 0                                      |
+| Escalated            | 0                                      |
+| Total test files     | 13                                     |
+| Total tests          | 275                                    |
 
 All four GRPH requirements have automated unit test coverage across 13 test files.
 No additional test generation was needed.

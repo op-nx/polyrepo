@@ -18,8 +18,8 @@ affects: [12-02 (e2e verification and workaround cleanup)]
 tech-stack:
   added: []
   patterns:
-    - "dependsOn preservation: proxy targets set explicit dependsOn (preserved or []) to block host targetDefaults merge"
-    - "env isolation: proxy executor passes NX_DAEMON=false and NX_WORKSPACE_DATA_DIRECTORY to child Nx via runCommandsImpl env option"
+    - 'dependsOn preservation: proxy targets set explicit dependsOn (preserved or []) to block host targetDefaults merge'
+    - 'env isolation: proxy executor passes NX_DAEMON=false and NX_WORKSPACE_DATA_DIRECTORY to child Nx via runCommandsImpl env option'
 
 key-files:
   created: []
@@ -30,13 +30,13 @@ key-files:
     - packages/op-nx-polyrepo/src/lib/executors/run/executor.spec.ts
 
 key-decisions:
-  - "rewriteDependsOn namespaces only project names in object entries with projects arrays; string entries (caret, bare) and special keywords (self, dependencies) pass through unchanged"
-  - "Tag selectors (tag:*) in projects arrays pass through without namespacing since tags are preserved on namespaced projects"
-  - "Non-array dependsOn values treated as absent and return [] for safety"
+  - 'rewriteDependsOn namespaces only project names in object entries with projects arrays; string entries (caret, bare) and special keywords (self, dependencies) pass through unchanged'
+  - 'Tag selectors (tag:*) in projects arrays pass through without namespacing since tags are preserved on namespaced projects'
+  - 'Non-array dependsOn values treated as absent and return [] for safety'
 
 patterns-established:
-  - "dependsOn preservation: every proxy target gets explicit dependsOn to block host targetDefaults merge"
-  - "env isolation: child Nx processes get their own workspace-data directory to prevent SQLite conflicts"
+  - 'dependsOn preservation: every proxy target gets explicit dependsOn to block host targetDefaults merge'
+  - 'env isolation: child Nx processes get their own workspace-data directory to prevent SQLite conflicts'
 
 requirements-completed: [TDEF-01, TDEF-02, TDEF-03, BUILD-01]
 
@@ -58,6 +58,7 @@ completed: 2026-03-21
 - **Files modified:** 4
 
 ## Accomplishments
+
 - Added `rewriteDependsOn` function that correctly handles all 5 dependsOn entry types: caret strings, bare strings, object entries with projects arrays (namespaced), object entries with string projects (self/dependencies pass-through), and tag selectors (pass-through)
 - Every proxy target now gets an explicit `dependsOn` value -- either the preserved/rewritten original or `[]` for targets without dependsOn -- blocking host `targetDefaults` from leaking in
 - Proxy executor now passes `NX_DAEMON=false` and `NX_WORKSPACE_DATA_DIRECTORY` to child Nx processes, preventing SQLite database conflicts between host and child workspaces
@@ -73,12 +74,14 @@ Each task was committed atomically:
 _Note: TDD tasks had RED/GREEN phases within each commit (tests written first, then implementation, committed together after GREEN)_
 
 ## Files Created/Modified
+
 - `packages/op-nx-polyrepo/src/lib/graph/transform.ts` - Added `rewriteDependsOn` function and `dependsOn` field to `createProxyTarget` return value
 - `packages/op-nx-polyrepo/src/lib/graph/transform.spec.ts` - Replaced "dependsOn omission" tests with 9 "dependsOn preservation" test cases
 - `packages/op-nx-polyrepo/src/lib/executors/run/executor.ts` - Added `env` option to `runCommandsImpl` call with NX_DAEMON and NX_WORKSPACE_DATA_DIRECTORY
 - `packages/op-nx-polyrepo/src/lib/executors/run/executor.spec.ts` - Added 2 tests for env var passing and Windows path normalization
 
 ## Decisions Made
+
 - `rewriteDependsOn` namespaces only project names in object entries with explicit `projects` arrays; bare string entries like `"build-base"` are same-project target references and pass through unchanged
 - Tag selectors (`tag:npm:public`) in projects arrays pass through without namespacing since tags are preserved on the namespaced projects by `transformGraphForRepo`
 - Non-array `dependsOn` values (e.g., a raw string instead of an array) are treated as absent and return `[]`, providing the same host targetDefaults blocking behavior
@@ -96,6 +99,7 @@ None
 None - no external service configuration required.
 
 ## Next Phase Readiness
+
 - dependsOn preservation and env isolation are in place
 - Plan 12-02 can now verify the end-to-end fix by running builds through proxy targets and removing the `--exclude-task-dependencies` workaround
 
@@ -110,5 +114,6 @@ None - no external service configuration required.
 - [x] Commit 221bf7d found in git log
 
 ---
-*Phase: 12-resolve-the-cross-repo-build-cascade-issue-when-syncing-external-nrwl-nx-repo-on-windows*
-*Completed: 2026-03-21*
+
+_Phase: 12-resolve-the-cross-repo-build-cascade-issue-when-syncing-external-nrwl-nx-repo-on-windows_
+_Completed: 2026-03-21_

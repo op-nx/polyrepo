@@ -8,10 +8,10 @@ tags: [testcontainers, docker, e2e, vitest, container-exec]
 requires:
   - phase: 06-add-e2e-container
     plan: 01
-    provides: "Prebaked Docker image, testcontainers global setup, ProvidedContext types"
+    provides: 'Prebaked Docker image, testcontainers global setup, ProvidedContext types'
 provides:
-  - "Container-based e2e tests using testcontainers container.exec()"
-  - "23s e2e wall time on warm Docker cache (down from ~3min host-based)"
+  - 'Container-based e2e tests using testcontainers container.exec()'
+  - '23s e2e wall time on warm Docker cache (down from ~3min host-based)'
 affects: []
 
 # Tech tracking
@@ -29,14 +29,14 @@ key-files:
     - packages/op-nx-polyrepo-e2e/docker/Dockerfile
 
 key-decisions:
-  - "Used file:///repos/nx URL scheme for local repo reference (schema validation requires URL format)"
-  - "Used Docker CLI for image build instead of fromDockerfile() (Windows path issues with testcontainers)"
-  - "Added container-specific verdaccio.yaml with correct storage path for npm auth token publishing"
-  - "Used RegExp#exec() for JSON extraction from nx show output (more robust than replace)"
+  - 'Used file:///repos/nx URL scheme for local repo reference (schema validation requires URL format)'
+  - 'Used Docker CLI for image build instead of fromDockerfile() (Windows path issues with testcontainers)'
+  - 'Added container-specific verdaccio.yaml with correct storage path for npm auth token publishing'
+  - 'Used RegExp#exec() for JSON extraction from nx show output (more robust than replace)'
 
 patterns-established:
-  - "container.exec() pattern: all Nx commands run inside container, not on host"
-  - "nx.json written via heredoc through sh -c in container.exec()"
+  - 'container.exec() pattern: all Nx commands run inside container, not on host'
+  - 'nx.json written via heredoc through sh -c in container.exec()'
 
 requirements-completed: []
 
@@ -58,6 +58,7 @@ completed: 2026-03-16
 - **Files modified:** 5
 
 ## Accomplishments
+
 - Replaced all host-based execSync calls with container.exec() running inside Docker containers
 - Vitest config now uses testcontainers global setup with reduced timeouts (60s test, 120s hook)
 - All 3 e2e tests pass: plugin installed, unsynced repo detection, target registration
@@ -75,6 +76,7 @@ Each task was committed atomically:
    - `ca45c9f` - fix: lint errors in e2e spec
 
 ## Files Created/Modified
+
 - `packages/op-nx-polyrepo-e2e/src/op-nx-polyrepo.spec.ts` - Rewritten to use inject('snapshotImage'), GenericContainer, container.exec() for all Nx commands
 - `packages/op-nx-polyrepo-e2e/vitest.config.mts` - globalSetup points to new setup, reduced timeouts from 300s to 60s/120s
 - `packages/op-nx-polyrepo-e2e/src/setup/global-setup.ts` - Switched to Docker CLI build, added npm auth token for Verdaccio publish
@@ -82,6 +84,7 @@ Each task was committed atomically:
 - `packages/op-nx-polyrepo-e2e/docker/verdaccio.yaml` - Container-specific Verdaccio config with correct storage path
 
 ## Decisions Made
+
 - Used `file:///repos/nx` URL scheme for local repo reference in nx.json -- the plugin's schema validation requires a URL format, bare paths are rejected
 - Switched from `GenericContainer.fromDockerfile()` to Docker CLI build -- testcontainers path handling has issues with Windows paths
 - Added container-specific `verdaccio.yaml` -- default Verdaccio config uses wrong storage path in container context
@@ -93,6 +96,7 @@ Each task was committed atomically:
 ### Auto-fixed Issues
 
 **1. [Rule 3 - Blocking] Fixed restrict-template-expressions lint error in global-setup.ts**
+
 - **Found during:** Task 1 (lint verification)
 - **Issue:** `registryPort` (number) used directly in template literal violated @typescript-eslint/restrict-template-expressions
 - **Fix:** Wrapped in `String(registryPort)`
@@ -115,6 +119,7 @@ The following issues were discovered and fixed by the orchestrator during the hu
 **Impact on plan:** All fixes necessary for runtime correctness. The core spec structure and test strategy remained as planned.
 
 ## Issues Encountered
+
 - `tsconfig.json` polluted by `nx sync` adding .repos/nx external project references -- restored via `git checkout`, unrelated to plan changes
 - Pre-existing lint error in global-setup.ts from Plan 01 (restrict-template-expressions) had to be fixed to pass lint
 
@@ -123,6 +128,7 @@ The following issues were discovered and fixed by the orchestrator during the hu
 None - Docker Desktop must be running for e2e test execution.
 
 ## Next Phase Readiness
+
 - Phase 6 is complete. All e2e tests run inside Docker containers via testcontainers.
 - No further plans in this phase.
 
@@ -131,5 +137,6 @@ None - Docker Desktop must be running for e2e test execution.
 Verified below.
 
 ---
-*Phase: 06-add-e2e-container*
-*Completed: 2026-03-16*
+
+_Phase: 06-add-e2e-container_
+_Completed: 2026-03-16_

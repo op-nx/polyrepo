@@ -7,10 +7,10 @@ tags: [nx-graph, child-process, env-vars, stdout-sanitization, json-parse]
 # Dependency graph
 requires:
   - phase: 02-unified-project-graph
-    provides: "extractGraphFromRepo function and graph pipeline"
+    provides: 'extractGraphFromRepo function and graph pipeline'
 provides:
-  - "Robust graph extraction immune to NX_VERBOSE_LOGGING stdout contamination"
-  - "Stdout sanitization finding first JSON object in mixed output"
+  - 'Robust graph extraction immune to NX_VERBOSE_LOGGING stdout contamination'
+  - 'Stdout sanitization finding first JSON object in mixed output'
 affects: [02-unified-project-graph, e2e-testing]
 
 # Tech tracking
@@ -50,6 +50,7 @@ completed: 2026-03-12
 - **Files modified:** 2
 
 ## Accomplishments
+
 - Suppressed NX_VERBOSE_LOGGING and NX_PERF_LOGGING in child process env to prevent diagnostic output contamination
 - Added stdout sanitization that finds first '{' character before JSON.parse, handling any prefix contamination
 - Added descriptive error when stdout contains no JSON payload at all
@@ -63,10 +64,12 @@ Each task was committed atomically:
 2. **Task 1 (GREEN): Implement env suppression and stdout sanitization** - `95f813c` (fix)
 
 ## Files Created/Modified
+
 - `packages/op-nx-polyrepo/src/lib/graph/extract.ts` - Added NX_VERBOSE_LOGGING/NX_PERF_LOGGING env vars, stdout sanitization before JSON.parse
 - `packages/op-nx-polyrepo/src/lib/graph/extract.spec.ts` - Updated env test to assert all three env vars, added contaminated stdout and no-JSON tests
 
 ## Decisions Made
+
 - Sanitize stdout by slicing from first '{' rather than regex-stripping known prefixes -- handles unknown future contamination sources generically
 
 ## Deviations from Plan
@@ -74,12 +77,15 @@ Each task was committed atomically:
 None - plan executed exactly as written.
 
 ## Issues Encountered
+
 None
 
 ## User Setup Required
+
 None - no external service configuration required.
 
 ## Next Phase Readiness
+
 - Graph extraction is now resilient to stdout contamination from verbose logging
 - UAT Test 1 unblocked: external projects will appear in `nx show projects`
 - All Phase 2 plans complete
@@ -93,5 +99,6 @@ None - no external service configuration required.
 - [x] Commit 95f813c (fix GREEN) exists
 
 ---
-*Phase: 02-unified-project-graph*
-*Completed: 2026-03-12*
+
+_Phase: 02-unified-project-graph_
+_Completed: 2026-03-12_

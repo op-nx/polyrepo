@@ -2,7 +2,14 @@
 phase: 05-avoid-type-casting-and-prefer-satisfies
 plan: 03
 subsystem: type-safety
-tags: [typescript, eslint, strict-type-checked, noUncheckedIndexedAccess, restrict-template-expressions]
+tags:
+  [
+    typescript,
+    eslint,
+    strict-type-checked,
+    noUncheckedIndexedAccess,
+    restrict-template-expressions,
+  ]
 
 requires:
   - phase: 05-avoid-type-casting-and-prefer-satisfies/01
@@ -18,10 +25,10 @@ affects: [05-04, 05-05]
 tech-stack:
   added: []
   patterns:
-    - "String() wraps for non-string values in template literals"
-    - "Undefined guards for indexed access (noUncheckedIndexedAccess)"
-    - "Type-safe unknown narrowing with isRecord guard functions"
-    - "Optional chaining on regex capture groups for undefined safety"
+    - 'String() wraps for non-string values in template literals'
+    - 'Undefined guards for indexed access (noUncheckedIndexedAccess)'
+    - 'Type-safe unknown narrowing with isRecord guard functions'
+    - 'Optional chaining on regex capture groups for undefined safety'
 
 key-files:
   created: []
@@ -35,13 +42,13 @@ key-files:
     - packages/op-nx-polyrepo/src/lib/graph/transform.ts
 
 key-decisions:
-  - "Replaced rewriteTarget with createProxyTarget accepting unknown, using isRecord type guards to avoid as-assertions banned by assertionStyle:never"
-  - "Used Array.from<number>({length}) instead of new Array().fill() to avoid any[] unsafe assignment"
-  - "Regex capture group access uses optional chaining (match?.[1]) with truthiness check instead of non-null assertions"
+  - 'Replaced rewriteTarget with createProxyTarget accepting unknown, using isRecord type guards to avoid as-assertions banned by assertionStyle:never'
+  - 'Used Array.from<number>({length}) instead of new Array().fill() to avoid any[] unsafe assignment'
+  - 'Regex capture group access uses optional chaining (match?.[1]) with truthiness check instead of non-null assertions'
 
 patterns-established:
   - "isRecord type guard: typeof value === 'object' && value !== null && !Array.isArray(value)"
-  - "isRecordOfRecords type guard for nested record validation"
+  - 'isRecordOfRecords type guard for nested record validation'
 
 requirements-completed: [SAFE-ANY, SAFE-TYPES]
 
@@ -62,6 +69,7 @@ completed: 2026-03-12
 - **Files modified:** 7
 
 ## Accomplishments
+
 - Zero production lint errors under strict-type-checked rules (25+ errors fixed)
 - Zero production typecheck errors with noUncheckedIndexedAccess
 - All 280 existing tests still pass with no changes to test files
@@ -76,6 +84,7 @@ Each task was committed atomically:
 **Plan metadata:** [pending] (docs: complete plan)
 
 ## Files Created/Modified
+
 - `packages/op-nx-polyrepo/src/index.ts` - String(error) in catch template literal
 - `packages/op-nx-polyrepo/src/lib/executors/status/executor.ts` - String() wraps for numbers in template literals, undefined guards for indexed array access, typed error narrowing
 - `packages/op-nx-polyrepo/src/lib/executors/sync/executor.ts` - String() wraps, undefined guards, typed error narrowing (partially from interrupted previous run)
@@ -85,6 +94,7 @@ Each task was committed atomically:
 - `packages/op-nx-polyrepo/src/lib/graph/transform.ts` - New isRecord/isRecordOfRecords guards, createProxyTarget accepting unknown instead of TargetConfiguration
 
 ## Decisions Made
+
 - Used isRecord type guard pattern to narrow unknown target config data from Zod schema (z.unknown()), avoiding banned as-assertions
 - Used Array.from<number>({length: N}).fill(0) instead of new Array(N).fill(0) which TypeScript infers as any[]
 - Regex capture groups narrowed with optional chaining + truthiness check instead of non-null assertions
@@ -94,6 +104,7 @@ Each task was committed atomically:
 ### Auto-fixed Issues
 
 **1. [Rule 1 - Bug] Fixed unnecessary optional chains on non-nullish GraphCacheFile**
+
 - **Found during:** Task 1
 - **Issue:** `cache.report?.repos?.[alias]` used optional chains on a type that is always defined per GraphCacheFile interface
 - **Fix:** Removed optional chains: `cache.report.repos[alias]`
@@ -107,17 +118,21 @@ Each task was committed atomically:
 **Impact on plan:** Minor fix required by no-unnecessary-condition rule. No scope creep.
 
 ## Issues Encountered
+
 - Lint --fix autofix modified test files (spec.ts) and tsconfig.json alongside production files. Had to stash, verify test baseline, and restore only production changes to avoid cross-plan contamination.
 - Previous interrupted run had partial changes in sync/executor.ts that needed validation before committing.
 
 ## User Setup Required
+
 None - no external service configuration required.
 
 ## Next Phase Readiness
+
 - All production code is now fully compliant with strict lint and typecheck rules
 - Test files (Plans 04-05) can now be refactored to match the production types
 - 9 remaining files listed in the plan (config/resolve.ts, config/schema.ts, config/validate.ts, executors/run/executor.ts, git/commands.ts, git/patterns.ts, graph/cache.ts, graph/extract.ts) had zero production violations and required no changes
 
 ---
-*Phase: 05-avoid-type-casting-and-prefer-satisfies*
-*Completed: 2026-03-12*
+
+_Phase: 05-avoid-type-casting-and-prefer-satisfies_
+_Completed: 2026-03-12_

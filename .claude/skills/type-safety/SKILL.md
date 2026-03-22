@@ -10,6 +10,7 @@ description: "Project-specific type safety patterns and alternatives to banned T
 This project enforces maximum type safety via ESLint and tsconfig rules. Every `as` cast, `any` type, non-null assertion, and test hook produces a lint error that blocks the build. This skill teaches the approved alternatives so you write code that passes on the first attempt.
 
 **Enforced rules:**
+
 - **`assertionStyle: 'never'`** -- ALL `as` type assertions are banned (no exceptions in source code; `as const` is the sole permitted usage)
 - **`no-explicit-any`** -- `any` type is banned everywhere
 - **`no-non-null-assertion`** -- `!` postfix operator is banned
@@ -71,31 +72,32 @@ const mockExec = vi.fn() as unknown as typeof exec;
 
 ## Rule Index
 
-| Rule File | What It Teaches | When to Use |
-|-----------|----------------|-------------|
-| [satisfies-patterns.md](rules/satisfies-patterns.md) | `satisfies` vs type annotation vs `as const satisfies` | Writing config objects, lookup tables, typed literals |
-| [zod-validation.md](rules/zod-validation.md) | Zod `safeParse` at system boundaries | Any `JSON.parse`, API response, or file read |
-| [typed-mocks.md](rules/typed-mocks.md) | Cast-free Vitest mock patterns, custom type guards | Writing or modifying test files, narrowing `unknown` without casts |
-| [sifers-pattern.md](rules/sifers-pattern.md) | SIFERS test setup replacing hooks | Writing `describe` blocks in test files |
+| Rule File                                            | What It Teaches                                        | When to Use                                                        |
+| ---------------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------ |
+| [satisfies-patterns.md](rules/satisfies-patterns.md) | `satisfies` vs type annotation vs `as const satisfies` | Writing config objects, lookup tables, typed literals              |
+| [zod-validation.md](rules/zod-validation.md)         | Zod `safeParse` at system boundaries                   | Any `JSON.parse`, API response, or file read                       |
+| [typed-mocks.md](rules/typed-mocks.md)               | Cast-free Vitest mock patterns, custom type guards     | Writing or modifying test files, narrowing `unknown` without casts |
+| [sifers-pattern.md](rules/sifers-pattern.md)         | SIFERS test setup replacing hooks                      | Writing `describe` blocks in test files                            |
 
 ## Quick Reference: Banned Pattern -> Approved Alternative
 
-| Banned Pattern | ESLint Rule | Approved Alternative |
-|---------------|------------|---------------------|
-| `value as Type` | `consistent-type-assertions` | Type guards, `satisfies`, Zod validation |
-| `value as unknown as Type` | `consistent-type-assertions` | Restructure code, typed factories |
-| `value!` | `no-non-null-assertion` | Optional chaining `?.`, undefined guards, `assertDefined()` |
-| `any` | `no-explicit-any` | `unknown` + type guards (`isRecord()`), generic `<T>` |
-| `type Foo = { ... }` | `consistent-type-definitions` | `interface Foo { ... }` (prefer interface for objects) |
-| `import { Foo } from './m'` (type-only) | `consistent-type-imports` | `import { type Foo } from './m'` |
-| `obj.prop` on index sig | `noPropertyAccessFromIndexSignature` | `obj['prop']` bracket notation |
-| `arr[i]` used directly | `noUncheckedIndexedAccess` | `const val = arr[i]; if (val !== undefined) { ... }` |
-| `beforeEach(() => { ... })` | `vitest/no-hooks` | SIFERS `setup()` function pattern |
-| `// eslint-disable ...` | `require-description` | Fix the violation; if truly needed, add description |
+| Banned Pattern                          | ESLint Rule                          | Approved Alternative                                        |
+| --------------------------------------- | ------------------------------------ | ----------------------------------------------------------- |
+| `value as Type`                         | `consistent-type-assertions`         | Type guards, `satisfies`, Zod validation                    |
+| `value as unknown as Type`              | `consistent-type-assertions`         | Restructure code, typed factories                           |
+| `value!`                                | `no-non-null-assertion`              | Optional chaining `?.`, undefined guards, `assertDefined()` |
+| `any`                                   | `no-explicit-any`                    | `unknown` + type guards (`isRecord()`), generic `<T>`       |
+| `type Foo = { ... }`                    | `consistent-type-definitions`        | `interface Foo { ... }` (prefer interface for objects)      |
+| `import { Foo } from './m'` (type-only) | `consistent-type-imports`            | `import { type Foo } from './m'`                            |
+| `obj.prop` on index sig                 | `noPropertyAccessFromIndexSignature` | `obj['prop']` bracket notation                              |
+| `arr[i]` used directly                  | `noUncheckedIndexedAccess`           | `const val = arr[i]; if (val !== undefined) { ... }`        |
+| `beforeEach(() => { ... })`             | `vitest/no-hooks`                    | SIFERS `setup()` function pattern                           |
+| `// eslint-disable ...`                 | `require-description`                | Fix the violation; if truly needed, add description         |
 
 ## ESLint Config Reference
 
 The enforcement rules live in `eslint.config.mjs`:
+
 - **Production files** (`**/*.ts`): Full `strictTypeCheckedOnly` + `stylisticTypeCheckedOnly` + custom rules (type imports/exports, interface preference, return types, assertion ban)
 - **Test files** (`**/*.spec.ts`): `vitest.configs.recommended` with 30+ rules individually promoted to error (including `no-hooks`); `explicit-function-return-type` is relaxed for test files
 - **JS files** (`**/*.js`, `**/*.mjs`): Type-checked rules disabled via `disableTypeChecked`

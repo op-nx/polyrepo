@@ -350,15 +350,13 @@ describe('cache', () => {
       const { mocks } = await setup();
 
       // repo-a extraction fails
-      mocks.extractGraphFromRepo.mockImplementation(
-        (repoPath: string) => {
-          if (repoPath.includes('repo-a')) {
-            return Promise.reject(new Error('extraction failed'));
-          }
+      mocks.extractGraphFromRepo.mockImplementation((repoPath: string) => {
+        if (repoPath.includes('repo-a')) {
+          return Promise.reject(new Error('extraction failed'));
+        }
 
-          return Promise.resolve(rawGraph);
-        },
-      );
+        return Promise.resolve(rawGraph);
+      });
 
       const { populateGraphReport } = await loadCacheModule();
 
@@ -383,15 +381,13 @@ describe('cache', () => {
       const { mocks } = await setup();
 
       // repo-a extraction always fails
-      mocks.extractGraphFromRepo.mockImplementation(
-        (repoPath: string) => {
-          if (repoPath.includes('repo-a')) {
-            return Promise.reject(new Error('extraction failed'));
-          }
+      mocks.extractGraphFromRepo.mockImplementation((repoPath: string) => {
+        if (repoPath.includes('repo-a')) {
+          return Promise.reject(new Error('extraction failed'));
+        }
 
-          return Promise.resolve(rawGraph);
-        },
-      );
+        return Promise.resolve(rawGraph);
+      });
 
       const { populateGraphReport } = await loadCacheModule();
 
@@ -421,15 +417,13 @@ describe('cache', () => {
       const originalDateNow = Date.now;
 
       // repo-a extraction fails
-      mocks.extractGraphFromRepo.mockImplementation(
-        (repoPath: string) => {
-          if (repoPath.includes('repo-a')) {
-            return Promise.reject(new Error('extraction failed'));
-          }
+      mocks.extractGraphFromRepo.mockImplementation((repoPath: string) => {
+        if (repoPath.includes('repo-a')) {
+          return Promise.reject(new Error('extraction failed'));
+        }
 
-          return Promise.resolve(rawGraph);
-        },
-      );
+        return Promise.resolve(rawGraph);
+      });
 
       const { populateGraphReport } = await loadCacheModule();
 
@@ -463,15 +457,13 @@ describe('cache', () => {
       const { mocks } = await setup();
 
       // repo-a extraction fails initially
-      mocks.extractGraphFromRepo.mockImplementation(
-        (repoPath: string) => {
-          if (repoPath.includes('repo-a')) {
-            return Promise.reject(new Error('extraction failed'));
-          }
+      mocks.extractGraphFromRepo.mockImplementation((repoPath: string) => {
+        if (repoPath.includes('repo-a')) {
+          return Promise.reject(new Error('extraction failed'));
+        }
 
-          return Promise.resolve(rawGraph);
-        },
-      );
+        return Promise.resolve(rawGraph);
+      });
 
       const { populateGraphReport } = await loadCacheModule();
 
@@ -495,8 +487,8 @@ describe('cache', () => {
       // Second call (still within cooldown but hash changed): should attempt extraction
       await populateGraphReport(testConfig, '/workspace', 'opts-hash');
 
-      const repoACalls = mocks.extractGraphFromRepo.mock.calls.filter(
-        (call) => call[0].includes('repo-a'),
+      const repoACalls = mocks.extractGraphFromRepo.mock.calls.filter((call) =>
+        call[0].includes('repo-a'),
       );
 
       expect(repoACalls.length).toBeGreaterThanOrEqual(1);
@@ -514,15 +506,13 @@ describe('cache', () => {
       Date.now = () => fakeTime;
 
       // repo-a extraction always fails
-      mocks.extractGraphFromRepo.mockImplementation(
-        (repoPath: string) => {
-          if (repoPath.includes('repo-a')) {
-            return Promise.reject(new Error('extraction failed'));
-          }
+      mocks.extractGraphFromRepo.mockImplementation((repoPath: string) => {
+        if (repoPath.includes('repo-a')) {
+          return Promise.reject(new Error('extraction failed'));
+        }
 
-          return Promise.resolve(rawGraph);
-        },
-      );
+        return Promise.resolve(rawGraph);
+      });
 
       const { populateGraphReport } = await loadCacheModule();
 
@@ -571,10 +561,9 @@ describe('cache', () => {
 
         await populateGraphReport(testConfig, '/workspace', 'opts-hash');
 
-        const callsAfterCooldown =
-          mocks.extractGraphFromRepo.mock.calls.filter((call) =>
-            call[0].includes('repo-a'),
-          );
+        const callsAfterCooldown = mocks.extractGraphFromRepo.mock.calls.filter(
+          (call) => call[0].includes('repo-a'),
+        );
 
         expect(callsAfterCooldown.length).toBeGreaterThanOrEqual(1);
       } finally {
@@ -589,15 +578,13 @@ describe('cache', () => {
 
       const { mocks } = await setup();
 
-      mocks.extractGraphFromRepo.mockImplementation(
-        (repoPath: string) => {
-          if (repoPath.includes('repo-a')) {
-            return Promise.reject(new Error('extraction failed'));
-          }
+      mocks.extractGraphFromRepo.mockImplementation((repoPath: string) => {
+        if (repoPath.includes('repo-a')) {
+          return Promise.reject(new Error('extraction failed'));
+        }
 
-          return Promise.resolve(rawGraph);
-        },
-      );
+        return Promise.resolve(rawGraph);
+      });
 
       const { populateGraphReport } = await loadCacheModule();
 

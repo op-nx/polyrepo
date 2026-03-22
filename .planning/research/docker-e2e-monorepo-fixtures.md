@@ -16,11 +16,11 @@ The e2e sync test timeout has **three distinct bottlenecks**: (1) preinstall scr
 
 ### Three Sequential Bottlenecks
 
-| # | Operation | Time (estimated) | Where | Root Cause |
-|---|-----------|-----------------|-------|------------|
-| 1 | `corepack pnpm install` preinstall check | Instant fail (no Rust) | `syncRepo()` -> `tryInstallDeps()` | nrwl/nx `scripts/preinstall.js` requires `rustc`, exits non-zero |
-| 2 | `corepack pnpm install` dependency resolution | 60-120s+ | `syncRepo()` -> `tryInstallDeps()` | 4600+ packages, even with pnpm store warm |
-| 3 | `nx graph --print` | 60-120s+ | `createNodesV2` -> `populateGraphReport()` -> `extractGraphFromRepo()` | Computes full project graph for 600+ projects |
+| #   | Operation                                     | Time (estimated)       | Where                                                                  | Root Cause                                                       |
+| --- | --------------------------------------------- | ---------------------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| 1   | `corepack pnpm install` preinstall check      | Instant fail (no Rust) | `syncRepo()` -> `tryInstallDeps()`                                     | nrwl/nx `scripts/preinstall.js` requires `rustc`, exits non-zero |
+| 2   | `corepack pnpm install` dependency resolution | 60-120s+               | `syncRepo()` -> `tryInstallDeps()`                                     | 4600+ packages, even with pnpm store warm                        |
+| 3   | `nx graph --print`                            | 60-120s+               | `createNodesV2` -> `populateGraphReport()` -> `extractGraphFromRepo()` | Computes full project graph for 600+ projects                    |
 
 **Total wall time:** Exceeds 120s test timeout. Even if bottleneck #1 is fixed (via `CI=true`), bottlenecks #2 and #3 together likely exceed 120s in a Docker container, especially on Windows/QEMU or resource-constrained CI.
 
@@ -70,34 +70,38 @@ The `@nx/plugin:e2e` executor and `ensureNxProject()` from `@nrwl/nx-plugin/test
 
 **No.** `node_modules/` is universally `.gitignore`d. A `git clone` from a local path (`file:///repos/nx`) does not copy untracked files. Options for carrying installed state:
 
-| Method | Works? | Tradeoffs |
-|--------|--------|-----------|
-| `git clone` from prebaked local repo | No | `.gitignore` excludes `node_modules` |
-| `git clone` + warm pnpm store | Partial | Avoids network downloads but still runs install/linking (slow for 4600 packages) |
-| Commit `node_modules` to git | Technically yes | Terrible idea: bloats git, breaks native binaries across platforms |
-| Copy directory (not clone) | Yes | Skips git entirely; must fake or preserve `.git/` |
-| Docker volume mount | Yes | Pre-populated volume with installed state; `docker cp` or build-time volume |
-| Bind mount from host prebake layer | Possible | Not portable, breaks on Testcontainers Cloud |
+| Method                               | Works?          | Tradeoffs                                                                        |
+| ------------------------------------ | --------------- | -------------------------------------------------------------------------------- |
+| `git clone` from prebaked local repo | No              | `.gitignore` excludes `node_modules`                                             |
+| `git clone` + warm pnpm store        | Partial         | Avoids network downloads but still runs install/linking (slow for 4600 packages) |
+| Commit `node_modules` to git         | Technically yes | Terrible idea: bloats git, breaks native binaries across platforms               |
+| Copy directory (not clone)           | Yes             | Skips git entirely; must fake or preserve `.git/`                                |
+| Docker volume mount                  | Yes             | Pre-populated volume with installed state; `docker cp` or build-time volume      |
+| Bind mount from host prebake layer   | Possible        | Not portable, breaks on Testcontainers Cloud                                     |
 
 ### Copy Instead of Clone (MEDIUM confidence)
 
 The sync executor currently calls `gitClone()`. To use a pre-installed copy instead:
 
 **Option A: Prebake in Docker, copy at test time**
+
 ```dockerfile
 # In Dockerfile: prebake fully installed repo
 RUN git clone --depth 1 ... /repos/nx \
     && cd /repos/nx && CI=true corepack pnpm install --frozen-lockfile
 ```
+
 At test time, instead of cloning, `cp -a /repos/nx /workspace/.repos/nx/`. This carries `node_modules` and `.git/`.
 
 **Problem:** The sync executor is hardcoded to `gitClone()`. Changing it to `cp` for testing would require either:
+
 - A test-only code path (bad: testing different code than production)
 - Modifying the executor to accept local paths with `file://` scheme and detect pre-installed state
 - Pre-populating `/workspace/.repos/nx/` before sync runs (faking the "already synced" state)
 
 **Option B: Pre-populate synced state in snapshot**
 In globalSetup, before committing the snapshot:
+
 1. Copy the prebaked repo with node_modules into `/workspace/.repos/nx/`
 2. Write the lockfile hash file (`.repos/.nx.lock-hash`) so `needsInstall()` returns false
 3. Write the graph cache file (`.repos/.polyrepo-graph-cache.json`) so `populateGraphReport()` hits disk cache
@@ -193,14 +197,14 @@ CMD ["sleep", "infinity"]
 
 ### Advantages Over nrwl/nx
 
-| Aspect | nrwl/nx | Synthetic Fixture |
-|--------|---------|-------------------|
-| Install time | 60-120s+ (4600 packages) | 5-15s (nx + @nx/js + few deps) |
-| Graph extraction | 60-120s+ (600+ projects) | <2s (2-5 projects) |
-| Preinstall script | Requires Rust or CI=true bypass | No custom preinstall |
-| Determinism | Master branch changes | Fully controlled, versioned |
-| Docker image size | ~2-3 GB (with node_modules) | ~200-400 MB |
-| Maintenance | Must track upstream changes | Zero upstream dependency |
+| Aspect            | nrwl/nx                         | Synthetic Fixture              |
+| ----------------- | ------------------------------- | ------------------------------ |
+| Install time      | 60-120s+ (4600 packages)        | 5-15s (nx + @nx/js + few deps) |
+| Graph extraction  | 60-120s+ (600+ projects)        | <2s (2-5 projects)             |
+| Preinstall script | Requires Rust or CI=true bypass | No custom preinstall           |
+| Determinism       | Master branch changes           | Fully controlled, versioned    |
+| Docker image size | ~2-3 GB (with node_modules)     | ~200-400 MB                    |
+| Maintenance       | Must track upstream changes     | Zero upstream dependency       |
 
 ### Creating the Fixture
 
@@ -221,6 +225,7 @@ RUN npx --yes create-nx-workspace@${NX_VERSION} synthetic-nx \
 ```
 
 This approach:
+
 - Guarantees compatibility with the Nx version under test
 - Generates valid lockfile, nx.json, project.json automatically
 - Is fully reproducible
@@ -236,14 +241,18 @@ The project already uses `container.commit()` to snapshot the installed state. T
 
 ### Pattern: Pre-Populated Docker Volumes (MEDIUM confidence)
 
-For cases where the expensive operation is the *fixture* rather than the *plugin install*, you can use Docker named volumes:
+For cases where the expensive operation is the _fixture_ rather than the _plugin install_, you can use Docker named volumes:
 
 ```typescript
 // Create a volume with pre-installed fixture
 const volume = await new Volume().start();
 const prepContainer = await new GenericContainer('op-nx-e2e-workspace')
   .withBindMounts([{ source: volume.getName(), target: '/repos/fixture' }])
-  .withCommand(['sh', '-c', 'cp -a /repos/synthetic-nx /repos/fixture/nx && sleep infinity'])
+  .withCommand([
+    'sh',
+    '-c',
+    'cp -a /repos/synthetic-nx /repos/fixture/nx && sleep infinity',
+  ])
   .start();
 // ... volume persists across test runs
 ```
@@ -274,47 +283,67 @@ Sharing a container across test files breaks isolation. The snapshot pattern (al
 
 ```typescript
 // Before: uses nrwl/nx monorepo (600+ projects)
-const nxJsonContent = JSON.stringify({
-  plugins: [{
-    plugin: '@op-nx/polyrepo',
-    options: {
-      repos: {
-        nx: { url: 'file:///repos/nx', depth: 1, ref: 'master' },
+const nxJsonContent = JSON.stringify(
+  {
+    plugins: [
+      {
+        plugin: '@op-nx/polyrepo',
+        options: {
+          repos: {
+            nx: { url: 'file:///repos/nx', depth: 1, ref: 'master' },
+          },
+        },
       },
-    },
-  }],
-}, null, 2);
+    ],
+  },
+  null,
+  2,
+);
 
 // After: uses synthetic fixture (2-5 projects)
-const nxJsonContent = JSON.stringify({
-  plugins: [{
-    plugin: '@op-nx/polyrepo',
-    options: {
-      repos: {
-        fixture: { url: 'file:///repos/synthetic-nx', depth: 1, ref: 'main' },
+const nxJsonContent = JSON.stringify(
+  {
+    plugins: [
+      {
+        plugin: '@op-nx/polyrepo',
+        options: {
+          repos: {
+            fixture: {
+              url: 'file:///repos/synthetic-nx',
+              depth: 1,
+              ref: 'main',
+            },
+          },
+        },
       },
-    },
-  }],
-}, null, 2);
+    ],
+  },
+  null,
+  2,
+);
 ```
 
 ### Expected Timing After Fix
 
-| Operation | Before | After |
-|-----------|--------|-------|
-| git clone (local file://) | ~2s | ~1s (smaller repo) |
-| pnpm install | 60-120s+ (fails or slow) | 5-15s (few packages) |
-| nx graph --print | 60-120s+ | <2s |
-| **Total sync test** | **>120s (timeout)** | **~10-20s** |
+| Operation                 | Before                   | After                |
+| ------------------------- | ------------------------ | -------------------- |
+| git clone (local file://) | ~2s                      | ~1s (smaller repo)   |
+| pnpm install              | 60-120s+ (fails or slow) | 5-15s (few packages) |
+| nx graph --print          | 60-120s+                 | <2s                  |
+| **Total sync test**       | **>120s (timeout)**      | **~10-20s**          |
 
 ### Optional: Keep nrwl/nx as Scale Test
 
 If scale testing against a real large monorepo is valuable, add it as a **separate, optional** test with a longer timeout (300s+) and `skip` by default. Run it manually or in a dedicated CI job:
 
 ```typescript
-it.skipIf(process.env['SKIP_SCALE_TEST'])('should sync large monorepo', async () => {
-  // nrwl/nx scale test with 300s timeout
-}, 300_000);
+it.skipIf(process.env['SKIP_SCALE_TEST'])(
+  'should sync large monorepo',
+  async () => {
+    // nrwl/nx scale test with 300s timeout
+  },
+  300_000,
+);
 ```
 
 ---
@@ -322,22 +351,27 @@ it.skipIf(process.env['SKIP_SCALE_TEST'])('should sync large monorepo', async ()
 ## Pitfalls to Avoid
 
 ### Pitfall 1: Synthetic Fixture Drift
+
 **What:** The synthetic fixture's Nx version falls behind the plugin's target Nx version.
 **Prevention:** Generate the fixture using the same `NX_VERSION` ARG as the host workspace prebake. Both layers share the same ARG.
 
 ### Pitfall 2: Lockfile Mismatch on Docker Rebuild
+
 **What:** Regenerating the fixture produces a different lockfile, invalidating the install layer cache.
 **Prevention:** Accept that the fixture generation layer rebuilds when NX_VERSION changes. It only takes 15-30s for a 2-lib workspace.
 
 ### Pitfall 3: Git Identity in Docker
+
 **What:** `git init && git commit` fails without git identity.
 **Prevention:** Already handled in current Dockerfile: `git config --global user.email "e2e@test.local"`.
 
 ### Pitfall 4: Fixture Must Be a Git Repo
+
 **What:** The sync executor's `gitClone()` requires a valid git repo as source.
 **Prevention:** The fixture must have `git init && git add -A && git commit` as part of the Docker build.
 
 ### Pitfall 5: Corepack Version Pinning
+
 **What:** The synthetic fixture's `package.json` `packageManager` field pins a specific pnpm version. If the Docker image's Node.js ships a different corepack version that cannot download that pnpm version, install fails.
 **Prevention:** Use `corepack enable` in the Dockerfile. corepack handles downloading the pinned pnpm version.
 
@@ -355,6 +389,7 @@ RUN cd /repos/nx && \
 ```
 
 Then at test time, instead of running install + graph extraction:
+
 1. Copy the prebaked repo to `/workspace/.repos/nx/`
 2. Copy the prebaked graph cache to `/workspace/.repos/.polyrepo-graph-cache.json`
 3. Write the lockfile hash so `needsInstall()` returns false
@@ -368,6 +403,7 @@ Then at test time, instead of running install + graph extraction:
 ## Sources
 
 ### Primary (HIGH confidence)
+
 - [nrwl/nx scripts/preinstall.js](https://github.com/nrwl/nx/blob/master/scripts/preinstall.js) -- Verified: `CI=true` bypasses Rust check
 - [nrwl/nx e2e/utils](https://github.com/nrwl/nx/blob/master/e2e/utils/index.ts) -- How Nx tests its own plugins (newProject pattern)
 - [nrwl/nx package.json](https://github.com/nrwl/nx/blob/master/package.json) -- Preinstall script reference, packageManager field
@@ -376,6 +412,7 @@ Then at test time, instead of running install + graph extraction:
 - [Docker Build Cache](https://docs.docker.com/build/cache/optimize/) -- Layer caching optimization
 
 ### Secondary (MEDIUM confidence)
+
 - [Faithful E2E Testing of Nx Preset Generators](https://blog.chiubaka.com/faithful-e2e-testing-of-nx-preset-generators) -- Plugin e2e testing patterns
 - [Battle-Testing Nx Console with E2E Tests](https://blog.nrwl.io/battle-testing-nx-console-with-e2e-tests-c2d9ed299c98) -- Nx Console e2e approach
 - [Better @nrwl/nx-plugin testing utils (Issue #10992)](https://github.com/nrwl/nx/issues/10992) -- Public vs internal e2e util gap
@@ -383,6 +420,7 @@ Then at test time, instead of running install + graph extraction:
 - [Resolving a failing NX post-install](https://timdeschryver.dev/blog/resolving-a-failing-nx-post-install) -- Nx native binding install issues
 
 ### Tertiary (LOW confidence)
+
 - [testcontainers/testcontainers-dotnet Discussion #438](https://github.com/testcontainers/testcontainers-dotnet/discussions/438) -- Volume sharing patterns across tests
 
 ---
@@ -390,6 +428,7 @@ Then at test time, instead of running install + graph extraction:
 ## Metadata
 
 **Confidence breakdown:**
+
 - Problem analysis: HIGH -- verified from source code (preinstall.js, executor.ts, extract.ts, cache.ts)
 - Nx testing patterns: HIGH -- verified from Nx's own e2e test infrastructure
 - Synthetic fixture approach: HIGH -- standard pattern, no novel dependencies

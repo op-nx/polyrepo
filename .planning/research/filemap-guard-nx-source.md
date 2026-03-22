@@ -123,8 +123,8 @@ pub struct NxWorkspaceFilesExternals {
 
 ```typescript
 interface FileMap {
-    nonProjectFiles: FileData[];
-    projectFileMap: ProjectFileMap;  // { [projectName: string]: FileData[] }
+  nonProjectFiles: FileData[];
+  projectFileMap: ProjectFileMap; // { [projectName: string]: FileData[] }
 }
 ```
 
@@ -175,13 +175,13 @@ code to inject entries into this Rust-owned data structure after it's created.
 
 ```typescript
 interface ProjectGraphExternalNode {
-    type: string;  // NOT 'app', 'e2e', or 'lib' -- typically 'npm'
-    name: string;  // e.g., "npm:lodash" or "npm:lodash@4.17.21"
-    data: {
-        version: string;
-        packageName: string;
-        hash?: string;
-    };
+  type: string; // NOT 'app', 'e2e', or 'lib' -- typically 'npm'
+  name: string; // e.g., "npm:lodash" or "npm:lodash@4.17.21"
+  data: {
+    version: string;
+    packageName: string;
+    hash?: string;
+  };
 }
 ```
 
@@ -231,8 +231,12 @@ if self.project_graph.nodes.contains_key(dep) {
 
 ```typescript
 // project-graph-builder.ts, validateCommonDependencyRules()
-if (!projects[d.target] && !externalNodes[d.target] && !('sourceFile' in d && d.sourceFile)) {
-    throw new Error(`Target project does not exist: ${d.target}`);
+if (
+  !projects[d.target] &&
+  !externalNodes[d.target] &&
+  !('sourceFile' in d && d.sourceFile)
+) {
+  throw new Error(`Target project does not exist: ${d.target}`);
 }
 ```
 
@@ -250,14 +254,14 @@ our plugin's `createNodesV2` registers external repo projects as **project nodes
 
 ### The Key Distinction
 
-| Aspect | `graph.nodes` (project nodes) | `graph.externalNodes` |
-|--------|-------------------------------|----------------------|
-| Who creates them | `createNodesV2` plugins | Package manager plugin (JS plugin) |
-| Stored in | `project_graph.nodes` HashMap | `project_graph.external_nodes` HashMap |
+| Aspect                | `graph.nodes` (project nodes)              | `graph.externalNodes`                    |
+| --------------------- | ------------------------------------------ | ---------------------------------------- |
+| Who creates them      | `createNodesV2` plugins                    | Package manager plugin (JS plugin)       |
+| Stored in             | `project_graph.nodes` HashMap              | `project_graph.external_nodes` HashMap   |
 | Hash planner behavior | Generates `ProjectFileSet` (needs fileMap) | Generates `External` (uses version/hash) |
-| File requirements | MUST have fileMap entry | NO file requirements |
-| Task execution | Can have targets, run tasks | No targets, no task execution |
-| Type field | `'app' \| 'e2e' \| 'lib'` | `'npm'` (or any non-project type) |
+| File requirements     | MUST have fileMap entry                    | NO file requirements                     |
+| Task execution        | Can have targets, run tasks                | No targets, no task execution            |
+| Type field            | `'app' \| 'e2e' \| 'lib'`                  | `'npm'` (or any non-project type)        |
 
 ---
 
@@ -333,9 +337,9 @@ the ability to `nx run repo/project:build`.
 ```typescript
 const fileMap = context.fileMap?.projectFileMap ?? {};
 for (const dep of crossRepoDeps) {
-    if (fileMap[dep.source] && fileMap[dep.target]) {
-        dependencies.push(dep);
-    }
+  if (fileMap[dep.source] && fileMap[dep.target]) {
+    dependencies.push(dep);
+  }
 }
 ```
 
@@ -429,6 +433,7 @@ fileSet instructions for the dependency project.
 ### Solution E: Override `namedInputs.default` on External Projects
 
 **Approach:** When `createNodesV2` registers external projects, set:
+
 ```typescript
 namedInputs: { default: [] }
 ```
@@ -507,6 +512,7 @@ comes from `.gitignore`, not from hardcoded patterns.
 
 If `.repos/` were REMOVED from `.gitignore`, the walker would pick up files under
 `.repos/` and the fileMap would be populated. However, this is undesirable because:
+
 - It would make git track external repo files (merge conflicts, bloat)
 - It would make `nx affected` calculate against external repo file changes
 - The external repo's files would be hashed as part of the host workspace
@@ -541,14 +547,15 @@ In `createNodesV2`, when registering external repo projects:
 
 ```typescript
 projects[node.root] = {
-    name: node.name,
-    // ...existing fields...
-    targets: proxyTargets,  // already have inputs: [], cache: false
-    namedInputs: { default: [] },  // <-- ADD THIS
+  name: node.name,
+  // ...existing fields...
+  targets: proxyTargets, // already have inputs: [], cache: false
+  namedInputs: { default: [] }, // <-- ADD THIS
 };
 ```
 
 This ensures:
+
 1. No `ProjectFileSet` instructions generated for external projects
 2. `ProjectConfiguration` + `TsConfiguration` still work (they don't use fileMap)
 3. Cross-repo dependency edges can be safely added without crashing the hasher
@@ -584,22 +591,22 @@ is the only implicitly-used named input. Monitor Nx changelogs for changes to
 
 ## Source Files Referenced
 
-| File | Lines | What |
-|------|-------|------|
-| `packages/nx/src/native/tasks/hashers/hash_project_files.rs` | 53-54 | THE ERROR: `project {} not found` |
-| `packages/nx/src/native/tasks/hashers/hash_project_config.rs` | 14-16 | Secondary error: `Could not find project '{}'` |
-| `packages/nx/src/native/tasks/task_hasher.rs` | 143-466 | TaskHasher struct + hash_plans + hash_instruction |
-| `packages/nx/src/native/tasks/hash_planner.rs` | 23-515 | HashPlanner: plan generation, dependency traversal |
-| `packages/nx/src/native/tasks/inputs.rs` | 14-289 | Input expansion: get_inputs, get_named_inputs, defaults |
-| `packages/nx/src/native/tasks/types.rs` | 52-64 | HashInstruction enum definition |
-| `packages/nx/src/native/project_graph/types.rs` | 1-36 | ProjectGraph, Project, ExternalNode Rust types |
-| `packages/nx/src/native/workspace/workspace_files.rs` | 12-83 | FileMap construction from walker output |
-| `packages/nx/src/native/workspace/types.rs` | 1-41 | NxWorkspaceFiles, ProjectFiles type definitions |
-| `packages/nx/src/native/walker.rs` | 97-206 | Workspace file walker (respects .gitignore) |
-| `packages/nx/src/hasher/native-task-hasher-impl.ts` | 19-91 | TS bridge to Rust TaskHasher |
-| `packages/nx/src/hasher/task-hasher.ts` | 137-218 | InProcessTaskHasher wrapping NativeTaskHasherImpl |
-| `packages/nx/src/hasher/create-task-hasher.ts` | 1-27 | Factory: daemon vs in-process hasher |
-| `packages/nx/src/native/transform-objects.ts` | 1-63 | JS ProjectGraph -> Rust ProjectGraph transform |
-| `packages/nx/src/project-graph/build-project-graph.ts` | 50-85 | FileMap storage + hydration |
-| `packages/nx/src/project-graph/project-graph-builder.ts` | 25-631 | Graph builder: addNode, addExternalNode, addDependency |
-| `packages/nx/src/config/project-graph.ts` | 67-72 | ProjectGraph TS interface (nodes + externalNodes) |
+| File                                                          | Lines   | What                                                    |
+| ------------------------------------------------------------- | ------- | ------------------------------------------------------- |
+| `packages/nx/src/native/tasks/hashers/hash_project_files.rs`  | 53-54   | THE ERROR: `project {} not found`                       |
+| `packages/nx/src/native/tasks/hashers/hash_project_config.rs` | 14-16   | Secondary error: `Could not find project '{}'`          |
+| `packages/nx/src/native/tasks/task_hasher.rs`                 | 143-466 | TaskHasher struct + hash_plans + hash_instruction       |
+| `packages/nx/src/native/tasks/hash_planner.rs`                | 23-515  | HashPlanner: plan generation, dependency traversal      |
+| `packages/nx/src/native/tasks/inputs.rs`                      | 14-289  | Input expansion: get_inputs, get_named_inputs, defaults |
+| `packages/nx/src/native/tasks/types.rs`                       | 52-64   | HashInstruction enum definition                         |
+| `packages/nx/src/native/project_graph/types.rs`               | 1-36    | ProjectGraph, Project, ExternalNode Rust types          |
+| `packages/nx/src/native/workspace/workspace_files.rs`         | 12-83   | FileMap construction from walker output                 |
+| `packages/nx/src/native/workspace/types.rs`                   | 1-41    | NxWorkspaceFiles, ProjectFiles type definitions         |
+| `packages/nx/src/native/walker.rs`                            | 97-206  | Workspace file walker (respects .gitignore)             |
+| `packages/nx/src/hasher/native-task-hasher-impl.ts`           | 19-91   | TS bridge to Rust TaskHasher                            |
+| `packages/nx/src/hasher/task-hasher.ts`                       | 137-218 | InProcessTaskHasher wrapping NativeTaskHasherImpl       |
+| `packages/nx/src/hasher/create-task-hasher.ts`                | 1-27    | Factory: daemon vs in-process hasher                    |
+| `packages/nx/src/native/transform-objects.ts`                 | 1-63    | JS ProjectGraph -> Rust ProjectGraph transform          |
+| `packages/nx/src/project-graph/build-project-graph.ts`        | 50-85   | FileMap storage + hydration                             |
+| `packages/nx/src/project-graph/project-graph-builder.ts`      | 25-631  | Graph builder: addNode, addExternalNode, addDependency  |
+| `packages/nx/src/config/project-graph.ts`                     | 67-72   | ProjectGraph TS interface (nodes + externalNodes)       |

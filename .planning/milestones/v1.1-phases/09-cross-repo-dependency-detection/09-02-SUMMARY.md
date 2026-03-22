@@ -1,13 +1,23 @@
 ---
 phase: 09-cross-repo-dependency-detection
-plan: "02"
+plan: '02'
 subsystem: graph
-tags: [nx, dependency-detection, tsconfig, path-aliases, overrides, minimatch, cross-repo, graph-edges]
+tags:
+  [
+    nx,
+    dependency-detection,
+    tsconfig,
+    path-aliases,
+    overrides,
+    minimatch,
+    cross-repo,
+    graph-edges,
+  ]
 
 # Dependency graph
 requires:
   - phase: 09-cross-repo-dependency-detection
-    plan: "01"
+    plan: '01'
     provides: detectCrossRepoDependencies with lookup map and package.json dep-list scan
 provides:
   - Complete detectCrossRepoDependencies — tsconfig path alias expansion (DETECT-04), override emission (OVRD-01), negation suppression (OVRD-02), unknown-project validation (OVRD-03)
@@ -19,12 +29,12 @@ tech-stack:
   added:
     - minimatch ^10.0.0 — glob pattern matching for implicitDependencies key/target patterns
   patterns:
-    - "tsConfigPathsSchema: z.object({ compilerOptions: z.object({ paths: ... }).loose() }).loose() — same loose() pattern as resolve.ts/types.ts"
-    - "readTsconfigPaths: silent-skip on read/parse/validation failure; normalize path to forward slashes before readFileSync"
-    - "expandTsconfigPathsIntoMap: strips filename from value, walks up path segments to find matching project root, Map.has() guard preserves precedence"
-    - "Override processing order: validate first (OVRD-03) -> accumulate auto-detected -> build negation set -> filter -> emit overrides (OVRD-01)"
+    - 'tsConfigPathsSchema: z.object({ compilerOptions: z.object({ paths: ... }).loose() }).loose() — same loose() pattern as resolve.ts/types.ts'
+    - 'readTsconfigPaths: silent-skip on read/parse/validation failure; normalize path to forward slashes before readFileSync'
+    - 'expandTsconfigPathsIntoMap: strips filename from value, walks up path segments to find matching project root, Map.has() guard preserves precedence'
+    - 'Override processing order: validate first (OVRD-03) -> accumulate auto-detected -> build negation set -> filter -> emit overrides (OVRD-01)'
     - "Negation suppression via Set<'source::target'> keys — O(1) lookup, applied as post-filter after accumulation"
-    - "allProjectNames built from both external nodes and host projects for uniform override validation"
+    - 'allProjectNames built from both external nodes and host projects for uniform override validation'
 
 key-files:
   created: []
@@ -35,14 +45,14 @@ key-files:
 
 key-decisions:
   - "Normalize tsconfig path to forward slashes before readFileSync — Windows join() returns backslashes but mock predicates use endsWith('/path')"
-  - "Override validation uses allProjectNames (external + host) — enables validating patterns that target host projects"
-  - "Negation suppression applied as post-filter after full auto-detection accumulation — not inline during scan (avoids Pitfall 4)"
-  - "Override deduplication uses separate overrideEmitted set seeded from filteredEdges — prevents double-emitting edges already present from auto-detection"
-  - "minimatch added to package.json dependencies (not devDependencies) — used at runtime in createDependencies plugin hook"
+  - 'Override validation uses allProjectNames (external + host) — enables validating patterns that target host projects'
+  - 'Negation suppression applied as post-filter after full auto-detection accumulation — not inline during scan (avoids Pitfall 4)'
+  - 'Override deduplication uses separate overrideEmitted set seeded from filteredEdges — prevents double-emitting edges already present from auto-detection'
+  - 'minimatch added to package.json dependencies (not devDependencies) — used at runtime in createDependencies plugin hook'
 
 patterns-established:
-  - "expandTsconfigPathsIntoMap(paths, nodeRoots, map): reusable for both external repos and host workspace tsconfig expansion"
-  - "readTsconfigPathsWithFallback(dirPath): try tsconfig.base.json first, fall back to tsconfig.json — same pattern as Nx itself"
+  - 'expandTsconfigPathsIntoMap(paths, nodeRoots, map): reusable for both external repos and host workspace tsconfig expansion'
+  - 'readTsconfigPathsWithFallback(dirPath): try tsconfig.base.json first, fall back to tsconfig.json — same pattern as Nx itself'
 
 requirements-completed: [DETECT-04, OVRD-01, OVRD-02, OVRD-03]
 
@@ -101,6 +111,7 @@ _No REFACTOR commits needed — both implementations were clean on first pass._
 ### Auto-fixed Issues
 
 **1. [Rule 1 - Bug] Normalize path to forward slashes before readFileSync**
+
 - **Found during:** Task 1 GREEN (tsconfig path alias expansion)
 - **Issue:** `path.join('/workspace', '.repos', 'repo-b', 'tsconfig.base.json')` returns `\workspace\.repos\repo-b\tsconfig.base.json` on Windows. Test mocks used `endsWith('repo-b/tsconfig.base.json')` and all 4 edge-detection tests were failing.
 - **Fix:** Added `normalizePath(filePath)` call before `readFileSync` in `readTsconfigPaths`

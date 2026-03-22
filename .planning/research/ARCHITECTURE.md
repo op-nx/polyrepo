@@ -127,35 +127,39 @@ The `validateDependency` function in `nx/src/project-graph/project-graph-builder
 ### Critical Constraint: .repos/ Files Not in FileMap
 
 The `.repos/` directory is gitignored. Nx builds its fileMap from git-tracked files. Therefore:
+
 - Files under `.repos/<alias>/...` are NOT in `fileMap.projectFileMap` or `fileMap.nonProjectFiles`
 - A `sourceFile` pointing to `.repos/repo-a/packages/app/package.json` will FAIL validation
 
 ### Solution: Bifurcated Edge Types by Source Location
 
 **External-sourced edges (source project in `.repos/`):**
+
 - The source project is registered as a `projects` entry (via `createNodesV2`), NOT as an `externalNode`
 - `sourceFile` pointing into `.repos/` would fail `getFileData()` validation
 - MUST remain `DependencyType.implicit` -- no `sourceFile` required or validated
 
 **Host-sourced edges (source project in host workspace):**
+
 - The source project IS a standard host project
 - `sourceFile` pointing to the host's `package.json` (e.g., `packages/my-app/package.json`) IS in the fileMap
 - CAN use `DependencyType.static` with `sourceFile`
 
 **Override edges (from `implicitDependencies` config):**
+
 - No natural source file -- these are user-configured manual wiring
 - MUST remain `DependencyType.implicit`
 
 ### Component Changes for Feature 1
 
-| Component | File | Change |
-|-----------|------|--------|
-| `detect.ts` | `lib/graph/detect.ts` | Bifurcate `maybeEmitEdge` into two code paths based on source location |
-| `detect.ts` | `lib/graph/detect.ts` | Host-sourced: emit `DependencyType.static` + `sourceFile` pointing to host package.json |
-| `detect.ts` | `lib/graph/detect.ts` | External-sourced: keep `DependencyType.implicit` (no sourceFile) |
-| `detect.spec.ts` | `lib/graph/detect.spec.ts` | Update ~30 test assertions for edge types |
-| `index.spec.ts` | `src/index.spec.ts` | Update integration assertions |
-| `cross-repo-deps.spec.ts` | `e2e/src/cross-repo-deps.spec.ts` | Update 3 e2e assertions |
+| Component                 | File                              | Change                                                                                  |
+| ------------------------- | --------------------------------- | --------------------------------------------------------------------------------------- |
+| `detect.ts`               | `lib/graph/detect.ts`             | Bifurcate `maybeEmitEdge` into two code paths based on source location                  |
+| `detect.ts`               | `lib/graph/detect.ts`             | Host-sourced: emit `DependencyType.static` + `sourceFile` pointing to host package.json |
+| `detect.ts`               | `lib/graph/detect.ts`             | External-sourced: keep `DependencyType.implicit` (no sourceFile)                        |
+| `detect.spec.ts`          | `lib/graph/detect.spec.ts`        | Update ~30 test assertions for edge types                                               |
+| `index.spec.ts`           | `src/index.spec.ts`               | Update integration assertions                                                           |
+| `cross-repo-deps.spec.ts` | `e2e/src/cross-repo-deps.spec.ts` | Update 3 e2e assertions                                                                 |
 
 ### Detailed detect.ts Changes
 
@@ -223,6 +227,7 @@ Proxy targets set `cache: false` and `inputs: []`. Every invocation spawns a chi
 ### Solution: Runtime Input Tied to Git State
 
 Change `createProxyTarget` (transform.ts) to set:
+
 - `cache: true`
 - `inputs: [{ runtime: "<command that outputs repo git state>" }]`
 
@@ -233,10 +238,12 @@ Nx executes the runtime command, hashes its stdout, and uses it as the cache key
 **Recommended: Compound HEAD + diff hash**
 
 The runtime input needs to capture two things:
+
 1. The commit SHA (changes after `polyrepo-sync`)
 2. Uncommitted changes (users editing files in `.repos/<alias>/`)
 
 Single-command approach using shell compound:
+
 ```
 git -C .repos/<alias> rev-parse HEAD && git -C .repos/<alias> diff HEAD
 ```
@@ -244,15 +251,16 @@ git -C .repos/<alias> rev-parse HEAD && git -C .repos/<alias> diff HEAD
 Nx hashes the full stdout. When HEAD is the same and no uncommitted changes exist, the output is identical and the cache hits.
 
 **Cross-platform verification:**
+
 - `git -C <path>` works on Windows (Git for Windows), Linux, macOS
 - Nx executes runtime inputs via the shell, so no `.cmd` shim issues
 - Forward slashes in `.repos/<alias>` work on all platforms in git commands
 
 ### Component Changes for Feature 2
 
-| Component | File | Change |
-|-----------|------|--------|
-| `transform.ts` | `lib/graph/transform.ts` | Change `createProxyTarget`: `cache: true`, add runtime input |
+| Component           | File                          | Change                                                          |
+| ------------------- | ----------------------------- | --------------------------------------------------------------- |
+| `transform.ts`      | `lib/graph/transform.ts`      | Change `createProxyTarget`: `cache: true`, add runtime input    |
 | `transform.spec.ts` | `lib/graph/transform.spec.ts` | Update test: cache false -> true, verify inputs contain runtime |
 
 ### Detailed transform.ts Changes
@@ -324,16 +332,17 @@ The proxy executor and graph extraction create per-repo temp directories at `.re
 ### Solution: Rename to `tmp`
 
 Change the path from `.tmp` to `tmp` in two locations:
+
 1. `run/executor.ts` lines 41-42
 2. `extract.ts` lines 91-92
 
 ### Component Changes for Feature 3
 
-| Component | File | Change |
-|-----------|------|--------|
-| `extract.ts` | `lib/graph/extract.ts` | Lines 91-92: `.tmp` -> `tmp` |
-| `run/executor.ts` | `lib/executors/run/executor.ts` | Lines 41-42: `.tmp` -> `tmp` |
-| `extract.spec.ts` | `lib/graph/extract.spec.ts` | Update path assertions if any |
+| Component          | File                                 | Change                        |
+| ------------------ | ------------------------------------ | ----------------------------- |
+| `extract.ts`       | `lib/graph/extract.ts`               | Lines 91-92: `.tmp` -> `tmp`  |
+| `run/executor.ts`  | `lib/executors/run/executor.ts`      | Lines 41-42: `.tmp` -> `tmp`  |
+| `extract.spec.ts`  | `lib/graph/extract.spec.ts`          | Update path assertions if any |
 | `executor.spec.ts` | `lib/executors/run/executor.spec.ts` | Update path assertions if any |
 
 ### Detailed Changes
@@ -364,18 +373,18 @@ mkdirSync(join(repoPath, 'tmp'), { recursive: true });
 
 ## New vs Modified Components Summary
 
-| Component | Status | File | Feature | Lines Changed |
-|-----------|--------|------|---------|---------------|
-| `detect.ts` | MODIFY | `lib/graph/detect.ts` | Static edges | ~20 lines (bifurcate maybeEmitEdge) |
-| `detect.spec.ts` | MODIFY | `lib/graph/detect.spec.ts` | Static edges | ~30 assertions |
-| `transform.ts` | MODIFY | `lib/graph/transform.ts` | Proxy caching | ~5 lines (cache + inputs) |
-| `transform.spec.ts` | MODIFY | `lib/graph/transform.spec.ts` | Proxy caching | ~5 assertions |
-| `extract.ts` | MODIFY | `lib/graph/extract.ts` | Temp rename | 2 lines |
-| `extract.spec.ts` | MODIFY | `lib/graph/extract.spec.ts` | Temp rename | Path assertions |
-| `run/executor.ts` | MODIFY | `lib/executors/run/executor.ts` | Temp rename | 2 lines |
-| `run/executor.spec.ts` | MODIFY | `lib/executors/run/executor.spec.ts` | Temp rename | Path assertions |
-| `index.spec.ts` | MODIFY | `src/index.spec.ts` | Static edges | Edge type assertions |
-| `cross-repo-deps.spec.ts` | MODIFY | `e2e/src/cross-repo-deps.spec.ts` | Static edges | Edge type assertions |
+| Component                 | Status | File                                 | Feature       | Lines Changed                       |
+| ------------------------- | ------ | ------------------------------------ | ------------- | ----------------------------------- |
+| `detect.ts`               | MODIFY | `lib/graph/detect.ts`                | Static edges  | ~20 lines (bifurcate maybeEmitEdge) |
+| `detect.spec.ts`          | MODIFY | `lib/graph/detect.spec.ts`           | Static edges  | ~30 assertions                      |
+| `transform.ts`            | MODIFY | `lib/graph/transform.ts`             | Proxy caching | ~5 lines (cache + inputs)           |
+| `transform.spec.ts`       | MODIFY | `lib/graph/transform.spec.ts`        | Proxy caching | ~5 assertions                       |
+| `extract.ts`              | MODIFY | `lib/graph/extract.ts`               | Temp rename   | 2 lines                             |
+| `extract.spec.ts`         | MODIFY | `lib/graph/extract.spec.ts`          | Temp rename   | Path assertions                     |
+| `run/executor.ts`         | MODIFY | `lib/executors/run/executor.ts`      | Temp rename   | 2 lines                             |
+| `run/executor.spec.ts`    | MODIFY | `lib/executors/run/executor.spec.ts` | Temp rename   | Path assertions                     |
+| `index.spec.ts`           | MODIFY | `src/index.spec.ts`                  | Static edges  | Edge type assertions                |
+| `cross-repo-deps.spec.ts` | MODIFY | `e2e/src/cross-repo-deps.spec.ts`    | Static edges  | Edge type assertions                |
 
 **No new files created.** All three features modify existing components only.
 
@@ -420,6 +429,7 @@ extract.ts + run/executor.ts:
 **When to use:** Any time Nx validation constraints differ based on project location. The Nx `validateStaticDependency` function requires `sourceFile` for internal projects and validates it against the fileMap. External projects under `.repos/` cannot satisfy this constraint.
 
 **Trade-offs:**
+
 - PRO: Host-sourced edges gain provenance (sourceFile) for `nx affected` tracing
 - PRO: External-sourced edges avoid validation errors
 - CON: Two edge types in the same detection function -- slightly more complex
@@ -432,6 +442,7 @@ extract.ts + run/executor.ts:
 **When to use:** When the task's correctness depends on state outside the host workspace's git-tracked files. The `.repos/` directory is gitignored, so Nx's file-based hashing sees nothing there. Runtime inputs bridge this gap.
 
 **Trade-offs:**
+
 - PRO: Eliminates child Nx bootstrap overhead on warm runs (~2-5s per target)
 - PRO: Correct invalidation on sync (new HEAD) and local edits (diff changes)
 - CON: Runtime command adds ~12ms per target to hash computation
@@ -445,6 +456,7 @@ extract.ts + run/executor.ts:
 **When to use:** When creating auxiliary directories in external repositories that you do not control. Nx's `create-nx-workspace` scaffold includes `tmp/` in `.gitignore`. Using `tmp/` instead of `.tmp/` gets free coverage.
 
 **Trade-offs:**
+
 - PRO: Zero configuration needed in synced repos
 - PRO: Follows Nx conventions
 - CON: `tmp/` is less visually distinctive than `.tmp/`
@@ -529,21 +541,22 @@ Phase 3: Static dependency edges
 ```
 
 **Phase ordering rationale:**
+
 - Phase 1 first because it is trivial and unblocks a consistent naming convention before phases 2-3 touch the same files
 - Phase 2 before phase 3 because proxy caching is isolated to `transform.ts` with no downstream test coupling, while static edges touch detect.ts + index.ts + e2e
 - Phase 3 last because it has the widest blast radius (~30+ test assertions) and benefits from the other changes being stable
 
 ## Scaling Considerations
 
-| Scale | Architecture Impact |
-|-------|---------------------|
-| 1-3 synced repos | All features work as designed. Runtime input overhead is ~12ms * number of targets |
+| Scale             | Architecture Impact                                                                                 |
+| ----------------- | --------------------------------------------------------------------------------------------------- |
+| 1-3 synced repos  | All features work as designed. Runtime input overhead is ~12ms \* number of targets                 |
 | 5-10 synced repos | Runtime inputs scale linearly. ~50-100ms total for hash computation. Still negligible vs build time |
-| 20+ synced repos | Each repo's runtime input is independent. No cross-repo hash computation. Linear scaling holds |
+| 20+ synced repos  | Each repo's runtime input is independent. No cross-repo hash computation. Linear scaling holds      |
 
 ### First Bottleneck: Runtime Input Execution
 
-At large scale, the compound `git rev-parse HEAD && git diff HEAD` command runs per-target (not per-repo). With 20 repos averaging 7.5 targets each = 150 runtime commands during hash computation. At ~12ms each, that is ~1.8s total. This is still much faster than the ~5s * 150 = 750s of child Nx bootstraps without caching.
+At large scale, the compound `git rev-parse HEAD && git diff HEAD` command runs per-target (not per-repo). With 20 repos averaging 7.5 targets each = 150 runtime commands during hash computation. At ~12ms each, that is ~1.8s total. This is still much faster than the ~5s \* 150 = 750s of child Nx bootstraps without caching.
 
 **Future optimization (not needed for v1.2):** Deduplicate runtime commands per-repo. All targets in the same repo share the same git state. Nx does not natively deduplicate runtime inputs, but the runtime command output is identical for all targets in the same repo, so Nx's internal runtime cache (keyed by command string) handles this automatically.
 
@@ -558,5 +571,6 @@ At large scale, the compound `git rev-parse HEAD && git diff HEAD` command runs 
 - Todo files in `.planning/todos/pending/` -- feature specifications and design decisions
 
 ---
-*Architecture research for: v1.2 static edges, proxy caching, and temp directory rename*
-*Researched: 2026-03-22*
+
+_Architecture research for: v1.2 static edges, proxy caching, and temp directory rename_
+_Researched: 2026-03-22_

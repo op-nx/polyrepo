@@ -27,11 +27,11 @@ key-files:
     - packages/op-nx-polyrepo/src/lib/executors/status/executor.spec.ts
 
 key-decisions:
-  - "Summary line appends behind/ahead counts conditionally (omitted when all repos are even)"
-  - "Tag-pinned warning placed after detached HEAD check so both cannot appear simultaneously"
+  - 'Summary line appends behind/ahead counts conditionally (omitted when all repos are even)'
+  - 'Tag-pinned warning placed after detached HEAD check so both cannot appear simultaneously'
 
 patterns-established:
-  - "rawAheadBehind field in RepoRowData enables summary aggregation without re-querying"
+  - 'rawAheadBehind field in RepoRowData enables summary aggregation without re-querying'
 
 requirements-completed: [GITX-01, GITX-03]
 
@@ -53,6 +53,7 @@ completed: 2026-03-11
 - **Files modified:** 2
 
 ## Accomplishments
+
 - Summary line now shows "N behind" / "N ahead" counts when repos are behind/ahead of remote
 - Tag-pinned repos display [WARN: tag-pinned] instead of being silently excluded from warnings
 - Clean repos show 'ok' instead of 'clean' in the dirty summary column for clearer status display
@@ -69,10 +70,12 @@ Each task was committed atomically:
 _Note: TDD task with RED + GREEN commits. No refactor needed._
 
 ## Files Created/Modified
+
 - `packages/op-nx-polyrepo/src/lib/executors/status/executor.ts` - Enhanced summary line, tag-pinned warning, 'ok' label
 - `packages/op-nx-polyrepo/src/lib/executors/status/executor.spec.ts` - 5 new tests, 2 updated assertions
 
 ## Decisions Made
+
 - Summary line appends behind/ahead counts conditionally -- omitted when all repos are 0/0 to keep output clean
 - Tag-pinned warning placed after detached HEAD check, since `isTagPinned` is a subset of `isDetachedHead` -- the two warnings are mutually exclusive
 - Added `rawAheadBehind` field to `RepoRowData` interface to retain the structured data for summary aggregation
@@ -90,6 +93,7 @@ None.
 None - no external service configuration required.
 
 ## Next Phase Readiness
+
 - UAT Test 1 gap closed: summary line now includes repo-level behind/ahead counts
 - UAT Test 4 gap closed: tag-pinned repos show [WARN: tag-pinned] warning
 - Status executor fully covers all warning scenarios
@@ -103,5 +107,6 @@ None - no external service configuration required.
 - [x] Commit 977dda3 (GREEN) found
 
 ---
-*Phase: 03-multi-repo-git-dx*
-*Completed: 2026-03-11*
+
+_Phase: 03-multi-repo-git-dx_
+_Completed: 2026-03-11_

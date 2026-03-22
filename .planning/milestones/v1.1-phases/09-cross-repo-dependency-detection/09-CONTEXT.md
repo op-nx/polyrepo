@@ -68,6 +68,7 @@ A pure detection function that identifies cross-repo dependency edges from packa
 </decisions>
 
 <code_context>
+
 ## Existing Code Insights
 
 ### Reusable Assets
@@ -112,5 +113,5 @@ A pure detection function that identifies cross-repo dependency edges from packa
 
 ---
 
-*Phase: 09-cross-repo-dependency-detection*
-*Context gathered: 2026-03-17*
+_Phase: 09-cross-repo-dependency-detection_
+_Context gathered: 2026-03-17_

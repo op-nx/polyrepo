@@ -14,7 +14,7 @@ next_action: Report diagnosis
 
 ## Symptoms
 
-expected: Auto-detected cross-repo edges from @workspace/source to nx/* projects (e.g., nx/devkit) should appear in nx graph --print output
+expected: Auto-detected cross-repo edges from @workspace/source to nx/\* projects (e.g., nx/devkit) should appear in nx graph --print output
 actual: No auto-detected edges appear; the e2e test was removed claiming nrwl/nx projects lack packageName fields
 errors: None (silent data loss)
 reproduction: Run auto-detect e2e test inside Docker container
@@ -50,7 +50,7 @@ started: Commit 885e0c7 removed the test; commit c839559 introduced the fileMap 
 - timestamp: 2026-03-18T23:08:00Z
   checked: index.ts lines 149-166 (createDependencies fileMap filter)
   found: "const fileMap = context.fileMap?.projectFileMap ?? {};" then edges are only included if fileMap[dep.source] AND fileMap[dep.target] are truthy
-  implication: CRITICAL -- .repos/ is gitignored, so Nx's projectFileMap has NO entries for nx/* projects. fileMap["nx/devkit"] is undefined. ALL cross-repo edges where target is an external project are silently dropped.
+  implication: CRITICAL -- .repos/ is gitignored, so Nx's projectFileMap has NO entries for nx/\* projects. fileMap["nx/devkit"] is undefined. ALL cross-repo edges where target is an external project are silently dropped.
 
 - timestamp: 2026-03-18T23:09:00Z
   checked: Commit c839559 message and diff
@@ -59,7 +59,7 @@ started: Commit 885e0c7 removed the test; commit c839559 introduced the fileMap 
 
 - timestamp: 2026-03-18T23:11:00Z
   checked: Commit d5fbbb7 (original e2e test)
-  found: Original test injected @nx/devkit into host's devDependencies, then expected crossRepoEdges.length > 0 with type 'static' from @workspace/source to nx/* projects
+  found: Original test injected @nx/devkit into host's devDependencies, then expected crossRepoEdges.length > 0 with type 'static' from @workspace/source to nx/\* projects
   implication: The test design was correct -- it expected auto-detection to work after injecting a matching dependency
 
 - timestamp: 2026-03-18T23:12:00Z
@@ -85,37 +85,39 @@ started: Commit 885e0c7 removed the test; commit c839559 introduced the fileMap 
 ## Resolution
 
 root_cause: |
-  TWO compounding issues prevent auto-detected cross-repo edges from appearing:
+TWO compounding issues prevent auto-detected cross-repo edges from appearing:
 
-  **Primary (Bug): fileMap filter in createDependencies (index.ts:156-166) silently drops ALL cross-repo edges involving external projects.**
+**Primary (Bug): fileMap filter in createDependencies (index.ts:156-166) silently drops ALL cross-repo edges involving external projects.**
 
-  Commit c839559 added a guard that requires BOTH source AND target to have entries in `context.fileMap.projectFileMap`. Since `.repos/` is gitignored, Nx's file map has no entries for any `nx/*` project. This means:
-  - Host -> External edges: blocked (target has no file map)
-  - External -> Host edges: blocked (source has no file map)
-  - External -> External edges: blocked (neither has file map)
+Commit c839559 added a guard that requires BOTH source AND target to have entries in `context.fileMap.projectFileMap`. Since `.repos/` is gitignored, Nx's file map has no entries for any `nx/*` project. This means:
 
-  The fileMap filter was added to fix a real task hasher crash ("project not found" during task hashing), but it has the side effect of making cross-repo auto-detection completely non-functional at the integration level.
+- Host -> External edges: blocked (target has no file map)
+- External -> Host edges: blocked (source has no file map)
+- External -> External edges: blocked (neither has file map)
 
-  **Secondary (Misdiagnosis): The e2e test was removed based on a wrong diagnosis.**
+The fileMap filter was added to fix a real task hasher crash ("project not found" during task hashing), but it has the side effect of making cross-repo auto-detection completely non-functional at the integration level.
 
-  Commit 885e0c7 claimed "nrwl/nx repo only produces example projects without packageName fields." This is incorrect. The nrwl/nx monorepo's projects DO have `metadata.js.packageName` set (e.g., `@nx/devkit`, `@nx/js`, `nx`). The `detect.ts` function correctly builds the lookup map and produces edges. But `createDependencies` in `index.ts` drops them all before they reach the graph.
+**Secondary (Misdiagnosis): The e2e test was removed based on a wrong diagnosis.**
+
+Commit 885e0c7 claimed "nrwl/nx repo only produces example projects without packageName fields." This is incorrect. The nrwl/nx monorepo's projects DO have `metadata.js.packageName` set (e.g., `@nx/devkit`, `@nx/js`, `nx`). The `detect.ts` function correctly builds the lookup map and produces edges. But `createDependencies` in `index.ts` drops them all before they reach the graph.
 
 fix: |
-  The fileMap filter needs to be relaxed for cross-repo edges. Options:
+The fileMap filter needs to be relaxed for cross-repo edges. Options:
 
-  1. **Only check fileMap for the source side of host-sourced edges**: Host projects have file map entries; external projects don't. For host->external edges, only verify fileMap[source]. For external->host, only verify fileMap[target]. For external->external, skip fileMap check entirely. The task hasher issue only matters when Nx tries to hash inputs for a task -- implicit deps don't trigger cascading task hashing.
+1. **Only check fileMap for the source side of host-sourced edges**: Host projects have file map entries; external projects don't. For host->external edges, only verify fileMap[source]. For external->host, only verify fileMap[target]. For external->external, skip fileMap check entirely. The task hasher issue only matters when Nx tries to hash inputs for a task -- implicit deps don't trigger cascading task hashing.
 
-  2. **Inject synthetic file map entries for external projects**: In createNodesV2, register a minimal file entry (e.g., the project root package.json path) so that the fileMap guard passes. This requires understanding how Nx populates projectFileMap.
+2. **Inject synthetic file map entries for external projects**: In createNodesV2, register a minimal file entry (e.g., the project root package.json path) so that the fileMap guard passes. This requires understanding how Nx populates projectFileMap.
 
-  3. **Remove the fileMap guard entirely for implicit edges**: Since commit b9af9bb already changed all auto-detected edges to implicit type (not static), and the task hasher concern was about static edges with sourceFile, the fileMap guard may be unnecessary for implicit edges.
+3. **Remove the fileMap guard entirely for implicit edges**: Since commit b9af9bb already changed all auto-detected edges to implicit type (not static), and the task hasher concern was about static edges with sourceFile, the fileMap guard may be unnecessary for implicit edges.
 
-  Option 3 is the most targeted fix: the fileMap guard was added alongside the static->implicit migration but may have been overly conservative. Implicit edges don't carry sourceFile, so the task hasher's "project not found" error path may not apply to them.
+Option 3 is the most targeted fix: the fileMap guard was added alongside the static->implicit migration but may have been overly conservative. Implicit edges don't carry sourceFile, so the task hasher's "project not found" error path may not apply to them.
 
 verification: |
-  Not yet verified (diagnosis only).
+Not yet verified (diagnosis only).
 
 files_changed:
-  - packages/op-nx-polyrepo/src/index.ts (lines 156-166, fileMap filter)
-  - packages/op-nx-polyrepo/src/lib/graph/detect.ts (correct, no changes needed)
-  - packages/op-nx-polyrepo/src/lib/graph/transform.ts (correct, no changes needed)
-  - packages/op-nx-polyrepo-e2e/src/op-nx-polyrepo.spec.ts (restore auto-detect test after fix)
+
+- packages/op-nx-polyrepo/src/index.ts (lines 156-166, fileMap filter)
+- packages/op-nx-polyrepo/src/lib/graph/detect.ts (correct, no changes needed)
+- packages/op-nx-polyrepo/src/lib/graph/transform.ts (correct, no changes needed)
+- packages/op-nx-polyrepo-e2e/src/op-nx-polyrepo.spec.ts (restore auto-detect test after fix)

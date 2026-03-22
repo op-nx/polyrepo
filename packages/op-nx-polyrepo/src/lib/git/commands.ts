@@ -8,7 +8,11 @@ interface CloneOptions {
   disableHooks?: boolean;
 }
 
-function execGit(args: string[], cwd?: string, disableHooks?: boolean): Promise<string> {
+function execGit(
+  args: string[],
+  cwd?: string,
+  disableHooks?: boolean,
+): Promise<string> {
   if (disableHooks) {
     args = ['-c', 'core.hooksPath=__op-nx_polyrepo_disable-hooks__', ...args];
   }
@@ -50,19 +54,31 @@ export async function gitClone(
   await execGit(args, undefined, disableHooks);
 }
 
-export async function gitPull(cwd: string, disableHooks?: boolean): Promise<void> {
+export async function gitPull(
+  cwd: string,
+  disableHooks?: boolean,
+): Promise<void> {
   await execGit(['pull'], cwd, disableHooks);
 }
 
-export async function gitFetch(cwd: string, disableHooks?: boolean): Promise<void> {
+export async function gitFetch(
+  cwd: string,
+  disableHooks?: boolean,
+): Promise<void> {
   await execGit(['fetch'], cwd, disableHooks);
 }
 
-export async function gitPullRebase(cwd: string, disableHooks?: boolean): Promise<void> {
+export async function gitPullRebase(
+  cwd: string,
+  disableHooks?: boolean,
+): Promise<void> {
   await execGit(['pull', '--rebase'], cwd, disableHooks);
 }
 
-export async function gitPullFfOnly(cwd: string, disableHooks?: boolean): Promise<void> {
+export async function gitPullFfOnly(
+  cwd: string,
+  disableHooks?: boolean,
+): Promise<void> {
   await execGit(['pull', '--ff-only'], cwd, disableHooks);
 }
 
@@ -76,7 +92,11 @@ export async function gitCheckoutBranch(
   try {
     await execGit(['checkout', branch], cwd, disableHooks);
   } catch {
-    await execGit(['checkout', '-b', branch, `origin/${branch}`], cwd, disableHooks);
+    await execGit(
+      ['checkout', '-b', branch, `origin/${branch}`],
+      cwd,
+      disableHooks,
+    );
   }
 }
 
@@ -86,6 +106,10 @@ export async function gitFetchTag(
   depth = 1,
   disableHooks?: boolean,
 ): Promise<void> {
-  await execGit(['fetch', '--depth', String(depth), 'origin', 'tag', tag], cwd, disableHooks);
+  await execGit(
+    ['fetch', '--depth', String(depth), 'origin', 'tag', tag],
+    cwd,
+    disableHooks,
+  );
   await execGit(['checkout', tag], cwd, disableHooks);
 }

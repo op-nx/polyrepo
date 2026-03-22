@@ -20,6 +20,7 @@ The proxy caching feature carries one significant known risk: an open Nx bug ([n
 No stack changes for v1.2. All three features are implementable with the existing dependency set. `DependencyType.static` with `sourceFile`, runtime inputs (`{ runtime: "..." }`), and `cache: true` are all available in `@nx/devkit` 22.5.4. The `git -C <path>` pattern has worked cross-platform since Git 1.8.5 (2013).
 
 **Core technologies (unchanged for v1.2):**
+
 - `@nx/devkit` ^22.5.4: Plugin API — `DependencyType`, `RawProjectGraphDependency`, `TargetConfiguration` all export the required types; no version bump needed
 - `nx` ^22.5.4: Plugin host — `validateStaticDependency` and `addDependency` validation chain verified directly in installed source
 - TypeScript ~5.9.x: Language — no new type requirements
@@ -31,15 +32,18 @@ No stack changes for v1.2. All three features are implementable with the existin
 The v1.2 scope is correctness and performance improvements, not new user-facing functionality.
 
 **Must have (table stakes for v1.2):**
+
 - Static dependency edges for host-sourced cross-repo deps — auto-detected edges that derive from `package.json` files should carry provenance; `implicit` loses the source file reference needed by `nx affected`
 - Proxy target caching via runtime inputs — eliminating 2-5s child Nx bootstrap overhead per proxy target on warm runs is the highest impact change relative to implementation effort
 - Rename `.tmp` to `tmp` in child repo temp directories — Nx's default `.gitignore` scaffold covers `tmp/` but not `.tmp/`; the rename removes a manual `.gitignore` configuration burden from every synced repo
 
 **Should have (differentiators within v1.2):**
+
 - Compound git state input capturing both committed and uncommitted changes — `git describe --always --dirty` catches sync changes (new HEAD) and local edits (dirty suffix) in a single cross-platform command, preventing stale cache hits for users editing files directly in `.repos/<alias>/`
 - Granular `sourceFile` per detection source — pointing to the specific `package.json` enables Nx's incremental re-analysis to skip dependency recomputation for unchanged files
 
 **Defer to future:**
+
 - Per-target cache tuning — only warranted if users report cache hit rate issues with the compound input
 - `outputs` declaration on proxy targets — requires non-trivial output path rewriting; child Nx manages its own build artifact cache independently
 - Static edges for external-sourced dependencies — blocked by Nx `fileMap` constraint until Nx core supports gitignored path inclusion
@@ -49,6 +53,7 @@ The v1.2 scope is correctness and performance improvements, not new user-facing 
 All three features modify existing components only — no new files are created. The existing code already has separate scanning paths for external-sourced (section 3a) and host-sourced (section 3b) dependency detection in `detect.ts`, so the edge type bifurcation aligns naturally with the current structure. The proxy caching change is isolated to a single function (`createProxyTarget` in `transform.ts`). The temp directory rename is a two-line string replacement in each of two files.
 
 **Components modified:**
+
 1. `lib/graph/detect.ts` — bifurcate `maybeEmitEdge` to emit `DependencyType.static` + `sourceFile` for host-sourced edges, keep `DependencyType.implicit` for external-sourced and override edges (~20 lines changed)
 2. `lib/graph/transform.ts` — change `createProxyTarget` to set `cache: true` and `inputs: [{ runtime: "git -C .repos/<alias> describe --always --dirty" }]` (~5 lines changed)
 3. `lib/graph/extract.ts` — replace `.tmp` with `tmp` (2 lines)
@@ -105,20 +110,22 @@ All three features are independent — no code-level dependency between them. Th
 ### Research Flags
 
 Phases requiring careful cross-environment validation during implementation:
+
 - **Phase 2 (Proxy Caching):** The Nx daemon runtime input caching bug ([nrwl/nx#30170](https://github.com/nrwl/nx/issues/30170)) is an active open issue. Must validate with `NX_DAEMON=false` first, then `NX_DAEMON=true`, to distinguish expected behavior from daemon cache staleness. Runtime command cross-platform behavior must also be verified in CI (Linux) given the Windows-first development environment.
 - **Phase 3 (Static Edges):** Two distinct crash modes with different trigger conditions (graph construction vs. task hashing). Unit tests catching Pitfall 1 will not catch Pitfall 2. Integration or e2e testing with `nx affected` is required — cannot rely on unit test coverage alone.
 
 Phases with standard, well-understood patterns (skip deeper research):
+
 - **Phase 1 (Temp Rename):** Two-line string replacement per file, no API interaction, no behavioral change. Standard practice with negligible risk.
 
 ## Confidence Assessment
 
-| Area | Confidence | Notes |
-|------|------------|-------|
-| Stack | HIGH | All APIs verified against installed Nx 22.5.4 source in `node_modules`. `DependencyType`, `StaticDependency`, runtime input shapes all confirmed. Runtime verification: `DependencyType` enum values confirmed via `node -e`. |
-| Features | HIGH | Feature boundaries are precise. The fileMap constraint is a hard Nx implementation fact verified line-by-line in the installed source — it is not an interpretation or inference. The split strategy is the only valid approach. |
-| Architecture | HIGH | All changes are modifications to existing components following established patterns. No new abstractions required. Implementation pattern for static edges confirmed against Nx's own `explicit-package-json-dependencies.js` as a reference implementation. |
-| Pitfalls | HIGH | Critical pitfalls verified against Nx 22.5.4 source code (validation chain confirmed at specific line numbers). Daemon caching bug confirmed from open GitHub issue active through December 2025. Cross-platform behavior inferred from Nx docs, Git for Windows documentation, and the existing `git -C` usage pattern in the codebase. |
+| Area         | Confidence | Notes                                                                                                                                                                                                                                                                                                                                    |
+| ------------ | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Stack        | HIGH       | All APIs verified against installed Nx 22.5.4 source in `node_modules`. `DependencyType`, `StaticDependency`, runtime input shapes all confirmed. Runtime verification: `DependencyType` enum values confirmed via `node -e`.                                                                                                            |
+| Features     | HIGH       | Feature boundaries are precise. The fileMap constraint is a hard Nx implementation fact verified line-by-line in the installed source — it is not an interpretation or inference. The split strategy is the only valid approach.                                                                                                         |
+| Architecture | HIGH       | All changes are modifications to existing components following established patterns. No new abstractions required. Implementation pattern for static edges confirmed against Nx's own `explicit-package-json-dependencies.js` as a reference implementation.                                                                             |
+| Pitfalls     | HIGH       | Critical pitfalls verified against Nx 22.5.4 source code (validation chain confirmed at specific line numbers). Daemon caching bug confirmed from open GitHub issue active through December 2025. Cross-platform behavior inferred from Nx docs, Git for Windows documentation, and the existing `git -C` usage pattern in the codebase. |
 
 **Overall confidence:** HIGH
 
@@ -133,6 +140,7 @@ Phases with standard, well-understood patterns (skip deeper research):
 ## Sources
 
 ### Primary (HIGH confidence)
+
 - `node_modules/nx/src/project-graph/project-graph-builder.js` — `validateStaticDependency`, `validateCommonDependencyRules`, `getFileData`, `getNonProjectFileData` implementations verified at lines 304-379 in Nx 22.5.4
 - `node_modules/nx/src/project-graph/build-project-graph.js` — `builder.addDependency(dep.source, dep.target, dep.type, sourceFile)` call confirmed at line 225
 - `node_modules/nx/src/project-graph/file-map-utils.js` — `createFileMap` uses `getAllFileDataInContext` which respects `.gitignore` (lines 21-39)
@@ -150,6 +158,7 @@ Phases with standard, well-understood patterns (skip deeper research):
 - [Nx Extending the Project Graph](https://nx.dev/docs/extending-nx/project-graph-plugins) — `createDependencies` plugin API
 
 ### Secondary (MEDIUM confidence)
+
 - [nrwl/nx#30170](https://github.com/nrwl/nx/issues/30170) — "Runtime cache input simply does not work" (OPEN, Nx 20.0.3+, last confirmed December 2025)
 - [nrwl/nx#20949](https://github.com/nrwl/nx/issues/20949) — confirms `NX_PROJECT_ROOT` not available in runtime inputs; commands execute from workspace root
 - [nrwl/nx#6821](https://github.com/nrwl/nx/issues/6821) — confirms `.nxignore` cannot override `.gitignore` for file inclusion
@@ -157,9 +166,11 @@ Phases with standard, well-understood patterns (skip deeper research):
 - [Nx .nxignore Reference](https://nx.dev/docs/reference/nxignore) — `.nxignore` syntax and scope
 
 ### Tertiary (LOW confidence)
+
 - Nx failure behavior for failed runtime input commands — undocumented; assumed to produce constant hash based on Rust hasher implementation patterns; needs empirical validation during Phase 2
 - `git describe --always --dirty` output format on shallow clones — not explicitly tested; the `--always` flag should ensure output even without tags, but the tag-relative portion may be absent or inconsistent
 
 ---
-*Research completed: 2026-03-22*
-*Ready for roadmap: yes*
+
+_Research completed: 2026-03-22_
+_Ready for roadmap: yes_

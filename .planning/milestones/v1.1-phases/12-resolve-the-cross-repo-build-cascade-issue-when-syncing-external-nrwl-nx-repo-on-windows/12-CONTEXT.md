@@ -9,6 +9,7 @@
 Fix the targetDefaults isolation leak where host workspace `targetDefaults` (e.g., `test.dependsOn: ["^build"]`) merge into external project proxy targets, causing amplified cross-repo build cascading. Get `nx/devkit:build` (and its intra-repo `^build` chain) working on Windows via the proxy executor so `nx test @op-nx/polyrepo` succeeds without `--exclude-task-dependencies`.
 
 Two deliverables:
+
 1. **targetDefaults isolation** — each workspace's `targetDefaults` only affects its own projects
 2. **Windows build resolution** — `nx/devkit:build` succeeds via proxy executor on Windows
 
@@ -21,13 +22,13 @@ Two deliverables:
 
 Full bidirectional isolation — each workspace's `targetDefaults` only affects its own projects:
 
-| Direction | Rule |
-|-----------|------|
-| Host `targetDefaults` -> external repos | Blocked |
-| External repo B `targetDefaults` -> host | Blocked |
-| External repo A `targetDefaults` -> repo B | Blocked |
+| Direction                                                        | Rule                            |
+| ---------------------------------------------------------------- | ------------------------------- |
+| Host `targetDefaults` -> external repos                          | Blocked                         |
+| External repo B `targetDefaults` -> host                         | Blocked                         |
+| External repo A `targetDefaults` -> repo B                       | Blocked                         |
 | External repo B `dependsOn` -> cross-repo cascade to host/repo A | Allowed (Nx caching handles it) |
-| External repo B `dependsOn` -> intra-repo cascade within repo B | Preserved |
+| External repo B `dependsOn` -> intra-repo cascade within repo B  | Preserved                       |
 
 - Host `targetDefaults` must NOT override or remove `dependsOn` that was applied by an external repo's own `targetDefaults`
 - External repo A's `targetDefaults` must NOT affect external repo B or host
@@ -39,10 +40,10 @@ The root cause: proxy targets currently omit `dependsOn` (set to `undefined`). N
 
 The fix — set `dependsOn` to an **explicit** value on every proxy target:
 
-| External repo graph output | Proxy target gets | Host targetDefaults merge? |
-|---|---|---|
+| External repo graph output                                  | Proxy target gets                              | Host targetDefaults merge?      |
+| ----------------------------------------------------------- | ---------------------------------------------- | ------------------------------- |
 | Target has `dependsOn: ["^build"]` (from repo's own config) | `dependsOn: ["^build"]` (preserved, rewritten) | Blocked — value already defined |
-| Target has no `dependsOn` | `dependsOn: []` (explicit empty) | Blocked — value already defined |
+| Target has no `dependsOn`                                   | `dependsOn: []` (explicit empty)               | Blocked — value already defined |
 
 - `dependsOn` is read from the raw target config in the external repo's `nx graph --print` output (which already has that repo's `targetDefaults` baked in)
 - Project references are rewritten to namespaced form (e.g., `generate-api` -> `nx/generate-api`)
@@ -52,6 +53,7 @@ The fix — set `dependsOn` to an **explicit** value on every proxy target:
 ### Preserve Only dependsOn
 
 Other proxy target fields remain as-is:
+
 - `inputs: []` — host doesn't hash external files (correct for proxy pattern)
 - `cache: false` — proxy always delegates to child repo (correct)
 - `outputs` — omitted (child repo manages its own outputs)
@@ -88,13 +90,14 @@ The cascade into `nx/devkit:build` must succeed on Windows. This is the only cro
 
 - `rewriteDependsOn` function implementation details (parsing string vs object entries)
 - Exact Zod schema changes for validating dependsOn from raw target config
-- Research approach for Windows build investigation (order of experiments, which NX_ env vars to try first)
+- Research approach for Windows build investigation (order of experiments, which NX\_ env vars to try first)
 - Whether to extract repos in parallel or sequentially for build testing
 - Test organization for targetDefaults isolation tests
 
 </decisions>
 
 <code_context>
+
 ## Existing Code Insights
 
 ### Reusable Assets
@@ -141,5 +144,5 @@ The cascade into `nx/devkit:build` must succeed on Windows. This is the only cro
 
 ---
 
-*Phase: 12-resolve-the-cross-repo-build-cascade-issue-when-syncing-external-nrwl-nx-repo-on-windows*
-*Context gathered: 2026-03-21*
+_Phase: 12-resolve-the-cross-repo-build-cascade-issue-when-syncing-external-nrwl-nx-repo-on-windows_
+_Context gathered: 2026-03-21_

@@ -15,13 +15,13 @@ created: 2026-03-22
 
 ## Test Infrastructure
 
-| Property | Value |
-|----------|-------|
-| **Framework** | Vitest (workspace version) |
-| **Config file** | `packages/op-nx-polyrepo/vitest.config.mts` |
-| **Quick run command** | `npm exec nx -- test @op-nx/polyrepo` |
+| Property               | Value                                                 |
+| ---------------------- | ----------------------------------------------------- |
+| **Framework**          | Vitest (workspace version)                            |
+| **Config file**        | `packages/op-nx-polyrepo/vitest.config.mts`           |
+| **Quick run command**  | `npm exec nx -- test @op-nx/polyrepo`                 |
 | **Full suite command** | `npm exec nx -- test @op-nx/polyrepo --skip-nx-cache` |
-| **Estimated runtime** | ~10 seconds |
+| **Estimated runtime**  | ~10 seconds                                           |
 
 ---
 
@@ -36,12 +36,12 @@ created: 2026-03-22
 
 ## Per-Task Verification Map
 
-| Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
-|---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 14-01-01 | 01 | 1 | EXEC-01 | unit | `npm exec nx -- test @op-nx/polyrepo` | Yes -- update assertions | pending |
-| 14-01-02 | 01 | 1 | EXEC-02 | unit | `npm exec nx -- test @op-nx/polyrepo` | Partial -- add TEMP assertions | pending |
+| Task ID  | Plan | Wave | Requirement | Test Type | Automated Command                     | File Exists                    | Status  |
+| -------- | ---- | ---- | ----------- | --------- | ------------------------------------- | ------------------------------ | ------- |
+| 14-01-01 | 01   | 1    | EXEC-01     | unit      | `npm exec nx -- test @op-nx/polyrepo` | Yes -- update assertions       | pending |
+| 14-01-02 | 01   | 1    | EXEC-02     | unit      | `npm exec nx -- test @op-nx/polyrepo` | Partial -- add TEMP assertions | pending |
 
-*Status: pending / green / red / flaky*
+_Status: pending / green / red / flaky_
 
 ---
 

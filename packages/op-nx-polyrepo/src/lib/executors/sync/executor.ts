@@ -20,7 +20,13 @@ import {
   gitFetchTag,
   gitCheckoutBranch,
 } from '../../git/commands';
-import { detectRepoState, getWorkingTreeState, getCurrentBranch, getCurrentRef, isGitTag } from '../../git/detect';
+import {
+  detectRepoState,
+  getWorkingTreeState,
+  getCurrentBranch,
+  getCurrentRef,
+  isGitTag,
+} from '../../git/detect';
 import { formatAlignedTable, type ColumnDef } from '../../format/table';
 
 export interface SyncExecutorOptions {
@@ -29,9 +35,7 @@ export interface SyncExecutorOptions {
   verbose?: boolean;
 }
 
-function detectPackageManager(
-  repoPath: string,
-): 'pnpm' | 'yarn' | 'npm' {
+function detectPackageManager(repoPath: string): 'pnpm' | 'yarn' | 'npm' {
   if (existsSync(join(repoPath, 'pnpm-lock.yaml'))) {
     return 'pnpm';
   }
@@ -49,9 +53,7 @@ const packageJsonSchema = z
   })
   .loose();
 
-function getCorepackPm(
-  repoPath: string,
-): string | undefined {
+function getCorepackPm(repoPath: string): string | undefined {
   try {
     const pkgJsonPath = join(repoPath, 'package.json');
 
@@ -101,7 +103,11 @@ function quietFlag(pm: string): string {
   }
 }
 
-function installDeps(repoPath: string, alias: string, verbose: boolean): Promise<void> {
+function installDeps(
+  repoPath: string,
+  alias: string,
+  verbose: boolean,
+): Promise<void> {
   const corepackPm = getCorepackPm(repoPath);
   let command: string;
   let displayPm: string;
@@ -114,9 +120,7 @@ function installDeps(repoPath: string, alias: string, verbose: boolean): Promise
   } else {
     const pm = detectPackageManager(repoPath);
     displayPm = pm;
-    command = verbose
-      ? `${pm} install`
-      : `${pm} install ${quietFlag(pm)}`;
+    command = verbose ? `${pm} install` : `${pm} install ${quietFlag(pm)}`;
   }
 
   const mode = verbose ? '' : ', silent mode';
@@ -202,7 +206,10 @@ function hashFilePath(workspaceRoot: string, alias: string): string {
   return join(workspaceRoot, '.repos', `.${alias}.lock-hash`);
 }
 
-function readInstalledHash(workspaceRoot: string, alias: string): string | null {
+function readInstalledHash(
+  workspaceRoot: string,
+  alias: string,
+): string | null {
   const hashPath = hashFilePath(workspaceRoot, alias);
 
   if (!existsSync(hashPath)) {
@@ -216,11 +223,19 @@ function readInstalledHash(workspaceRoot: string, alias: string): string | null 
   }
 }
 
-function writeInstalledHash(workspaceRoot: string, alias: string, hash: string): void {
+function writeInstalledHash(
+  workspaceRoot: string,
+  alias: string,
+  hash: string,
+): void {
   writeFileSync(hashFilePath(workspaceRoot, alias), hash);
 }
 
-function needsInstall(repoPath: string, workspaceRoot: string, alias: string): boolean {
+function needsInstall(
+  repoPath: string,
+  workspaceRoot: string,
+  alias: string,
+): boolean {
   // If node_modules is missing (e.g., after git clean -fdx), always install
   // regardless of lockfile hash match.
   if (!existsSync(join(repoPath, 'node_modules'))) {
@@ -323,31 +338,59 @@ async function syncRepo(
         disableHooks: entry.disableHooks,
       });
       logger.info(`Done: ${entry.alias} cloned.`);
-      const installed = await tryInstallDeps(repoPath, entry.alias, verbose, workspaceRoot);
+      const installed = await tryInstallDeps(
+        repoPath,
+        entry.alias,
+        verbose,
+        workspaceRoot,
+      );
 
       if (installed) {
-        await preCacheGraph(repoPath, entry.alias, workspaceRoot, reposConfigHash);
+        await preCacheGraph(
+          repoPath,
+          entry.alias,
+          workspaceRoot,
+          reposConfigHash,
+        );
       }
 
       return { action: 'cloned', installFailed: !installed };
     }
 
-    if (entry.ref && await isGitTag(repoPath, entry.ref)) {
+    if (entry.ref && (await isGitTag(repoPath, entry.ref))) {
       logger.info(`Syncing ${entry.alias} to tag ${entry.ref}...`);
       await gitFetchTag(repoPath, entry.ref, entry.depth, entry.disableHooks);
       logger.info(`Done: ${entry.alias} synced to tag ${entry.ref}.`);
 
       if (needsInstall(repoPath, workspaceRoot, entry.alias)) {
-        const installed = await tryInstallDeps(repoPath, entry.alias, verbose, workspaceRoot);
+        const installed = await tryInstallDeps(
+          repoPath,
+          entry.alias,
+          verbose,
+          workspaceRoot,
+        );
 
         if (installed) {
-          await preCacheGraph(repoPath, entry.alias, workspaceRoot, reposConfigHash);
+          await preCacheGraph(
+            repoPath,
+            entry.alias,
+            workspaceRoot,
+            reposConfigHash,
+          );
         }
 
-        return { action: `synced to tag ${entry.ref}`, installFailed: !installed };
+        return {
+          action: `synced to tag ${entry.ref}`,
+          installFailed: !installed,
+        };
       }
 
-      await preCacheGraph(repoPath, entry.alias, workspaceRoot, reposConfigHash);
+      await preCacheGraph(
+        repoPath,
+        entry.alias,
+        workspaceRoot,
+        reposConfigHash,
+      );
 
       return { action: `synced to tag ${entry.ref}` };
     }
@@ -366,10 +409,20 @@ async function syncRepo(
     logger.info(`Done: ${entry.alias} updated.`);
 
     if (needsInstall(repoPath, workspaceRoot, entry.alias)) {
-      const installed = await tryInstallDeps(repoPath, entry.alias, verbose, workspaceRoot);
+      const installed = await tryInstallDeps(
+        repoPath,
+        entry.alias,
+        verbose,
+        workspaceRoot,
+      );
 
       if (installed) {
-        await preCacheGraph(repoPath, entry.alias, workspaceRoot, reposConfigHash);
+        await preCacheGraph(
+          repoPath,
+          entry.alias,
+          workspaceRoot,
+          reposConfigHash,
+        );
       }
 
       return { action: strategy ?? 'pull', installFailed: !installed };
@@ -395,10 +448,20 @@ async function syncRepo(
   logger.info(`Done: ${entry.alias} updated.`);
 
   if (needsInstall(entry.path, workspaceRoot, entry.alias)) {
-    const installed = await tryInstallDeps(entry.path, entry.alias, verbose, workspaceRoot);
+    const installed = await tryInstallDeps(
+      entry.path,
+      entry.alias,
+      verbose,
+      workspaceRoot,
+    );
 
     if (installed) {
-      await preCacheGraph(entry.path, entry.alias, workspaceRoot, reposConfigHash);
+      await preCacheGraph(
+        entry.path,
+        entry.alias,
+        workspaceRoot,
+        reposConfigHash,
+      );
     }
 
     return { action: strategy ?? 'pull', installFailed: !installed };
@@ -423,7 +486,11 @@ async function getDryRunAction(
     return 'would skip (path not found)';
   }
 
-  if (entry.type === 'remote' && entry.ref && await isGitTag(repoPath, entry.ref)) {
+  if (
+    entry.type === 'remote' &&
+    entry.ref &&
+    (await isGitTag(repoPath, entry.ref))
+  ) {
     return `would sync to tag ${entry.ref}`;
   }
 
@@ -450,16 +517,21 @@ async function executeDryRun(
 
   for (const entry of entries) {
     const state = detectRepoState(entry.alias, entry, workspaceRoot);
-    const repoPath = entry.type === 'remote'
-      ? join(workspaceRoot, '.repos', entry.alias)
-      : entry.path;
+    const repoPath =
+      entry.type === 'remote'
+        ? join(workspaceRoot, '.repos', entry.alias)
+        : entry.path;
     const action = await getDryRunAction(entry, state, strategy, repoPath);
     const warnings: string[] = [];
 
     if (state !== 'not-synced') {
       const treeState = await getWorkingTreeState(repoPath);
-      const total = treeState.modified + treeState.staged + treeState.deleted
-        + treeState.untracked + treeState.conflicts;
+      const total =
+        treeState.modified +
+        treeState.staged +
+        treeState.deleted +
+        treeState.untracked +
+        treeState.conflicts;
 
       if (total > 0) {
         warnings.push('[WARN: dirty, may fail]');
@@ -502,7 +574,9 @@ async function executeDryRun(
   }
 
   logger.info('');
-  logger.info(`Dry run: ${String(wouldSync)} would sync, ${String(wouldSkip)} would skip`);
+  logger.info(
+    `Dry run: ${String(wouldSync)} would sync, ${String(wouldSkip)} would skip`,
+  );
 
   return { success: true };
 }
@@ -522,7 +596,9 @@ export default async function syncExecutor(
   const reposConfigHash = hashObject(config.repos);
 
   const results = await Promise.allSettled(
-    entries.map((entry) => syncRepo(entry, context.root, strategy, verbose, reposConfigHash)),
+    entries.map((entry) =>
+      syncRepo(entry, context.root, strategy, verbose, reposConfigHash),
+    ),
   );
 
   let synced = 0;
@@ -557,9 +633,8 @@ export default async function syncExecutor(
     } else {
       failed++;
       const reason: unknown = result.reason;
-      const reasonMessage = reason instanceof Error
-        ? reason.message
-        : String(reason);
+      const reasonMessage =
+        reason instanceof Error ? reason.message : String(reason);
       logger.error(`Failed to sync ${entry.alias}: ${reasonMessage}`);
       tableRows.push([
         { value: entry.alias },

@@ -7,36 +7,36 @@ tags: [vitest, jest, e2e, nx-plugin, verdaccio]
 # Dependency graph
 requires: []
 provides:
-  - "Unified Vitest test runner for all projects (unit + e2e)"
-  - "Jest-free workspace"
+  - 'Unified Vitest test runner for all projects (unit + e2e)'
+  - 'Jest-free workspace'
 affects: []
 
 # Tech tracking
 tech-stack:
   added: []
   patterns:
-    - "Vitest globalSetup/globalTeardown for e2e local registry lifecycle"
-    - "createRequire(import.meta.url) for require.resolve in ESM test files"
+    - 'Vitest globalSetup/globalTeardown for e2e local registry lifecycle'
+    - 'createRequire(import.meta.url) for require.resolve in ESM test files'
 
 key-files:
   created:
-    - "packages/nx-openpolyrepo-e2e/vitest.config.mts"
+    - 'packages/nx-openpolyrepo-e2e/vitest.config.mts'
   modified:
-    - "packages/nx-openpolyrepo-e2e/package.json"
-    - "packages/nx-openpolyrepo-e2e/tsconfig.spec.json"
-    - "packages/nx-openpolyrepo-e2e/src/nx-openpolyrepo.spec.ts"
-    - "tools/scripts/start-local-registry.ts"
-    - "tools/scripts/stop-local-registry.ts"
-    - "nx.json"
-    - "package.json"
+    - 'packages/nx-openpolyrepo-e2e/package.json'
+    - 'packages/nx-openpolyrepo-e2e/tsconfig.spec.json'
+    - 'packages/nx-openpolyrepo-e2e/src/nx-openpolyrepo.spec.ts'
+    - 'tools/scripts/start-local-registry.ts'
+    - 'tools/scripts/stop-local-registry.ts'
+    - 'nx.json'
+    - 'package.json'
 
 key-decisions:
-  - "Used @nx/vitest:test executor instead of deprecated @nx/vite:test"
-  - "Used maxWorkers: 1 instead of deprecated poolOptions.forks.singleFork for Vitest 4"
-  - "Added hookTimeout: 300_000 alongside testTimeout for beforeAll/afterAll hooks"
+  - 'Used @nx/vitest:test executor instead of deprecated @nx/vite:test'
+  - 'Used maxWorkers: 1 instead of deprecated poolOptions.forks.singleFork for Vitest 4'
+  - 'Added hookTimeout: 300_000 alongside testTimeout for beforeAll/afterAll hooks'
 
 patterns-established:
-  - "E2e vitest config with 5-min test+hook timeouts, forks pool, single worker"
+  - 'E2e vitest config with 5-min test+hook timeouts, forks pool, single worker'
 
 requirements-completed: []
 
@@ -58,6 +58,7 @@ completed: 2026-03-10
 - **Files modified:** 10
 
 ## Accomplishments
+
 - E2e tests run and pass using Vitest via @nx/vitest:test executor
 - All Jest dependencies, config files, and plugin references removed from workspace
 - Unit tests unaffected and still passing (83 tests)
@@ -70,6 +71,7 @@ Each task was committed atomically:
 2. **Task 2: Remove all Jest tooling from the workspace** - `910512e` (chore)
 
 ## Files Created/Modified
+
 - `packages/nx-openpolyrepo-e2e/vitest.config.mts` - Vitest config with globalSetup/globalTeardown, 5-min timeouts, forks pool
 - `packages/nx-openpolyrepo-e2e/package.json` - Switched executor from @nx/jest:jest to @nx/vitest:test
 - `packages/nx-openpolyrepo-e2e/tsconfig.spec.json` - Updated types from jest to vitest/globals, removed CJS module settings
@@ -84,6 +86,7 @@ Each task was committed atomically:
 - `packages/nx-openpolyrepo-e2e/jest.config.cts` - Deleted (e2e Jest config)
 
 ## Decisions Made
+
 - Used `@nx/vitest:test` executor instead of `@nx/vite:test` which is deprecated and scheduled for removal in Nx 23
 - Used `maxWorkers: 1` as the Vitest 4 replacement for the removed `poolOptions.forks.singleFork` option
 - Added `hookTimeout: 300_000` in addition to `testTimeout` because Vitest has separate timeout defaults for hooks (10s) vs tests
@@ -95,6 +98,7 @@ Each task was committed atomically:
 ### Auto-fixed Issues
 
 **1. [Rule 1 - Bug] Added hookTimeout for beforeAll/afterAll**
+
 - **Found during:** Task 1 (Vitest config creation)
 - **Issue:** Vitest default hookTimeout is 10s, but beforeAll creates an Nx workspace which takes ~75s. Tests were skipped due to hook timeout.
 - **Fix:** Added `hookTimeout: 300_000` to vitest.config.mts
@@ -103,6 +107,7 @@ Each task was committed atomically:
 - **Committed in:** 408a344 (Task 1 commit)
 
 **2. [Rule 1 - Bug] Fixed deprecated poolOptions for Vitest 4**
+
 - **Found during:** Task 1 (Vitest config creation)
 - **Issue:** `test.poolOptions` was removed in Vitest 4. Using it caused a deprecation warning.
 - **Fix:** Replaced `poolOptions.forks.singleFork: true` with top-level `maxWorkers: 1`
@@ -111,6 +116,7 @@ Each task was committed atomically:
 - **Committed in:** 408a344 (Task 1 commit)
 
 **3. [Rule 1 - Bug] Used @nx/vitest:test instead of @nx/vite:test**
+
 - **Found during:** Task 1 (e2e target update)
 - **Issue:** Plan specified `@nx/vite:test` but this executor is deprecated in favor of `@nx/vitest:test`
 - **Fix:** Used `@nx/vitest:test` executor in package.json
@@ -124,12 +130,15 @@ Each task was committed atomically:
 **Impact on plan:** All auto-fixes necessary for correctness with Vitest 4 and current Nx version. No scope creep.
 
 ## Issues Encountered
+
 None beyond the auto-fixed deviations above.
 
 ## User Setup Required
+
 None - no external service configuration required.
 
 ## Next Phase Readiness
+
 - Workspace fully unified on Vitest for both unit and e2e tests
 - No Jest tooling remains to maintain or update
 
@@ -138,5 +147,6 @@ None - no external service configuration required.
 All created files exist, all deleted files confirmed removed, both task commits verified.
 
 ---
-*Phase: quick*
-*Completed: 2026-03-10*
+
+_Phase: quick_
+_Completed: 2026-03-10_

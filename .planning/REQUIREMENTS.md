@@ -43,36 +43,38 @@ Deferred to future releases. Tracked but not in current roadmap.
 
 ## Out of Scope
 
-| Feature | Reason |
-|---------|--------|
-| Make ALL edges static (including external-sourced) | Nx validates sourceFile against fileMap; `.repos/` is gitignored = not in fileMap. Would require Nx core changes. |
-| File-hash inputs instead of git-based runtime inputs | `.repos/` files excluded from Nx input hashing (gitignored). Git commands are the correct abstraction. |
-| Outputs declaration for proxy targets | Child Nx manages its own build artifact cache. Host cache stores terminal output + success flag only. |
-| Per-target runtime inputs | Child Nx already handles target-level caching. Compound git input at repo level is sufficient. |
-| Clear host cache on sync | Compound runtime input (HEAD + diff) handles invalidation organically. `nx reset` handles daemon bug. |
+| Feature                                              | Reason                                                                                                            |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Make ALL edges static (including external-sourced)   | Nx validates sourceFile against fileMap; `.repos/` is gitignored = not in fileMap. Would require Nx core changes. |
+| File-hash inputs instead of git-based runtime inputs | `.repos/` files excluded from Nx input hashing (gitignored). Git commands are the correct abstraction.            |
+| Outputs declaration for proxy targets                | Child Nx manages its own build artifact cache. Host cache stores terminal output + success flag only.             |
+| Per-target runtime inputs                            | Child Nx already handles target-level caching. Compound git input at repo level is sufficient.                    |
+| Clear host cache on sync                             | Compound runtime input (HEAD + diff) handles invalidation organically. `nx reset` handles daemon bug.             |
 
 ## Traceability
 
-| Requirement | Phase | Status |
-|-------------|-------|--------|
-| EXEC-01 | Phase 14 | Complete |
-| EXEC-02 | Phase 14 | Complete |
-| DETECT-01 | Phase 16 | Pending |
-| DETECT-02 | Phase 16 | Pending |
-| DETECT-03 | Phase 16 | Pending |
-| DETECT-04 | Phase 16 | Pending |
-| DETECT-05 | Phase 16 | Pending |
-| PROXY-01 | Phase 15 | Pending |
-| PROXY-02 | Phase 15 | Pending |
-| PROXY-03 | Phase 15 | Pending |
-| PROXY-04 | Phase 15 | Pending |
-| PROXY-05 | Phase 15 | Pending |
+| Requirement | Phase    | Status   |
+| ----------- | -------- | -------- |
+| EXEC-01     | Phase 14 | Complete |
+| EXEC-02     | Phase 14 | Complete |
+| DETECT-01   | Phase 16 | Pending  |
+| DETECT-02   | Phase 16 | Pending  |
+| DETECT-03   | Phase 16 | Pending  |
+| DETECT-04   | Phase 16 | Pending  |
+| DETECT-05   | Phase 16 | Pending  |
+| PROXY-01    | Phase 15 | Pending  |
+| PROXY-02    | Phase 15 | Pending  |
+| PROXY-03    | Phase 15 | Pending  |
+| PROXY-04    | Phase 15 | Pending  |
+| PROXY-05    | Phase 15 | Pending  |
 
 **Coverage:**
+
 - v1.2 requirements: 12 total
 - Mapped to phases: 12
 - Unmapped: 0
 
 ---
-*Requirements defined: 2026-03-22*
-*Last updated: 2026-03-22 after roadmap creation*
+
+_Requirements defined: 2026-03-22_
+_Last updated: 2026-03-22 after roadmap creation_

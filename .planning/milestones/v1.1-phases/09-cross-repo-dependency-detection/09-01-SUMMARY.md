@@ -1,6 +1,6 @@
 ---
 phase: 09-cross-repo-dependency-detection
-plan: "01"
+plan: '01'
 subsystem: graph
 tags: [nx, dependency-detection, package-json, cross-repo, graph-edges]
 
@@ -17,10 +17,10 @@ affects: [10-integration-and-e2e, createDependencies plugin hook]
 tech-stack:
   added: []
   patterns:
-    - "Lookup map (Map<string,string>) built in two passes: external nodes first (take precedence), host projects second"
+    - 'Lookup map (Map<string,string>) built in two passes: external nodes first (take precedence), host projects second'
     - "Repo membership sentinel '__host__' distinguishes host projects from namespaced external projects in cross-repo guard"
     - "Deduplication via Set<'source::target'> keys before appending to result array"
-    - "SIFERS test pattern: no beforeEach/afterEach, all setup inside local setup() functions per describe block"
+    - 'SIFERS test pattern: no beforeEach/afterEach, all setup inside local setup() functions per describe block'
 
 key-files:
   created:
@@ -29,15 +29,15 @@ key-files:
   modified: []
 
 key-decisions:
-  - "External TransformedNode.packageName wins over host project metadata.js.packageName on collision (external inserted first in map)"
-  - "All three dep fields (dependencies, devDependencies, peerDependencies) always emit DependencyType.static edges — dep type is inferred from presence in lookup map, not from dev/prod distinction"
-  - "Host projects read package.json from disk at detection time via readFileSync with silent try/catch (same approach as transform.ts)"
-  - "sourceFile is node.root + /package.json for external nodes (already .repos/<alias>/...), join(projectConfig.root, package.json) for host nodes"
+  - 'External TransformedNode.packageName wins over host project metadata.js.packageName on collision (external inserted first in map)'
+  - 'All three dep fields (dependencies, devDependencies, peerDependencies) always emit DependencyType.static edges — dep type is inferred from presence in lookup map, not from dev/prod distinction'
+  - 'Host projects read package.json from disk at detection time via readFileSync with silent try/catch (same approach as transform.ts)'
+  - 'sourceFile is node.root + /package.json for external nodes (already .repos/<alias>/...), join(projectConfig.root, package.json) for host nodes'
   - "Cross-repo guard uses repo alias prefix from namespaced project name (before first slash) and '__host__' sentinel for host projects"
 
 patterns-established:
-  - "extractRepoAlias(namespacedName): string | undefined — prefix before first slash in project name"
-  - "isRecord(value) guard pattern reused from transform.ts for safe unknown narrowing"
+  - 'extractRepoAlias(namespacedName): string | undefined — prefix before first slash in project name'
+  - 'isRecord(value) guard pattern reused from transform.ts for safe unknown narrowing'
 
 requirements-completed: [DETECT-01, DETECT-02, DETECT-03]
 

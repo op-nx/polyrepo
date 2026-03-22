@@ -101,13 +101,13 @@ export function buildNpmPackageNodes(builder: ProjectGraphBuilder) {
 
 ### npm externalNode properties
 
-| Property | Value | Example |
-|----------|-------|---------|
-| `type` | `'npm'` | `'npm'` |
-| `name` | `'npm:<packageName>'` | `'npm:lodash'` |
-| `data.version` | semver range from package.json | `'^4.17.21'` |
-| `data.packageName` | npm package name | `'lodash'` |
-| `data.hash` | `hashArray([name, version])` | `'12345678'` |
+| Property           | Value                          | Example        |
+| ------------------ | ------------------------------ | -------------- |
+| `type`             | `'npm'`                        | `'npm'`        |
+| `name`             | `'npm:<packageName>'`          | `'npm:lodash'` |
+| `data.version`     | semver range from package.json | `'^4.17.21'`   |
+| `data.packageName` | npm package name               | `'lodash'`     |
+| `data.hash`        | `hashArray([name, version])`   | `'12345678'`   |
 
 ### Naming convention
 
@@ -159,8 +159,8 @@ export interface ProjectGraph {
 
 ```typescript
 export interface CreateDependenciesContext {
-  readonly externalNodes: ProjectGraph['externalNodes'];  // <-- separate field
-  readonly projects: Record<string, ProjectConfiguration>;  // <-- project nodes only
+  readonly externalNodes: ProjectGraph['externalNodes']; // <-- separate field
+  readonly projects: Record<string, ProjectConfiguration>; // <-- project nodes only
   readonly nxJsonConfiguration: NxJsonConfiguration;
   readonly fileMap: FileMap;
   readonly filesToProcess: FileMap;
@@ -183,7 +183,7 @@ The `validateDependency` function calls `validateCommonDependencyRules` (lines 5
 ```typescript
 function validateCommonDependencyRules(
   d: RawProjectGraphDependency,
-  { externalNodes, projects, fileMap }: CreateDependenciesContext
+  { externalNodes, projects, fileMap }: CreateDependenciesContext,
 ) {
   // Source must exist as either project or external node
   if (!projects[d.source] && !externalNodes[d.source]) {
@@ -207,16 +207,17 @@ function validateCommonDependencyRules(
 
 ### Allowed edge directions
 
-| Source | Target | Allowed? | Notes |
-|--------|--------|----------|-------|
-| project node | project node | YES | Standard case |
-| project node | external node | YES | e.g., project -> npm:lodash |
-| external node | external node | YES | e.g., npm:react -> npm:react-dom |
-| external node | project node | **NO** | Throws "External projects can't depend on internal projects" |
+| Source        | Target        | Allowed? | Notes                                                        |
+| ------------- | ------------- | -------- | ------------------------------------------------------------ |
+| project node  | project node  | YES      | Standard case                                                |
+| project node  | external node | YES      | e.g., project -> npm:lodash                                  |
+| external node | external node | YES      | e.g., npm:react -> npm:react-dom                             |
+| external node | project node  | **NO**   | Throws "External projects can't depend on internal projects" |
 
 ### Additional constraints by dependency type
 
 **Static dependencies (lines 579-588):**
+
 ```typescript
 function validateStaticDependency(d, { projects }) {
   // internal nodes must provide sourceProjectFile
@@ -228,6 +229,7 @@ function validateStaticDependency(d, { projects }) {
 ```
 
 **Implicit dependencies (lines 555-561):**
+
 ```typescript
 function validateImplicitDependency(d, { externalNodes }) {
   if (externalNodes[d.source]) {
@@ -237,6 +239,7 @@ function validateImplicitDependency(d, { externalNodes }) {
 ```
 
 **Dynamic dependencies (lines 564-577):**
+
 ```typescript
 function validateDynamicDependency(d, { externalNodes }) {
   if (externalNodes[d.source]) {
@@ -247,15 +250,16 @@ function validateDynamicDependency(d, { externalNodes }) {
 
 ### Summary of dependency constraints on external nodes
 
-| Direction | Static | Dynamic | Implicit |
-|-----------|--------|---------|----------|
-| project -> external | YES (needs sourceFile) | YES (needs sourceFile) | YES |
-| external -> external | YES (no sourceFile needed) | NO | NO |
-| external -> project | NO (unconditional) | NO | NO |
+| Direction            | Static                     | Dynamic                | Implicit |
+| -------------------- | -------------------------- | ---------------------- | -------- |
+| project -> external  | YES (needs sourceFile)     | YES (needs sourceFile) | YES      |
+| external -> external | YES (no sourceFile needed) | NO                     | NO       |
+| external -> project  | NO (unconditional)         | NO                     | NO       |
 
 ### Answer for our use case
 
 **YES -- createDependencies can create edges FROM a project node TO an externalNode.** The validation explicitly checks `externalNodes[d.target]` as a valid target. However:
+
 - For static deps from a project, a `sourceFile` is required
 - Implicit deps are the simplest: just source (project) and target (externalNode)
 
@@ -354,6 +358,7 @@ When a regular project node has targets with file-based inputs (the default), th
 ### Answer: externalNodes COMPLETELY BYPASS the file map crash
 
 External nodes are hashed via `HashInstruction::External` which calls `hash_external`. This function:
+
 1. Looks up the node in `project_graph.external_nodes` (NOT project_file_map)
 2. Hashes using `node.hash` (if present) or `node.version` (fallback)
 3. Never touches the file map at all
@@ -376,7 +381,7 @@ The only code in Nx core that creates external nodes is `buildNpmPackageNodes` (
 export interface ProjectGraphExternalNode {
   type: string; // not app, e2e, or lib -- but ANY string is valid
   name: string;
-  data: { version: string; packageName: string; hash?: string; };
+  data: { version: string; packageName: string; hash?: string };
 }
 ```
 
@@ -404,6 +409,7 @@ I searched the Nx monorepo (`@nx/*` packages) and found no plugin that returns `
 ### Current approach (regular project nodes)
 
 Our plugin registers synced repo projects as regular `ProjectGraphProjectNode` entries via `CreateNodesResult.projects`. This means:
+
 - They appear in `context.projects` in `createDependencies`
 - They get targets, can be run via `nx run`
 - **Problem:** The native task hasher generates `HashInstruction::ProjectFileSet` for them, which calls `collect_project_files`, which crashes because `.repos/` is gitignored and has no file map entries
@@ -435,20 +441,20 @@ The code in `createDependencies` (our index.ts lines 161-172) works around this 
 
 ### Comparison matrix
 
-| Capability | Regular Project Node | External Node |
-|-----------|---------------------|---------------|
-| Has targets (runnable) | YES | NO |
-| Visible in `nx show projects` | YES | YES (with --type flag) |
-| Visible in `nx graph` UI | YES | YES (different rendering) |
-| Can be dependency target | YES | YES |
-| Can be dependency source | YES | YES (only static to other externals) |
-| Participates in task graph | YES | NO |
-| Needs file map entries | YES (for hashing) | NO |
-| Has project root | YES | NO |
-| Has tags | YES (via ProjectConfiguration) | NO |
-| Has metadata | YES | NO (only version, packageName, hash) |
-| Hash computation | File-based (expensive) | Version string (cheap) |
-| Cross-repo edge target | CRASHES (no file map) | WORKS |
+| Capability                    | Regular Project Node           | External Node                        |
+| ----------------------------- | ------------------------------ | ------------------------------------ |
+| Has targets (runnable)        | YES                            | NO                                   |
+| Visible in `nx show projects` | YES                            | YES (with --type flag)               |
+| Visible in `nx graph` UI      | YES                            | YES (different rendering)            |
+| Can be dependency target      | YES                            | YES                                  |
+| Can be dependency source      | YES                            | YES (only static to other externals) |
+| Participates in task graph    | YES                            | NO                                   |
+| Needs file map entries        | YES (for hashing)              | NO                                   |
+| Has project root              | YES                            | NO                                   |
+| Has tags                      | YES (via ProjectConfiguration) | NO                                   |
+| Has metadata                  | YES                            | NO (only version, packageName, hash) |
+| Hash computation              | File-based (expensive)         | Version string (cheap)               |
+| Cross-repo edge target        | CRASHES (no file map)          | WORKS                                |
 
 ### Hybrid approach (recommended)
 
@@ -487,10 +493,15 @@ Then in `createDependencies`, cross-repo edges would target `repo:alias/project`
 // Instead of:
 dependencies.push({ source: 'my-app', target: 'alias/lib', type: 'implicit' });
 // Use:
-dependencies.push({ source: 'my-app', target: 'repo:alias/lib', type: 'implicit' });
+dependencies.push({
+  source: 'my-app',
+  target: 'repo:alias/lib',
+  type: 'implicit',
+});
 ```
 
 #### Pros of hybrid approach
+
 - Cross-repo edges actually work (target the external node, not the project node)
 - External projects remain runnable via `nx run alias/project:build`
 - Tags, metadata, and project configuration preserved
@@ -498,6 +509,7 @@ dependencies.push({ source: 'my-app', target: 'repo:alias/lib', type: 'implicit'
 - Hash is based on commit/content hash of the synced repo (semantically correct)
 
 #### Cons of hybrid approach
+
 - Two representations per external project (duplication)
 - `nx graph` shows both the project node and external node
 - Edge semantics change: "my-app depends on repo:alias/lib" vs "my-app depends on alias/lib"
@@ -507,6 +519,7 @@ dependencies.push({ source: 'my-app', target: 'repo:alias/lib', type: 'implicit'
 ### Alternative: Fix the root cause (empty file map entries)
 
 Instead of using external nodes, inject empty file map entries for external projects. This would require:
+
 1. Ensuring `.repos/` files are tracked by Nx's workspace file watcher (difficult -- .gitignore controls this)
 2. Or patching the native hasher to treat missing file map entries as empty rather than erroring
 
@@ -533,6 +546,7 @@ The `dependsOn` omission in proxy targets (transform.ts line 17-20) already prev
 ### Naming convention for custom external nodes
 
 Use `repo:` prefix to distinguish from `npm:` nodes:
+
 - `repo:alias/project-name` for cross-repo dependency targets
 - Matches the existing `npm:package-name` convention
 
@@ -555,6 +569,7 @@ Use the external repo's content hash (from our graph report) as the `hash` field
 ### Implementation complexity
 
 **LOW.** The change is entirely within our plugin:
+
 1. Add `externalNodes` to `CreateNodesResult` alongside existing `projects` (index.ts)
 2. Change cross-repo edge targets in `createDependencies` from project names to external node names
 3. Remove the `fileMap` guard that currently drops all cross-repo edges
@@ -562,30 +577,30 @@ Use the external repo's content hash (from our graph report) as the `hash` field
 
 ### Risk assessment
 
-| Risk | Severity | Mitigation |
-|------|----------|------------|
-| Nx graph UI shows duplicate entries | LOW | External nodes render differently; acceptable UX |
-| Edge semantics confuse users | LOW | Document that cross-repo deps use `repo:` prefix |
-| Future Nx versions change external node handling | MEDIUM | Pin to Nx 22.x behavior; monitor changelogs |
-| `externalNodes` in CreateNodesResult is under-tested | MEDIUM | It's a public API with types but few first-party users; test thoroughly |
-| External node name collisions with npm nodes | LOW | `repo:` prefix avoids `npm:` collision |
+| Risk                                                 | Severity | Mitigation                                                              |
+| ---------------------------------------------------- | -------- | ----------------------------------------------------------------------- |
+| Nx graph UI shows duplicate entries                  | LOW      | External nodes render differently; acceptable UX                        |
+| Edge semantics confuse users                         | LOW      | Document that cross-repo deps use `repo:` prefix                        |
+| Future Nx versions change external node handling     | MEDIUM   | Pin to Nx 22.x behavior; monitor changelogs                             |
+| `externalNodes` in CreateNodesResult is under-tested | MEDIUM   | It's a public API with types but few first-party users; test thoroughly |
+| External node name collisions with npm nodes         | LOW      | `repo:` prefix avoids `npm:` collision                                  |
 
 ---
 
 ## Source Files Referenced
 
-| File | Lines | What |
-|------|-------|------|
-| `packages/nx/src/project-graph/plugins/public-api.ts` | 33-43, 57-84 | CreateNodesResult, CreateDependenciesContext |
-| `packages/nx/src/config/project-graph.ts` | 67-72, 95-136 | ProjectGraph, ProjectGraphExternalNode |
-| `packages/nx/src/project-graph/project-graph-builder.ts` | 111-123, 506-588 | addExternalNode, validateDependency |
-| `packages/nx/src/project-graph/utils/project-configuration-utils.ts` | 516-634 | mergeCreateNodesResults |
-| `packages/nx/src/project-graph/build-project-graph.ts` | 87-194, 220-283 | buildProjectGraphUsingProjectFileMap |
-| `packages/nx/src/plugins/js/project-graph/build-nodes/build-npm-package-nodes.ts` | 10-32 | npm external node creation |
-| `packages/nx/src/native/tasks/hash_planner.rs` | 149-358 | Hash plan generation, dependency traversal |
-| `packages/nx/src/native/tasks/task_hasher.rs` | 309-466 | Hash plan execution |
-| `packages/nx/src/native/tasks/hashers/hash_external.rs` | 9-31 | External node hashing (no file map) |
-| `packages/nx/src/native/tasks/hashers/hash_project_files.rs` | 44-66 | Project file hashing (CRASH SITE) |
-| `packages/nx/src/native/project_graph/types.rs` | 1-36 | Rust ProjectGraph, ExternalNode types |
-| `packages/nx/src/native/transform-objects.ts` | 9-63 | JS -> Rust graph transformation |
-| `packages/nx/src/command-line/graph/graph.ts` | 1470-1501 | nx graph --print JSON output |
+| File                                                                              | Lines            | What                                         |
+| --------------------------------------------------------------------------------- | ---------------- | -------------------------------------------- |
+| `packages/nx/src/project-graph/plugins/public-api.ts`                             | 33-43, 57-84     | CreateNodesResult, CreateDependenciesContext |
+| `packages/nx/src/config/project-graph.ts`                                         | 67-72, 95-136    | ProjectGraph, ProjectGraphExternalNode       |
+| `packages/nx/src/project-graph/project-graph-builder.ts`                          | 111-123, 506-588 | addExternalNode, validateDependency          |
+| `packages/nx/src/project-graph/utils/project-configuration-utils.ts`              | 516-634          | mergeCreateNodesResults                      |
+| `packages/nx/src/project-graph/build-project-graph.ts`                            | 87-194, 220-283  | buildProjectGraphUsingProjectFileMap         |
+| `packages/nx/src/plugins/js/project-graph/build-nodes/build-npm-package-nodes.ts` | 10-32            | npm external node creation                   |
+| `packages/nx/src/native/tasks/hash_planner.rs`                                    | 149-358          | Hash plan generation, dependency traversal   |
+| `packages/nx/src/native/tasks/task_hasher.rs`                                     | 309-466          | Hash plan execution                          |
+| `packages/nx/src/native/tasks/hashers/hash_external.rs`                           | 9-31             | External node hashing (no file map)          |
+| `packages/nx/src/native/tasks/hashers/hash_project_files.rs`                      | 44-66            | Project file hashing (CRASH SITE)            |
+| `packages/nx/src/native/project_graph/types.rs`                                   | 1-36             | Rust ProjectGraph, ExternalNode types        |
+| `packages/nx/src/native/transform-objects.ts`                                     | 9-63             | JS -> Rust graph transformation              |
+| `packages/nx/src/command-line/graph/graph.ts`                                     | 1470-1501        | nx graph --print JSON output                 |
